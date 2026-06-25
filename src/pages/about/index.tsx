@@ -6,12 +6,9 @@ import { appConfigDir, appLocalDataDir } from '@tauri-apps/api/path';
 import { version } from '../../../package.json';
 import Page from '@/components/page';
 import MoegirlLink from '@/components/MoegirlLink';
+import ExternalLink from '@/components/ExternalLink';
 import AboutItem from './AboutItem';
 import avatar from '@/assets/BearBin.jpg';
-
-const handleOpenUrl = (url: string) => {
-  openUrl(url);
-};
 
 export default function About() {
   const { message, modal } = App.useApp();
@@ -73,9 +70,9 @@ export default function About() {
         <Card>
           <div className='flex flex-col gap-4'>
             <AboutItem icon={<GithubOutlined />} label='GitHub 仓库'>
-              <Typography.Link onClick={() => handleOpenUrl('https://github.com/BearBin1215/mgp-vn-tool')}>
+              <ExternalLink href='https://github.com/BearBin1215/mgp-vn-tool'>
                 BearBin1215/mgp-vn-tool
-              </Typography.Link>
+              </ExternalLink>
             </AboutItem>
             <AboutItem icon={<UserOutlined />} label='作者'>
               <MoegirlLink title='User:BearBin'>
@@ -105,9 +102,9 @@ export default function About() {
             </AboutItem>
             <AboutItem icon={<ToolOutlined />} label='技术栈'>
               <Space separator='+' size={5}>
-                <Typography.Link onClick={() => handleOpenUrl('https://tauri.app')}>Tauri v2</Typography.Link>
-                <Typography.Link onClick={() => handleOpenUrl('https://react.dev')}>React 19</Typography.Link>
-                <Typography.Link onClick={() => handleOpenUrl('https://www.typescriptlang.org')}>TypeScript</Typography.Link>
+                <ExternalLink href='https://tauri.app'>Tauri v2</ExternalLink>
+                <ExternalLink href='https://react.dev'>React 19</ExternalLink>
+                <ExternalLink href='https://www.typescriptlang.org'>TypeScript</ExternalLink>
               </Space>
             </AboutItem>
           </div>
@@ -117,15 +114,15 @@ export default function About() {
           <div className='flex flex-col gap-4'>
             <AboutItem icon={<EditOutlined />} label='参与完善'>
               <Space separator={<span className='text-(--ant-color-text-tertiary)'>•</span>}>
-                <Typography.Link onClick={() => handleOpenUrl('https://github.com/BearBin1215/mgp-vn-tool/pulls')}>Pull request</Typography.Link>
-                <Typography.Link onClick={() => handleOpenUrl('https://github.com/BearBin1215/mgp-vn-tool/blob/main/CONTRIBUTING.md')}>贡献指南</Typography.Link>
+                <ExternalLink href='https://github.com/BearBin1215/mgp-vn-tool/pulls'>Pull request</ExternalLink>
+                <ExternalLink href='https://github.com/BearBin1215/mgp-vn-tool/blob/main/CONTRIBUTING.md'>贡献指南</ExternalLink>
               </Space>
             </AboutItem>
             <AboutItem icon={<CommentOutlined />} label='提出建议'>
               <Space separator={<span className='text-(--ant-color-text-tertiary)'>•</span>}>
-                <Typography.Link onClick={() => handleOpenUrl('https://github.com/BearBin1215/mgp-vn-tool/issues')}>GitHub Issues</Typography.Link>
+                <ExternalLink href='https://github.com/BearBin1215/mgp-vn-tool/issues'>GitHub Issues</ExternalLink>
                 <MoegirlLink title='User_talk:BearBin'>站内讨论页</MoegirlLink>
-                <Typography.Link onClick={() => handleOpenUrl('https://qm.qq.com/q/SfoxZeUIoY')}>视研会QQ群</Typography.Link>
+                <ExternalLink href='https://qm.qq.com/q/SfoxZeUIoY'>视研会QQ群</ExternalLink>
               </Space>
             </AboutItem>
             <AboutItem icon={<FolderOpenOutlined />} label='本地存储目录'>

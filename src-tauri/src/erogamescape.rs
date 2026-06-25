@@ -37,7 +37,7 @@ fn read_settings(app: &tauri::AppHandle) -> Result<ErogamescapeSettings, String>
         .get("erogamescapeTimeout")
         .and_then(|v| v.as_f64())
         .map(|v| v as u64)
-        .unwrap_or(20);
+        .unwrap_or(30);
 
     Ok(ErogamescapeSettings {
         url,

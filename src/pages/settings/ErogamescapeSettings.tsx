@@ -1,6 +1,6 @@
 import { Card, Input, InputNumber, Select, Button, Typography, Space, Modal, Tooltip, App } from 'antd';
 import type { ButtonProps } from 'antd';
-import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -70,7 +70,19 @@ export default function ErogamescapeSettings() {
     <>
       <Card title='批评空间'>
         <div className='flex flex-col gap-4'>
-          <SettingItem label='访问地址' description='批评空间（erogamescape）访问地址'>
+          <SettingItem
+            label={
+              <span className='inline-flex items-center gap-1'>
+                访问地址
+                <Tooltip
+                  title={<span>批评空间<b>通常</b>需要日本IP或家宽；镜像站仅限国内访问</span>}
+                >
+                  <QuestionCircleOutlined className='text-(--ant-color-text-tertiary) cursor-help' />
+                </Tooltip>
+              </span>
+            }
+            description='批评空间（erogamescape）访问地址'
+          >
             <Space>
               <Tooltip title='检测连通性'>
                 <Button
@@ -93,7 +105,17 @@ export default function ErogamescapeSettings() {
               />
             </Space>
           </SettingItem>
-          <SettingItem label='请求超时' description='判定连接超时的时长'>
+          <SettingItem
+            label={
+              <span className='inline-flex items-center gap-1'>
+                请求超时
+                <Tooltip title='通常批评空间请求超过30s就会报502'>
+                  <QuestionCircleOutlined className='text-(--ant-color-text-tertiary) cursor-help' />
+                </Tooltip>
+              </span>
+            }
+            description='判定连接超时的时长'
+          >
             <InputNumber
               className='w-60!'
               min={0.1}

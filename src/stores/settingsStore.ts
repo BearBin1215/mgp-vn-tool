@@ -228,7 +228,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     await store.save();
     set({ erogamescapePassword: password });
   },
-  erogamescapeTimeout: 20,
+  erogamescapeTimeout: 30,
   setErogamescapeTimeout: async (seconds) => {
     const store = await storePromise;
     await store.set('erogamescapeTimeout', seconds);

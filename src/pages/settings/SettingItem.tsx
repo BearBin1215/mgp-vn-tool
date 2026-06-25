@@ -3,7 +3,7 @@ import { Typography } from 'antd';
 
 interface SettingItemProps {
   /** 设置名称 */
-  label: string;
+  label: ReactNode;
   /** 设置描述 */
   description?: string;
   /** 右侧自定义内容 */

@@ -32,7 +32,11 @@ export default function MoegirlLink({ title, params, children, red, className }:
 
   return (
     <Typography.Link
-      onClick={() => openUrl(url)}
+      href={url}
+      onClick={(e) => {
+        e.preventDefault();
+        openUrl(url);
+      }}
       className={className ?? 'text-[length:inherit]!'}
       style={red ? { color: '#d73333' } : undefined}
     >
