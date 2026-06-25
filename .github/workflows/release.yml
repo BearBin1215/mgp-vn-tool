@@ -1,0 +1,61 @@
+name: '自动构建并发布'
+
+on:
+  push:
+    branches:
+      - release
+
+# 微调自 Tauri 官方文档的示例，代码合并到 release 分支时自动构建并发布应用。
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest' # macOS ARM64 架构
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-latest' # macOS Intel 64位架构
+            args: '--target x86_64-apple-darwin'
+          - platform: 'ubuntu-22.04' # Ubuntu
+            args: ''
+          - platform: 'windows-latest' # Windows
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: true
+
+      - uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'v__VERSION__'
+          releaseBody: 'See the assets to download this version and install.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
