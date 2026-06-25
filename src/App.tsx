@@ -1,39 +1,53 @@
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { BrowserRouter, Routes, Route } from 'react-router';
+import { ConfigProvider, App as AntApp, theme } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
+import Layout from '@/components/layout';
+import KeepAlive from '@/components/KeepAlive';
+import { routes } from '@/routes';
+import { useSettingsStore } from '@/stores/settingsStore';
+import './App.css';
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+const keepAliveRoutes = routes.map((r) => ({ path: r.path, element: <r.component />, keepAlive: r.keepAlive }));
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+export default function App() {
+  const colorMode = useSettingsStore((s) => s.colorMode);
+  const uiFont = useSettingsStore((s) => s.uiFont);
+  const codeFont = useSettingsStore((s) => s.codeFont);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        algorithm: colorMode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        token: {
+          fontFamily: uiFont || undefined,
+          fontFamilyCode: codeFont || undefined,
+        },
+        components: {
+          Card: {
+            paddingLG: 16,
+          },
+        },
+        cssVar: {},
+      }}
+      modal={{ centered: true }}
+    >
+      <AntApp>
+        <BrowserRouter>
+          <Routes>
+            <Route path='/' element={<Layout />}>
+              <Route
+                index
+                element={<KeepAlive routes={keepAliveRoutes} />}
+              />
+              <Route
+                path='*'
+                element={<KeepAlive routes={keepAliveRoutes} />}
+              />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AntApp>
+    </ConfigProvider>
   );
 }
-
-export default App;

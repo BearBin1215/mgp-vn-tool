@@ -1,14 +1,50 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+mod erogamescape;
+mod feishu;
+mod moegirl;
+mod settings;
 
+use tauri::window::Color;
+use tauri::Manager;
+
+/// 启动 Tauri 应用，注册插件和命令
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(tauri_plugin_log::log::LevelFilter::Info)
+                .build(),
+        )
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            moegirl::moegirl_request,
+            moegirl::moegirl_check_login,
+            moegirl::moegirl_logout,
+            feishu::feishu_fetch_sheet,
+            erogamescape::check_connectivity,
+            erogamescape::query_creator_works,
+            erogamescape::search_creators,
+        ])
+        .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+
+            // 根据颜色主题设置窗口主题和 webview 背景色，减少闪屏
+            if let Some(color_mode) = settings::get_string(&app.handle(), "colorMode") {
+                let (theme, bg_color) = match color_mode.as_str() {
+                    "dark" => (Some(tauri::Theme::Dark), Some(Color(0, 0, 0, 255))),
+                    "light" => (Some(tauri::Theme::Light), Some(Color(255, 255, 255, 255))),
+                    _ => return Ok(()),
+                };
+                let _ = window.set_theme(theme);
+                let _ = window.set_background_color(bg_color);
+            }
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Tauri 应用启动失败");
 }

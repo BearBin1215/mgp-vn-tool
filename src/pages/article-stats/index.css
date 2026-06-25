@@ -1,0 +1,5 @@
+.article-stats-table {
+  .ant-table-container {
+    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border-secondary);
+  }
+}
