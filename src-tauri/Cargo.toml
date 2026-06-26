@@ -1,6 +1,6 @@
 [package]
 name = "mgp-vn-tool"
-version = "0.1.0"
+version = "0.1.1"
 description = "萌百视研会条目工具"
 edition = "2021"
 

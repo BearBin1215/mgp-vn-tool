@@ -2,7 +2,7 @@
   "name": "mgp-vn-tool",
   "description": "萌百视觉小说研究会条目工具",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "scripts": {
