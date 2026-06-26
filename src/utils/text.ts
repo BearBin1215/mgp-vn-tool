@@ -15,6 +15,40 @@ export const kataToHira = (text: string) => {
   );
 };
 
+/**
+ * 生成 `{{日本人名}}` 模板文本
+ *
+ * 批评空间返回的假名（片假名）不带空格，无法直接区分姓与名的读音。
+ * 当声优名为「汉字姓＋假名名」时（如「天季ひより」，假名「アマキヒヨリ」），
+ * 可据名字中最后一个汉字的位置切出假名尾缀（名的书写形式），再从假名中剥离出姓的读音，
+ * 生成 `{{日本人名|天季|あまき|ひより}}`；其余情况退化为 `{{日本人名|姓名|假名}}`。
+ */
+export const buildJapaneseNameTemplate = (name: string, furigana: string) => {
+  const hira = kataToHira(furigana);
+
+  // 名字中最后一个汉字的位置，其后即为假名尾缀（名的书写形式）
+  let lastKanjiIdx = -1;
+  for (let i = 0; i < name.length; i++) {
+    // 汉字正则判断
+    if (/[々-〇㐀-鿿]/.test(name[i]!)) {
+      lastKanjiIdx = i;
+    }
+  }
+
+  if (lastKanjiIdx !== -1 && lastKanjiIdx < name.length - 1) {
+    const surnameKanji = name.slice(0, lastKanjiIdx + 1);
+    const givenKana = kataToHira(name.slice(lastKanjiIdx + 1));
+    // 假名尾缀需非空、且为完整假名的后缀，同时姓的读音非空
+    if (givenKana && hira.endsWith(givenKana) && hira.length > givenKana.length) {
+      const surnameReading = hira.slice(0, hira.length - givenKana.length);
+      return `{{日本人名|${surnameKanji}|${surnameReading}|${givenKana}}}`;
+    }
+  }
+
+  // 不满足汉字姓+假名名，使用最基础的 {{日本人名|姓名|假名}} 自行修改
+  return `{{日本人名|${name}|${hira}}}`;
+};
+
 /** 如果文本包含假名则包装为 {{lj|...}} 模板，同时统一全角标点 */
 export const wrapLj = (text: string) => {
   const normalized = normalizePunctuation(text);
