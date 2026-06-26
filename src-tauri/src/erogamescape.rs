@@ -260,10 +260,11 @@ pub async fn query_creator_works(app: tauri::AppHandle, creator_id: u64) -> Resu
 
 async fn do_query_creator_works(app: &tauri::AppHandle, creator_id: u64) -> Result<Value, String> {
     // 查询创作者信息及参与作品
+    // game_id 仅后端内部使用，用于追加 Fan Disk/追加篇/重制版 关联查询，不输出到前端 GameRecord
     let sql = format!(
         "SELECT c.name, c.furigana, c.url, c.twitter_username, c.blog, c.blog_title, c.pixiv, \
          s.shubetu, s.shubetu_detail, s.shubetu_detail_name, \
-         g.gamename, g.sellday, g.model \
+         g.id AS game_id, g.gamename, g.sellday, g.model \
          FROM createrlist c \
          LEFT JOIN shokushu s ON c.id = s.creater \
          LEFT JOIN gamelist g ON s.game = g.id \
@@ -312,12 +313,23 @@ async fn do_query_creator_works(app: &tauri::AppHandle, creator_id: u64) -> Resu
 
     // 提取参与作品
     let shubetu_idx = col_idx.get("shubetu").copied().unwrap_or(0);
+    let game_id_idx = col_idx.get("game_id").copied();
     let mut acting_rows = Vec::new();
     let mut music_rows = Vec::new();
+    // 收集本次结果集中的游戏 ID（去重），用于追加 Fan Disk/追加篇/重制版 关联查询
+    let mut game_ids: Vec<String> = Vec::new();
+    let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for row in &rows {
         if row.get(shubetu_idx).map(|s| s.as_str()) == Some("") {
             continue;
+        }
+
+        // 收集非空游戏 ID（去重）
+        if let Some(id) = game_id_idx.and_then(|idx| row.get(idx)) {
+            if !id.is_empty() && seen_ids.insert(id.clone()) {
+                game_ids.push(id.clone());
+            }
         }
 
         // 直接从 col_idx 查找字段，避免每行构建临时 HashMap
@@ -344,11 +356,79 @@ async fn do_query_creator_works(app: &tauri::AppHandle, creator_id: u64) -> Resu
         }
     }
 
+    // 查询 Fan Disk/追加篇/重制版 关联（subject=衍生作品，object=原作）
+    let game_connections = query_game_connections(app, &game_ids).await;
+
     Ok(serde_json::json!({
         "acting": acting_rows,
         "music": music_rows,
         "creatorInfo": creator_info,
+        "gameConnections": game_connections,
     }))
+}
+
+/// 查询给定游戏 ID 列表的 Fan Disk / 追加篇 / 重制版 关联
+///
+/// 关联方向：subject=衍生作品，object=原作。返回 `[{ kind, subjectGameName, objectGameName }]`。
+/// 查询失败时记录日志并返回空数组，不阻断主流程。
+///
+/// ~~太伟大了批评空间，你怎么连这都有啊~~
+async fn query_game_connections(app: &tauri::AppHandle, game_ids: &[String]) -> Vec<Value> {
+    if game_ids.is_empty() {
+        return Vec::new();
+    }
+
+    let ids_list = game_ids
+        .iter()
+        .map(|id| id.parse::<u64>().unwrap_or(0).to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "SELECT c.kind, g1.gamename AS subject_name, g2.gamename AS object_name \
+         FROM connection_between_lists_of_games c \
+         JOIN gamelist g1 ON c.game_subject = g1.id \
+         JOIN gamelist g2 ON c.game_object = g2.id \
+         WHERE c.kind IN ('fandisk','apend','remake') AND c.game_subject IN ({ids_list});"
+    );
+
+    let result = async {
+        let (status, html) = post_sql(app, &sql).await?;
+        check_status(status)?;
+        let (columns, rows) = parse_result_table(&html)?;
+        let col_idx: HashMap<String, usize> = columns
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.clone(), i))
+            .collect();
+
+        let kind_idx = col_idx.get("kind").copied();
+        let subject_idx = col_idx.get("subject_name").copied();
+        let object_idx = col_idx.get("object_name").copied();
+
+        let connections: Vec<Value> = rows
+            .iter()
+            .filter_map(|row| {
+                let kind = kind_idx.and_then(|i| row.get(i))?;
+                let subject = subject_idx.and_then(|i| row.get(i))?;
+                let object = object_idx.and_then(|i| row.get(i))?;
+                Some(serde_json::json!({
+                    "kind": kind,
+                    "subjectGameName": subject,
+                    "objectGameName": object,
+                }))
+            })
+            .collect();
+        Ok::<Vec<Value>, String>(connections)
+    }
+    .await;
+
+    match result {
+        Ok(conns) => conns,
+        Err(e) => {
+            log::warn!("游戏关联查询失败，跳过管道内链生成: {e}");
+            Vec::new()
+        }
+    }
 }
 
 /// 按名称搜索创作者，返回匹配的 id 和 name 列表

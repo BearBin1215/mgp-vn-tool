@@ -14,11 +14,11 @@ import {
 } from '@/stores/articleStore';
 import { queryCreatorWorks, searchCreators } from '@/api/erogamescape';
 import TemplateLinkModal from './TemplateLinkModal';
-import type { GameRecord } from '@/lib/types';
-import { shokushuDetailLabels } from '@/lib/erogamescapeDict';
+import type { GameConnection, GameConnectionKind, GameRecord } from '@/lib/types';
+import { shokushuDetailLabels, gameConnectionKindLabels } from '@/lib/erogamescapeDict';
 import { PENDING_SELL_DATE } from '@/utils/constants';
 import { normalizePunctuation, buildJapaneseNameTemplate, isNumeric, generateExternalLinksWikitext } from '@/utils/text';
-import { generateCVWikitext, generateMusicWikitable } from './generateWikitext';
+import { generateCVWikitext, generateMusicWikitable, buildConnectionsMap } from './generateWikitext';
 
 function CopyButton({ text }: { text: string }) {
   const { message } = App.useApp();
@@ -85,6 +85,20 @@ const musicColumns: TableColumnsType<TableGameRecord> = [
   { title: '发售日期', dataIndex: 'sellDay', key: 'sellDay', width: 120 },
 ];
 
+type TableGameConnection = GameConnection & { key: string };
+
+const connectionColumns: TableColumnsType<TableGameConnection> = [
+  {
+    title: '类型',
+    dataIndex: 'kind',
+    key: 'kind',
+    width: 80,
+    render: (value: GameConnectionKind) => gameConnectionKindLabels[value],
+  },
+  { title: '衍生作品', dataIndex: 'subjectGameName', key: 'subjectGameName' },
+  { title: '原作', dataIndex: 'objectGameName', key: 'objectGameName' },
+];
+
 interface CreatorOption {
   value: string;
   label: React.ReactNode;
@@ -142,8 +156,14 @@ export default function CvGenerator() {
   const [acting, setActing] = useState<GameRecord[]>([]);
   // 音乐作品数据
   const [music, setMusic] = useState<GameRecord[]>([]);
+  // 游戏关联数据
+  const [connections, setConnections] = useState<GameConnection[]>([]);
   const actingTableData = useMemo(() => toTableData(acting), [acting]);
   const musicTableData = useMemo(() => toTableData(music), [music]);
+  const connectionsTableData = useMemo(
+    () => connections.map((c, i) => ({ ...c, key: String(i) })),
+    [connections],
+  );
   // 生成的代码
   const [wikitext, setWikitext] = useState('');
   // 代码生成中状态
@@ -216,6 +236,7 @@ export default function CvGenerator() {
     // 清空已有数据
     setActing([]);
     setMusic([]);
+    setConnections([]);
     setWikitext('');
 
     setGenerating(true);
@@ -223,6 +244,7 @@ export default function CvGenerator() {
       const result = await queryCreatorWorks(Number(id));
       setActing(result.acting);
       setMusic(result.music);
+      setConnections(result.gameConnections);
       if (result.acting.length === 0 && result.music.length === 0) {
         message.info('未查询到数据');
         return;
@@ -268,6 +290,7 @@ export default function CvGenerator() {
       }
 
       const { creatorInfo } = result;
+      const connectionsMap = buildConnectionsMap(result.gameConnections);
       const nameWithFurigana = creatorInfo.furigana
         ? buildJapaneseNameTemplate(creatorInfo.name, creatorInfo.furigana)
         : creatorInfo.name;
@@ -293,10 +316,10 @@ export default function CvGenerator() {
         "主要角色以'''粗体'''显示。",
         '',
         '=== 游戏 ===',
-        generateCVWikitext(result.acting, gameArticleMap, pageInfoMap),
+        generateCVWikitext(result.acting, gameArticleMap, pageInfoMap, connectionsMap),
       );
 
-      const musicText = generateMusicWikitable(result.music, gameArticleMap);
+      const musicText = generateMusicWikitable(result.music, gameArticleMap, connectionsMap);
       if (musicText) {
         sections.push('== 音乐作品 ==', musicText);
       }
@@ -454,6 +477,17 @@ export default function CvGenerator() {
                   <Table
                     columns={musicColumns}
                     dataSource={musicTableData}
+                    size='small'
+                    pagination={false}
+                  />
+                </>
+              )}
+              {connections.length > 0 && (
+                <>
+                  <Typography.Text strong>作品关联</Typography.Text>
+                  <Table
+                    columns={connectionColumns}
+                    dataSource={connectionsTableData}
                     size='small'
                     pagination={false}
                   />

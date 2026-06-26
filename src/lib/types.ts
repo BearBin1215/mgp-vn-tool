@@ -49,6 +49,19 @@ export interface CreatorInfo {
   pixiv: string;
 }
 
+/** 游戏关联类型：fandisk=Fan Disk / apend=追加篇 / remake=重制版 */
+export type GameConnectionKind = 'fandisk' | 'apend' | 'remake';
+
+/** 游戏关联（Fan Disk / 追加篇 / 重制版）关系 */
+export interface GameConnection {
+  /** 关联类型 */
+  kind: GameConnectionKind;
+  /** 关联主体游戏名（衍生作品） */
+  subjectGameName: string;
+  /** 关联客体游戏名（原作） */
+  objectGameName: string;
+}
+
 /** 声优作品查询结果 */
 export interface QueryResult {
   /** 出演角色 */
@@ -57,4 +70,6 @@ export interface QueryResult {
   music: GameRecord[];
   /** 创作者信息 */
   creatorInfo: CreatorInfo;
+  /** Fan Disk / 追加篇 / 重制版关联列表 */
+  gameConnections: GameConnection[];
 }
