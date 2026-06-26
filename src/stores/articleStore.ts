@@ -1,11 +1,10 @@
 import { create } from 'zustand';
-import { Store } from '@tauri-apps/plugin-store';
-import { appConfigDir, join } from '@tauri-apps/api/path';
 import dayjs from 'dayjs';
 import feishu from '@/api/feishu';
 import moegirl from '@/api/moegirl';
 import { useMoegirlStore } from './moegirlStore';
 import { ApiParams } from '@/lib/types';
+import { loadConfigStore } from '@/lib/configStore';
 
 /** 条目数据 */
 export interface Article {
@@ -43,14 +42,8 @@ interface ArticleStore {
   fetchPageData: () => Promise<void>;
 }
 
-/** 获取用户配置目录下的 articles.json 路径 */
-const getStorePath = async (): Promise<string> => {
-  const configDir = await appConfigDir();
-  return await join(configDir, 'articles.json');
-};
-
-/** Tauri store 实例 */
-const storePromise = getStorePath().then((path) => Store.load(path));
+/** Tauri store 实例（路径由后端统一解析到用户配置目录） */
+const storePromise = loadConfigStore('articles.json');
 
 /** 将 Excel 序列日期转为 YYYY-MM-DD 字符串 */
 const excelDateToString = (value: string): string => {

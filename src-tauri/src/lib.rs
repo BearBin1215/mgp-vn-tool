@@ -21,6 +21,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            settings::config_file_path_command,
             moegirl::moegirl_request,
             moegirl::moegirl_check_login,
             moegirl::moegirl_logout,

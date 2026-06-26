@@ -1,10 +1,9 @@
 import { create } from 'zustand';
-import { Store } from '@tauri-apps/plugin-store';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { appConfigDir, join } from '@tauri-apps/api/path';
 import moegirl from '@/api/moegirl';
 import { DEFAULT_FEISHU_APP_ID } from '@/utils/constants';
 import { type ErogamescapeUrl, type MoegirlHost } from '@/lib/types';
+import { loadConfigStore } from '@/lib/configStore';
 import { useMoegirlStore } from './moegirlStore';
 
 export type ColorMode = 'light' | 'dark';
@@ -79,14 +78,8 @@ interface SettingsStore {
   setArticlePageSize: (size: number) => void;
 }
 
-/** 获取用户配置目录下的 settings.json 路径 */
-const getStorePath = async (): Promise<string> => {
-  const configDir = await appConfigDir();
-  return await join(configDir, 'settings.json');
-};
-
-/** Tauri store 实例（保存在用户配置目录） */
-const storePromise = getStorePath().then((path) => Store.load(path));
+/** Tauri store 实例（路径由后端统一解析到用户配置目录） */
+const storePromise = loadConfigStore('settings.json');
 
 /** 从 Tauri store 读取保存的颜色模式 */
 const getInitialColorMode = async (): Promise<ColorMode> => {
@@ -154,7 +147,7 @@ const getInitialMoegirlRetryDelay = async (): Promise<number> => {
 const getInitialErogamescapeTimeout = async (): Promise<number> => {
   const store = await storePromise;
   const saved = await store.get<number>('erogamescapeTimeout');
-  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 20;
+  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 30;
 };
 
 /** 从 Tauri store 读取保存的 Galgame 统计表应用 App ID */

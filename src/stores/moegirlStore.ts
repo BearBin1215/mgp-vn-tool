@@ -1,7 +1,6 @@
 import { create } from 'zustand';
-import { Store } from '@tauri-apps/plugin-store';
-import { appConfigDir, join } from '@tauri-apps/api/path';
 import moegirl from '@/api/moegirl';
+import { loadConfigStore } from '@/lib/configStore';
 
 interface MoegirlStore {
   /** 用户组 */
@@ -14,12 +13,7 @@ interface MoegirlStore {
   clearUserInfo: () => Promise<void>;
 }
 
-const getStorePath = async (): Promise<string> => {
-  const configDir = await appConfigDir();
-  return await join(configDir, 'moegirl.json');
-};
-
-const storePromise = getStorePath().then((path) => Store.load(path));
+const storePromise = loadConfigStore('moegirl.json');
 
 export const useMoegirlStore = create<MoegirlStore>((set) => ({
   groups: [],
