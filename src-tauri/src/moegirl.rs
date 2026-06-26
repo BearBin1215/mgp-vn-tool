@@ -1,4 +1,8 @@
 //! 萌百相关方法
+//!
+//! cookie 经系统凭据存储（keyring）持久化，跨请求共享于全局 `OnceLock` 中；
+//! 响应失败时按设置的重试次数与间隔重试。cookie 变更标记为 dirty，在下次成功
+//! 响应后批量写回磁盘，避免每次请求都触发 I/O。
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -52,7 +56,6 @@ fn cookies() -> &'static Arc<Mutex<Vec<Cookie>>> {
 
 /// 将 cookie 列表持久化到系统凭据存储
 fn persist_cookies() {
-    // 无变更则跳过，避免不必要的磁盘 I/O
     if !COOKIES_DIRTY.swap(false, Ordering::SeqCst) {
         return;
     }
@@ -63,7 +66,7 @@ fn persist_cookies() {
             return;
         }
     };
-    let data = cookies().lock().unwrap();
+    let data = cookies().lock().expect("cookie 锁中毒，数据可能不一致");
     if let Ok(json) = serde_json::to_string(&*data) {
         if let Err(e) = entry.set_password(&json) {
             log::warn!("cookies 持久化失败: {e}");
@@ -73,7 +76,7 @@ fn persist_cookies() {
 
 /// 根据域名从存储中筛选 cookie，拼成 "n1=v1; n2=v2" 格式
 fn cookie_header_for(host: &str) -> Option<String> {
-    let data = cookies().lock().unwrap();
+    let data = cookies().lock().expect("cookie 锁中毒，数据可能不一致");
     let parts: Vec<String> = data
         .iter()
         .filter(|c| c.domain == host || c.domain == "moegirl.org.cn")
@@ -94,15 +97,13 @@ fn store_set_cookie(header: &str, host: &str) {
             let value = value.trim().to_string();
             // 提取 Set-Cookie 中的 Domain 属性，否则使用 host
             let domain = extract_domain(header).unwrap_or_else(|| host.to_string());
-            let mut data = cookies().lock().unwrap();
-            // 移除同名同域旧 cookie，存入新 cookie
+            let mut data = cookies().lock().expect("cookie 锁中毒，数据可能不一致");
             data.retain(|c| !(c.name == name && c.domain == domain));
             data.push(Cookie {
                 name,
                 value,
                 domain,
             });
-            // 标记内存中有未持久化的变更，persist_cookies 会在下次成功响应后写入磁盘
             COOKIES_DIRTY.store(true, Ordering::SeqCst);
         }
     }
@@ -283,7 +284,10 @@ pub async fn moegirl_request(
 /// 清除内存和凭据存储中的 cookie，实现登出
 #[tauri::command]
 pub fn moegirl_logout() {
-    cookies().lock().unwrap().clear();
+    cookies()
+        .lock()
+        .expect("cookie 锁中毒，数据可能不一致")
+        .clear();
     // 标记变更并立即持久化空 cookie 列表，覆盖凭据存储中的旧数据
     COOKIES_DIRTY.store(true, Ordering::SeqCst);
     persist_cookies();

@@ -10,11 +10,17 @@ import About from '@/pages/about';
 import Settings from '@/pages/settings';
 
 export interface RouteConfig {
+  /** 页面路径 */
   path: string;
+  /** 页面组件 */
   component: React.ComponentType;
+  /** 保持页面活跃（切换页面不卸载） */
   keepAlive?: boolean;
+  /** 菜单标签（菜单及页顶显示名称） */
   label?: string;
+  /** 菜单图标 */
   icon?: React.ReactNode;
+  /** 菜单位置 */
   position?: 'top' | 'bottom';
 }
 

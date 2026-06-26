@@ -187,7 +187,8 @@ export const fetchPageInfo = async (titles: string[]): Promise<Map<string, PageI
   const result = new Map<string, PageInfo>();
   const convertedMap = new Map<string, string>();
   const redirectMap = new Map<string, string>();
-  const BATCH_SIZE = 50;
+  /** 根据用户权限调整批量大小 */
+  const BATCH_SIZE = useMoegirlStore.getState().rights.includes('apihighlimits') ? 500 : 50;
 
   for (let i = 0; i < titles.length; i += BATCH_SIZE) {
     const batch = titles.slice(i, i + BATCH_SIZE);

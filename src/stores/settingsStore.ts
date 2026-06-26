@@ -12,51 +12,39 @@ export type ColorMode = 'light' | 'dark';
 interface SettingsStore {
   /** 当前颜色模式 */
   colorMode: ColorMode;
-  /** 设置颜色模式 */
   setColorMode: (mode: ColorMode) => void;
   /** 界面字体（CSS font-family 值） */
   uiFont: string;
-  /** 设置界面字体 */
   setUiFont: (font: string) => void;
   /** 代码块字体（CSS font-family 值） */
   codeFont: string;
-  /** 设置代码块字体 */
   setCodeFont: (font: string) => void;
   /** 萌娘百科 API 域名前缀 */
   moegirlApiHost: MoegirlHost;
-  /** 设置萌娘百科 API 域名前缀 */
   setMoegirlApiHost: (host: MoegirlHost) => void;
   /** 萌娘百科跳转域名前缀（'same' 表示与请求域名一致） */
   moegirlJumpHost: MoegirlHost | 'same';
-  /** 设置萌娘百科跳转域名前缀 */
   setMoegirlJumpHost: (host: MoegirlHost | 'same') => void;
   /** 萌娘百科请求 User-Agent */
   moegirlUserAgent: string;
-  /** 设置萌娘百科请求 User-Agent */
   setMoegirlUserAgent: (ua: string) => void;
   /** 批评空间主机地址 */
   erogamescapeUrl: ErogamescapeUrl;
-  /** 设置批评空间地址 */
   setErogamescapeHost: (host: ErogamescapeUrl) => void;
   /** 批评空间账号 */
   erogamescapeUsername: string;
-  /** 设置批评空间账号 */
   setErogamescapeUsername: (username: string) => void;
   /** 批评空间密码 */
   erogamescapePassword: string;
-  /** 设置批评空间密码 */
   setErogamescapePassword: (password: string) => void;
   /** 批评空间请求超时时长（秒） */
   erogamescapeTimeout: number;
-  /** 设置批评空间请求超时时长 */
   setErogamescapeTimeout: (seconds: number) => void;
   /** 萌娘百科请求重试次数 */
   moegirlRetries: number;
-  /** 设置萌娘百科请求重试次数 */
   setMoegirlRetries: (n: number) => void;
   /** 萌娘百科请求重试间隔（毫秒） */
   moegirlRetryDelay: number;
-  /** 设置萌娘百科请求重试间隔 */
   setMoegirlRetryDelay: (ms: number) => void;
   /** 萌娘百科登录用户名（未登录为空） */
   moegirlUsername: string;
@@ -66,15 +54,12 @@ interface SettingsStore {
   logoutMoegirl: () => Promise<void>;
   /** Galgame 统计表应用 App ID */
   feishuStatsTableAppId: string;
-  /** 设置 Galgame 统计表应用 App ID */
   setFeishuStatsTableAppId: (id: string) => void;
   /** Galgame 统计表应用 App Secret */
   feishuStatsTableAppSecret: string;
-  /** 设置 Galgame 统计表应用 App Secret */
   setFeishuStatsTableAppSecret: (secret: string) => void;
   /** 条目统计页每页条数 */
   articlePageSize: number;
-  /** 设置条目统计页每页条数 */
   setArticlePageSize: (size: number) => void;
 }
 
@@ -318,10 +303,24 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   },
 }));
 
-/** 从 Tauri store 加载保存的设置并更新 store */
+/** 从 Tauri store 加载保存的设置并更新 zustand store */
 export const initSettings = async () => {
   const store = await storePromise;
-  const [colorMode, uiFont, codeFont, erogamescapeUrl, erogamescapeTimeout, moegirlApiHost, moegirlJumpHost, feishuStatsTableAppId, feishuStatsTableAppSecret, articlePageSize, moegirlUserAgent, moegirlRetries, moegirlRetryDelay] = await Promise.all([
+  const [
+    colorMode,
+    uiFont,
+    codeFont,
+    erogamescapeUrl,
+    erogamescapeTimeout,
+    moegirlApiHost,
+    moegirlJumpHost,
+    feishuStatsTableAppId,
+    feishuStatsTableAppSecret,
+    articlePageSize,
+    moegirlUserAgent,
+    moegirlRetries,
+    moegirlRetryDelay,
+  ] = await Promise.all([
     getInitialColorMode(),
     getInitialUiFont(),
     getInitialCodeFont(),

@@ -17,7 +17,7 @@ interface KeepAliveProps {
   routes: KeepAliveRoute[];
 }
 
-/** KeepAlive 组件：首次访问后挂载并缓存，不再卸载 */
+/** KeepAlive 组件：keepAlive 路由首次访问后挂载并缓存不卸载；普通路由每次切换重新挂载 */
 export default function KeepAlive({ routes }: KeepAliveProps) {
   const location = useLocation();
   const [visited, setVisited] = useState<Set<string>>(() => new Set());

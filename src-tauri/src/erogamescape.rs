@@ -47,6 +47,11 @@ fn read_settings(app: &tauri::AppHandle) -> Result<ErogamescapeSettings, String>
     })
 }
 
+/// 截取文本前500字符用于日志输出
+fn log_snippet(text: &str) -> String {
+    text.chars().take(500).collect()
+}
+
 /// 向批评空间 SQL 接口发送 POST 请求，返回原始 HTML 响应
 async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), String> {
     let settings = read_settings(app)?;
@@ -80,11 +85,7 @@ async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), St
     let status = resp.status().as_u16();
     let text = resp.text().await.map_err(|e| e.to_string())?;
     if status < 200 || status >= 300 {
-        let snippet = if text.len() > 500 {
-            &text[..500]
-        } else {
-            &text
-        };
+        let snippet = log_snippet(&text);
         log::error!("批评空间请求失败\n  URL: {sql_url}\n  SQL: {sql}\n  状态码: {status}\n  响应: {snippet}");
     }
     Ok((status, text))
@@ -109,13 +110,11 @@ fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Str
             continue;
         }
 
-        // 提取表头
         let headers: Vec<String> = rows[0]
             .select(&th_selector)
             .map(|th| th.text().collect::<String>())
             .collect();
 
-        // 跳过数据表定义表格（批评空间页面自带的表结构说明）
         if headers.len() == 3
             && headers
                 .iter()
@@ -184,7 +183,6 @@ fn check_status(status: u16) -> Result<(), String> {
     }
 }
 
-
 /// 检测批评空间连通性
 #[tauri::command]
 pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, String> {
@@ -214,9 +212,7 @@ pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, String> 
             } else {
                 e.to_string()
             };
-            log::error!(
-                "批评空间连通性检测失败\n  URL: {sql_url}\n  错误: {msg}"
-            );
+            log::error!("批评空间连通性检测失败\n  URL: {sql_url}\n  错误: {msg}");
             return Ok(serde_json::json!({
                 "statusCode": "0",
                 "result": "fail",
@@ -232,11 +228,7 @@ pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, String> 
         String::new()
     } else {
         let text = resp.text().await.unwrap_or_default();
-        let snippet = if text.len() > 500 {
-            &text[..500]
-        } else {
-            &text
-        };
+        let snippet = log_snippet(&text);
         log::error!(
             "批评空间连通性检测失败\n  URL: {sql_url}\n  状态码: {code}\n  响应: {snippet}"
         );
@@ -260,13 +252,14 @@ pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, String> 
 ///   - shubetuDetailName: 角色名/歌曲名等
 ///   - gameName: 游戏名
 ///   - sellDay: 发售日
+///   - model: 机型/平台
 #[tauri::command]
 pub async fn query_creator_works(app: tauri::AppHandle, creator_id: u64) -> Result<Value, String> {
     Ok(wrap_response(|| do_query_creator_works(&app, creator_id)).await)
 }
 
 async fn do_query_creator_works(app: &tauri::AppHandle, creator_id: u64) -> Result<Value, String> {
-    // 查询创作者信息及参与作品（LEFT JOIN 保证无作品时仍返回创作者数据）
+    // 查询创作者信息及参与作品
     let sql = format!(
         "SELECT c.name, c.furigana, c.url, c.twitter_username, c.blog, c.blog_title, c.pixiv, \
          s.shubetu, s.shubetu_detail, s.shubetu_detail_name, \
@@ -317,13 +310,12 @@ async fn do_query_creator_works(app: &tauri::AppHandle, creator_id: u64) -> Resu
         })
     };
 
-    // 提取参与作品（跳过 LEFT JOIN 无匹配的行）
+    // 提取参与作品
     let shubetu_idx = col_idx.get("shubetu").copied().unwrap_or(0);
     let mut acting_rows = Vec::new();
     let mut music_rows = Vec::new();
 
     for row in &rows {
-        // LEFT JOIN 无匹配时 shubetu 为空，跳过
         if row.get(shubetu_idx).map(|s| s.as_str()) == Some("") {
             continue;
         }

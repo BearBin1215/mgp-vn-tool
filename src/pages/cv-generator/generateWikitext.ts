@@ -149,7 +149,7 @@ export function generateCVWikitext(records: GameRecord[], gameMap: Map<string, s
       const hasMixed = charParts.some((c) => c.startsWith("'''")) && charParts.some((c) => !c.startsWith("'''"));
       const notes: string[] = [];
       if (hasMixed) {
-        // 标记为主要并且配音多个角色，加注释标记
+        // 同一游戏的角色列表中既有加粗（主要）也有不加粗（次要）的，提示人工确认
         notes.push('<!-- 第二个角色是否为主要角色可能需要手动确认 -->');
       }
       if (hasDisambiguation) {

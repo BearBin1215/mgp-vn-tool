@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { AutoComplete, Input, Button, App, Table, Result, Splitter, Typography, Tooltip, Spin, Modal } from 'antd';
 import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
@@ -56,7 +56,7 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
         <li>作品内链根据条目统计及重定向页判断添加，出现续作、特殊符号等会导致判断不到，需要手动添加。</li>
         <li>角色内链根据名称获取站内页面名称，遇到假名等就查不到。</li>
         <li>声优信息模板和大家族模板默认填写女性，如果是男性声优要自己改。</li>
-        <li>批评空间提供的声优名假名不带空格；「汉字姓＋假名名」的形式已自动拆分为 <code>{'{{日本人名|姓|姓假名|名}}'}</code>，其余情况仍需自行调整</li>
+        <li>批评空间提供的声优名假名不带空格；“汉字姓＋假名名”的形式已自动拆分为 <code>{'{{日本人名|姓|姓假名|名}}'}</code>，其余情况仍需自行调整</li>
         <li>批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。</li>
       </ul>
     </Modal>
@@ -130,6 +130,13 @@ export default function CvGenerator() {
   // 生成中状态：仅影响「开始生成」按钮的 loading
   const [generating, setGenerating] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 组件卸载时清理挂起的防抖定时器，避免卸载后仍触发搜索 setState
+  useEffect(() => () => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+  }, []);
 
   // 出演角色数据
   const [acting, setActing] = useState<GameRecord[]>([]);
