@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src",
-    "lint:fix": "eslint src --fix"
+    "lint:fix": "eslint src --fix",
+    "bump": "tsx scripts/bump-version.ts"
   },
   "dependencies": {
     "@ant-design/icons": "6.2.5",
@@ -42,10 +43,13 @@
     "@types/node": "^25.9.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/semver": "^7.7.1",
     "@vitejs/plugin-react": "^6.0.2",
     "eslint": "^9.39.4",
     "globals": "^17.6.0",
+    "semver": "^7.8.5",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.22.4",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.61.0",
     "vite": "^8.0.16"

@@ -50,7 +50,24 @@ pnpm tauri dev
 
 ## 构建并发布
 
-将代码合并到 release 分支会触发 GitHub Actions 自动构建。成功后会推送草稿到 [GitHub Release](https://github.com/BearBin1215/mgp-vn-tool/releases)，需要前往 Release 页面编辑并正式发布。
+推送 `v*` tag 会触发 GitHub Actions 自动构建。成功后会推送草稿到 [GitHub Release](https://github.com/BearBin1215/mgp-vn-tool/releases)，需要前往 Release 页面编辑并正式发布。
+
+发版步骤如下：
+
+1. 用脚本统一修改版本号（会同步修改 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`）。支持显式版本号或自增关键字：
+   ```bash
+   pnpm bump <version>   # 显式指定，如 pnpm bump 1.2.3
+   pnpm bump <keyword>   # 基于当前版本自增：major / minor / patch 等
+   ```
+2. 提交改动并打 tag（tag 名须为 `v` + 版本号，含预发布后缀）：
+   ```bash
+   git commit -am "chore: 发版 v<version>"
+   git tag v<version>
+   ```
+3. 推送 tag 触发 CI：
+   ```bash
+   git push origin v<version>
+   ```
 
 如果要在本地构建预览效果，可以执行构建命令：
 ```bash

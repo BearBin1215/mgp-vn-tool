@@ -2,10 +2,10 @@ name: '自动构建并发布'
 
 on:
   push:
-    branches:
-      - release
+    tags:
+      - 'v*'
 
-# 微调自 Tauri 官方文档的示例，代码合并到 release 分支时自动构建并发布应用。
+# 微调自 Tauri 官方文档的示例，推送 v* tag 时自动构建并发布应用。
 
 jobs:
   publish-tauri:
