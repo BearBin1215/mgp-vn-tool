@@ -1,11 +1,12 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
-import { AutoComplete, Input, Button, App, Table, Result, Splitter, Typography, Tooltip, Spin, Modal } from 'antd';
+import { useState, useRef, useMemo } from 'react';
+import { Button, App, Table, Result, Splitter, Typography, Tooltip, Spin, Modal } from 'antd';
 import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 import { CheckOutlined, CopyOutlined, ImportOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import Page from '@/components/page';
+import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/SearchInput';
 import {
   useArticleStore,
   fetchPageInfo,
@@ -13,11 +14,11 @@ import {
   type PageInfo,
 } from '@/stores/articleStore';
 import { queryCreatorWorks, searchCreators } from '@/api/erogamescape';
+import type { GameConnection, GameConnectionKind, GameRecord } from '@/api/erogamescape';
 import TemplateLinkModal from './TemplateLinkModal';
-import type { GameConnection, GameConnectionKind, GameRecord } from '@/lib/types';
 import { shokushuDetailLabels, gameConnectionKindLabels } from '@/lib/erogamescapeDict';
 import { PENDING_SELL_DATE } from '@/utils/constants';
-import { normalizePunctuation, buildJapaneseNameTemplate, isNumeric, generateExternalLinksWikitext } from '@/utils/text';
+import { normalizePunctuation, buildJapaneseNameTemplate, resolveInputId, generateExternalLinksWikitext } from '@/utils/text';
 import { generateCVWikitext, generateMusicWikitable, buildConnectionsMap } from './generateWikitext';
 
 function CopyButton({ text }: { text: string }) {
@@ -99,12 +100,6 @@ const connectionColumns: TableColumnsType<TableGameConnection> = [
   { title: '原作', dataIndex: 'objectGameName', key: 'objectGameName' },
 ];
 
-interface CreatorOption {
-  value: string;
-  label: React.ReactNode;
-  creatorId: string;
-}
-
 const toTableData = (records: GameRecord[]) => {
   return records.map((r, i) => ({ ...r, key: String(i) }));
 };
@@ -138,19 +133,9 @@ export default function CvGenerator() {
   const gameArticleMap = useMemo(() => buildGameArticleMap(articles), [articles]);
   const [searchValue, setSearchValue] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [options, setOptions] = useState<CreatorOption[]>([]);
-  // 搜索中状态：仅影响输入框 suffix 的「搜索中...」提示
-  const [searching, setSearching] = useState(false);
   // 生成中状态：仅影响「开始生成」按钮的 loading
   const [generating, setGenerating] = useState(false);
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // 组件卸载时清理挂起的防抖定时器，避免卸载后仍触发搜索 setState
-  useEffect(() => () => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-  }, []);
+  const searchInputRef = useRef<SearchInputHandle>(null);
 
   // 出演角色数据
   const [acting, setActing] = useState<GameRecord[]>([]);
@@ -173,65 +158,26 @@ export default function CvGenerator() {
   // 显示模板链接弹窗
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
 
-  const doSearch = async (value: string) => {
-    setSearching(true);
-    try {
-      const results = await searchCreators(value);
-      setOptions(
-        results.map((item) => ({
-          value: item.name,
-          label: `${item.name} - 配音${item.voice_count}丨音乐${item.music_count}`,
-          creatorId: String(item.id),
-        })),
-      );
-    } catch (e) {
-      message.error(`搜索失败: ${e instanceof Error ? e.message : e}`);
-    } finally {
-      setSearching(false);
-    }
+  /** 名称搜索：调用批评空间接口并映射为下拉选项 */
+  const handleFetchOptions = async (keyword: string): Promise<SearchInputOption[]> => {
+    const results = await searchCreators(keyword);
+    return results.map((item) => ({
+      value: item.name,
+      label: `${item.name} - 配音${item.voiceCount}丨音乐${item.musicCount}`,
+      id: item.id,
+    }));
   };
 
-  const handleSearch = (value: string) => {
-    setSearchValue(value);
-    setSelectedId(null);
-    setSearching(false);
-
-    // 清除上一次挂起的防抖定时器，避免快速连续输入时触发多次搜索
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-      searchTimeoutRef.current = null;
-    }
-
-    // 空输入或纯数字 id 时直接清空选项
-    if (!value.trim() || isNumeric(value)) {
-      setOptions([]);
-      return;
-    }
-
-    // 防抖：用户停止输入 500ms 后发起搜索
-    searchTimeoutRef.current = setTimeout(() => {
-      doSearch(value);
-    }, 500);
-  };
-
-  const handleSelect = (_value: string, option: CreatorOption) => {
-    setSelectedId(option.creatorId);
-  };
-
-  const canConfirm = !!selectedId || isNumeric(searchValue.trim());
+  const canConfirm = resolveInputId(selectedId, searchValue) !== null;
 
   const handleConfirm = async () => {
-    const id = selectedId ?? (isNumeric(searchValue) ? searchValue.trim() : null);
+    const id = resolveInputId(selectedId, searchValue);
     if (!id) {
       return;
     }
 
     // 取消可能挂起的搜索，避免生成期间输入框残留搜索中提示
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-      searchTimeoutRef.current = null;
-    }
-    setSearching(false);
+    searchInputRef.current?.cancelPendingSearch();
 
     // 清空已有数据
     setActing([]);
@@ -395,20 +341,15 @@ export default function CvGenerator() {
     >
       {/* 顶部搜索栏 */}
       <div className='flex gap-2 shrink-0 mb-2'>
-        <AutoComplete
+        <SearchInput
+          ref={searchInputRef}
           className='flex-1'
-          options={options}
-          showSearch={{ onSearch: handleSearch, filterOption: false }}
-          onSelect={handleSelect}
-          value={searchValue}
-          onChange={setSearchValue}
+          onValueChange={setSearchValue}
+          onIdChange={setSelectedId}
+          fetchOptions={handleFetchOptions}
+          disabled={generating}
           placeholder='通过名称查找或直接输入批评空间创作者id开始生成'
-        >
-          <Input
-            disabled={generating}
-            suffix={searching ? <span className='text-xs text-gray-400'>搜索中...</span> : <span />}
-          />
-        </AutoComplete>
+        />
         <Button
           icon={<ImportOutlined />}
           disabled={generating}
@@ -518,7 +459,7 @@ export default function CvGenerator() {
       <TemplateLinkModal
         open={templateModalOpen}
         onClose={() => setTemplateModalOpen(false)}
-        onSelect={(name) => { setSearchValue(name); doSearch(name); }}
+        onSelect={(name) => searchInputRef.current?.setValueAndSearch(name)}
       />
     </Page>
   );

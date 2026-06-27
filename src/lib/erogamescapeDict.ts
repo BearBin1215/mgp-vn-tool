@@ -1,4 +1,4 @@
-import type { GameConnectionKind } from './types';
+import type { GameConnectionKind } from '@/api/erogamescape';
 
 /** 批评空间职业类别映射 */
 export const shokushuLabels: Record<string, string> = {

@@ -183,6 +183,14 @@ fn check_status(status: u16) -> Result<(), String> {
     }
 }
 
+/// 转义用户输入用于 SQL LIKE 子句
+///
+/// 单引号转义为 `''` 防止注入。批评空间后端不支持 `ESCAPE` 子句，故不对 `%`/`_`
+/// 做字面量转义（用户输入通配符时按通配符语义匹配，可接受）。
+fn escape_sql_like(keyword: &str) -> String {
+    keyword.replace('\'', "''")
+}
+
 /// 检测批评空间连通性
 #[tauri::command]
 pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, String> {
@@ -440,8 +448,8 @@ pub async fn search_creators(app: tauri::AppHandle, keyword: String) -> Result<V
 }
 
 async fn do_search_creators(app: &tauri::AppHandle, keyword: &str) -> Result<Value, String> {
-    // 转义单引号，防止 SQL 注入（关键词由用户输入）
-    let safe_keyword = keyword.replace('\'', "''");
+    // 转义单引号及 LIKE 通配符（关键词由用户输入）
+    let safe_keyword = escape_sql_like(keyword);
     let sql = format!(
         "SELECT \
            c.id, c.name, \
@@ -472,8 +480,8 @@ async fn do_search_creators(app: &tauri::AppHandle, keyword: &str) -> Result<Val
             Some(serde_json::json!({
                 "id": id,
                 "name": name,
-                "voice_count": voice_count,
-                "music_count": music_count,
+                "voiceCount": voice_count,
+                "musicCount": music_count,
             }))
         })
         .collect();

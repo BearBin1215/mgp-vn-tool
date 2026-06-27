@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import type { GameConnection, GameRecord } from '@/lib/types';
+import type { GameConnection, GameRecord } from '@/api/erogamescape';
 import type { PageInfo } from '@/stores/articleStore';
 import { PENDING_SELL_DATE } from '@/utils/constants';
 import { normalizePunctuation, wrapLj } from '@/utils/text';

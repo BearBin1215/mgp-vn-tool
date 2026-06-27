@@ -1,4 +1,4 @@
-import type { CreatorInfo } from '@/lib/types';
+import type { CreatorInfo } from '@/api/erogamescape';
 
 /** 半角感叹号和问号转换为全角 */
 export const normalizePunctuation = (text: string) => {
@@ -7,6 +7,23 @@ export const normalizePunctuation = (text: string) => {
 
 /** 判断字符串是否只包含数字 */
 export const isNumeric = (str: string) => /^\d+$/.test(str.trim());
+
+/**
+ * 从搜索输入解析待查询的实体 id
+ *
+ * 优先取已选下拉项的 id；否则当输入为纯数字时视为直接输入的 id。
+ * 两者皆不满足时返回 null。
+ */
+export const resolveInputId = (
+  selectedId: string | null,
+  searchValue: string,
+): string | null => {
+  if (selectedId) {
+    return selectedId;
+  }
+  const trimmed = searchValue.trim();
+  return isNumeric(trimmed) ? trimmed : null;
+};
 
 /** 片假名转换为平假名 */
 export const kataToHira = (text: string) => {
