@@ -55,12 +55,14 @@ mgp-vn-tool/
 │   │   ├── moegirlDict.ts      # 萌百中文映射（用户组等）
 │   │   └── erogamescapeDict.ts # 批评空间中文映射（职种等）
 │   ├── utils/                  # 纯工具函数
+│   │   ├── articleMap.ts       # 批评空间数据映射等
 │   │   ├── constants.ts        # 常量定义
 │   │   └── text.ts             # 文本处理工具
 │   ├── pages/                  # 页面组件
 │   │   ├── about/              # 关于页面（首页）
 │   │   ├── article-stats/      # 条目统计
 │   │   ├── cv-generator/       # 声优条目生成
+│   │   ├── company-generator/  # 会社条目生成
 │   │   └── settings/           # 设置页面
 │   ├── stores/                 # Zustand 状态管理及对应持久化存储
 │   │   ├── settingsStore.ts    # 应用设置
@@ -170,7 +172,6 @@ export const routes: RouteConfig[] = [
 - **萌娘百科**：Rust 后端转发请求，前端直接使用 MediaWiki API 返回的 JSON，无需额外处理
 - **飞书**：Rust 后端转发请求并返回结构化数据（自动获取 token 并请求表格）
 - **批评空间**：Rust 后端解析 HTML 返回结构化数据，前端通过 `unwrap()` 解包响应：
-- **系统命令**：`open_folder` 命令用系统默认文件管理器打开指定文件夹（定义在 `lib.rs`）
 
 ```typescript
 // src/api/erogamescape.ts

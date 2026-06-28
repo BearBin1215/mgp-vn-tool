@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
-interface ErogamescapeResponse<T> {
+/** 后端统一响应包装 */
+export interface ErogamescapeResponse<T> {
   statusCode: string;
   result: 'success' | 'fail';
   response: T;

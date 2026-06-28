@@ -30,7 +30,7 @@ pub fn run() {
             erogamescape::check_connectivity,
             erogamescape::query_creator_works,
             erogamescape::search_creators,
-            company::generate_company_wikitext,
+            company::query_company_data,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

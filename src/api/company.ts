@@ -1,41 +1,70 @@
 import { invoke } from '@tauri-apps/api/core';
-import { unwrap } from '@/api/erogamescape';
+import { unwrap, type ErogamescapeResponse } from '@/api/erogamescape';
 
-interface ApiResponse<T> {
-  statusCode: string;
-  result: 'success' | 'fail';
-  response: T;
-}
-
+/** 链接信息（显示文本 + URL） */
 export interface LinkInfo {
   label: string;
   url: string;
 }
 
-export interface CompanySummary {
+/** 单部作品（原名、中文名、发行日期） */
+export interface Work {
+  original_title: string;
+  chinese_title: string | null;
+  date: string | null;
+}
+
+/** VNDB 关联会社/系列项 */
+export interface CompanyRelation {
+  label: string;
+  links: LinkInfo[];
+}
+
+/** Bangumi 信息框键值对 */
+export interface InfoItem {
+  label: string;
+  value: string;
+}
+
+/** VNDB 会社原始数据 */
+export interface VndbCompany {
+  id: number;
   name: string;
   aliases: string[];
-  official_website?: LinkInfo | null;
-  url: string;
+  official_website: LinkInfo | null;
+  relations: CompanyRelation[];
+  description: string;
+  releases: { vn_id: string; romanized_title: string; date: string | null }[];
 }
 
-export interface GeneratedCompanyArticle {
-  wikitext: string;
-  vndb: CompanySummary;
-  bangumi?: CompanySummary | null;
-  counts: Record<string, number>;
+/** Bangumi 会社原始数据 */
+export interface BangumiCompany {
+  id: number;
+  name: string;
+  aliases: string[];
+  official_website: LinkInfo | null;
+  image_url: string | null;
+  info_items: InfoItem[];
 }
 
-/** 调用后端生成 Galgame 会社条目 wikitext */
-export async function generateCompanyWikitext(
+/** 会社条目生成的原始数据（前端渲染 wikitext 所需） */
+export interface CompanyData {
+  vndb: VndbCompany;
+  bangumi: BangumiCompany | null;
+  galgames: Work[];
+  anime: Work[];
+  music: Work[];
+  book: Work[];
+}
+
+/** 根据 VNDB producer id（可选 Bangumi person id）抓取会社原始数据 */
+export async function queryCompanyData(
   producerId: number,
   bgmPersonId: number | null,
-  force: boolean,
-): Promise<GeneratedCompanyArticle> {
-  const res = await invoke<ApiResponse<GeneratedCompanyArticle>>('generate_company_wikitext', {
+): Promise<CompanyData> {
+  const res = await invoke<ErogamescapeResponse<CompanyData>>('query_company_data', {
     producerId,
     bgmPersonId,
-    force,
   });
   return unwrap(res);
 }

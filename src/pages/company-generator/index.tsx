@@ -1,9 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Alert, App, Button, Checkbox, Descriptions, Empty, Input, Splitter, Tooltip, Typography } from 'antd';
+import { Alert, App, Button, Checkbox, Descriptions, Empty, Input, Result, Splitter, Tooltip, Typography } from 'antd';
 import { CheckOutlined, LinkOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router';
 import Page from '@/components/page';
 import CopyButton from '@/components/CopyButton';
-import { generateCompanyWikitext, type GeneratedCompanyArticle } from '@/api/company';
+import { queryCompanyData, type CompanyData } from '@/api/company';
+import { useArticleStore } from '@/stores/articleStore';
+import { buildGameArticleMap } from '@/utils/articleMap';
+import { generateCompanyWikitext, ensureSameCompany } from './generateWikitext';
 
 /** 从用户输入的数字或链接中解析 VNDB/Bangumi ID */
 function parseId(value: string, kind: 'vndb' | 'bangumi') {
@@ -22,22 +26,29 @@ function parseId(value: string, kind: 'vndb' | 'bangumi') {
 }
 
 /** 生成人类可读的作品数量摘要 */
-function countLabel(result: GeneratedCompanyArticle | null) {
-  if (!result) {
+function countLabel(data: CompanyData | null) {
+  if (!data) {
     return '尚未生成';
   }
-  const counts = result.counts || {};
-  return `Galgame ${counts.galgame || 0} / 动画 ${counts.anime || 0} / 音乐 ${counts.music || 0} / 书籍 ${counts.book || 0}`;
+  return `Galgame ${data.galgames.length} / 动画 ${data.anime.length} / 音乐 ${data.music.length} / 书籍 ${data.book.length}`;
 }
 
 /** Galgame 会社条目生成页面 */
 export default function CompanyGenerator() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  const navigate = useNavigate();
+  const articles = useArticleStore((s) => s.articles);
+  const updatedAt = useArticleStore((s) => s.updatedAt);
+
+  const gameArticleMap = useMemo(() => buildGameArticleMap(articles), [articles]);
   const [producerInput, setProducerInput] = useState('');
   const [bangumiInput, setBangumiInput] = useState('');
   const [force, setForce] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<GeneratedCompanyArticle | null>(null);
+  const [data, setData] = useState<CompanyData | null>(null);
+  const [wikitext, setWikitext] = useState('');
+  // 用户在「未获取条目数据」提示页点击「继续使用」后标记，本会话内不再提示（页面级，不跨页面共享）
+  const [dismissedEmptyWarning, setDismissedEmptyWarning] = useState(false);
 
   const producerId = useMemo(() => parseId(producerInput, 'vndb'), [producerInput]);
   const bgmPersonId = useMemo(() => parseId(bangumiInput, 'bangumi'), [bangumiInput]);
@@ -46,16 +57,24 @@ export default function CompanyGenerator() {
   /** 更新 VNDB 输入，同时清除上一轮生成结果，避免显示与当前输入不符的旧 wikitext */
   const handleProducerChange = (value: string) => {
     setProducerInput(value);
-    setResult(null);
+    setData(null);
+    setWikitext('');
   };
 
   /** 更新 Bangumi 输入，同时清除上一轮生成结果 */
   const handleBangumiChange = (value: string) => {
     setBangumiInput(value);
-    setResult(null);
+    setData(null);
+    setWikitext('');
   };
 
-  /** 根据当前输入调用后端生成条目 wikitext */
+  /** 渲染 wikitext 并展示 */
+  const render = (companyData: CompanyData) => {
+    setData(companyData);
+    setWikitext(generateCompanyWikitext(companyData, gameArticleMap));
+  };
+
+  /** 根据当前输入抓取数据并生成条目 wikitext */
   const handleGenerate = async () => {
     if (!producerId) {
       message.warning('请输入 VNDB producer id，或形如 https://vndb.org/p24 的链接');
@@ -67,10 +86,30 @@ export default function CompanyGenerator() {
     }
 
     setLoading(true);
-    setResult(null);
+    setData(null);
+    setWikitext('');
     try {
-      const data = await generateCompanyWikitext(producerId, bgmPersonId, force);
-      setResult(data);
+      const companyData = await queryCompanyData(producerId, bgmPersonId);
+
+      // 前端一致性校验：不一致时弹确认框，用户可选择继续或中止
+      if (companyData.bangumi && !force) {
+        const check = ensureSameCompany(companyData.vndb, companyData.bangumi);
+        if (!check.ok) {
+          modal.confirm({
+            title: '会社匹配警告',
+            content: check.message,
+            okText: '仍要继续',
+            cancelText: '取消',
+            onOk: () => {
+              render(companyData);
+              message.success('生成完成');
+            },
+          });
+          return;
+        }
+      }
+
+      render(companyData);
       message.success('生成完成');
     } catch (e) {
       message.error(`生成失败: ${e instanceof Error ? e.message : e}`);
@@ -78,6 +117,36 @@ export default function CompanyGenerator() {
       setLoading(false);
     }
   };
+
+  if (!updatedAt && !dismissedEmptyWarning) {
+    return (
+      <Page
+        actions={
+          <Tooltip title='VNDB 必填；Bangumi 可选，用于补充 Logo、别名、官网和衍生作品。'>
+            <Button type='text' icon={<QuestionCircleOutlined />} />
+          </Tooltip>
+        }
+      >
+        <Result
+          status='warning'
+          title='未获取条目数据'
+          subTitle='条目统计数据为空，生成条目时可能无法正常生成作品内链。建议先前往条目统计页面获取数据。'
+          extra={[
+            <Button
+              key='continue'
+              type='primary'
+              onClick={() => setDismissedEmptyWarning(true)}
+            >
+              继续使用
+            </Button>,
+            <Button key='fetch' onClick={() => navigate('/article-stats')}>
+              前往获取数据
+            </Button>,
+          ]}
+        />
+      </Page>
+    );
+  }
 
   return (
     <Page
@@ -130,11 +199,11 @@ export default function CompanyGenerator() {
             忽略 VNDB / Bangumi 公司匹配警告
           </Checkbox>
           <span>已识别：VNDB {producerId || '-'}，Bangumi {bgmPersonId || '-'}</span>
-          <span>{countLabel(result)}</span>
+          <span>{countLabel(data)}</span>
         </div>
       </div>
 
-      {result ? (
+      {data ? (
         <Splitter className='flex-1 min-h-0 px-1 pb-1'>
           <Splitter.Panel
             defaultSize='62%'
@@ -149,10 +218,10 @@ export default function CompanyGenerator() {
             />
             <div className='flex items-center justify-between shrink-0 px-1 h-7'>
               <Typography.Text strong>生成结果</Typography.Text>
-              <CopyButton text={result.wikitext} />
+              <CopyButton text={wikitext} />
             </div>
             <pre className='bg-(--ant-color-bg-elevated) border border-(--ant-color-border) rounded-lg p-4 text-sm overflow-auto whitespace-pre-wrap m-0 leading-relaxed flex-1 min-h-0'>
-              {result.wikitext}
+              {wikitext}
             </pre>
           </Splitter.Panel>
 
@@ -173,35 +242,35 @@ export default function CompanyGenerator() {
               >
                 <Descriptions.Item label='VNDB'>
                   <a
-                    href={result.vndb.url}
+                    href={`https://vndb.org/p${data.vndb.id}/vn`}
                     target='_blank'
                     rel='noreferrer'
                   >
-                    {result.vndb.name}
+                    {data.vndb.name}
                   </a>
                 </Descriptions.Item>
                 <Descriptions.Item label='VNDB 别名'>
-                  {result.vndb.aliases?.join('、') || '-'}
+                  {data.vndb.aliases?.join('、') || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label='VNDB 官网'>
-                  {result.vndb.official_website?.url || '-'}
+                  {data.vndb.official_website?.url || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label='Bangumi'>
-                  {result.bangumi ? (
+                  {data.bangumi ? (
                     <a
-                      href={result.bangumi.url}
+                      href={`https://bgm.tv/person/${data.bangumi.id}`}
                       target='_blank'
                       rel='noreferrer'
                     >
-                      {result.bangumi.name}
+                      {data.bangumi.name}
                     </a>
                   ) : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label='Bangumi 别名'>
-                  {result.bangumi?.aliases?.join('、') || '-'}
+                  {data.bangumi?.aliases?.join('、') || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label='作品数量'>
-                  {countLabel(result)}
+                  {countLabel(data)}
                 </Descriptions.Item>
               </Descriptions>
             </div>

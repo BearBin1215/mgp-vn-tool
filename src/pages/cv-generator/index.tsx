@@ -10,7 +10,6 @@ import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/c
 import {
   useArticleStore,
   fetchPageInfo,
-  type Article,
   type PageInfo,
 } from '@/stores/articleStore';
 import { queryCreatorWorks, searchCreators } from '@/api/erogamescape';
@@ -18,7 +17,8 @@ import type { GameConnection, GameConnectionKind, GameRecord } from '@/api/eroga
 import TemplateLinkModal from './TemplateLinkModal';
 import { shokushuDetailLabels, gameConnectionKindLabels } from '@/lib/erogamescapeDict';
 import { PENDING_SELL_DATE } from '@/utils/constants';
-import { normalizePunctuation, buildJapaneseNameTemplate, resolveInputId, generateExternalLinksWikitext } from '@/utils/text';
+import { buildJapaneseNameTemplate, resolveInputId, generateExternalLinksWikitext } from '@/utils/text';
+import { buildGameArticleMap } from '@/utils/articleMap';
 import { generateCVWikitext, generateMusicWikitable, buildConnectionsMap } from './generateWikitext';
 
 function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -81,24 +81,6 @@ const toTableData = (records: GameRecord[]) => {
   return records.map((r, i) => ({ ...r, key: String(i) }));
 };
 
-/** 构建批评空间游戏名到条目名的映射 */
-const buildGameArticleMap = (articles: Article[]) => {
-  const map = new Map<string, string>();
-  for (const a of articles) {
-    if (a.redirect) {
-      continue;
-    }
-    const normJa = normalizePunctuation(a.ja);
-    const normTitle = normalizePunctuation(a.title);
-    map.set(normJa, a.title);
-    map.set(normTitle, a.title);
-    for (const r of a.redirects || []) {
-      map.set(normalizePunctuation(r), a.title);
-    }
-  }
-  return map;
-};
-
 
 export default function CvGenerator() {
   const { message } = App.useApp();
@@ -113,6 +95,8 @@ export default function CvGenerator() {
   // 生成中状态：仅影响「开始生成」按钮的 loading
   const [generating, setGenerating] = useState(false);
   const searchInputRef = useRef<SearchInputHandle>(null);
+  // 用户在「未获取条目数据」提示页点击「继续使用」后标记，本会话内不再提示（页面级，不跨页面共享）
+  const [dismissedEmptyWarning, setDismissedEmptyWarning] = useState(false);
 
   // 出演角色数据
   const [acting, setActing] = useState<GameRecord[]>([]);
@@ -269,7 +253,7 @@ export default function CvGenerator() {
     }
   };
 
-  if (!updatedAt) {
+  if (!updatedAt && !dismissedEmptyWarning) {
     return (
       <Page
         actions={
@@ -290,7 +274,7 @@ export default function CvGenerator() {
             <Button
               key='continue'
               type='primary'
-              onClick={() => useArticleStore.setState({ updatedAt: ' ' })}
+              onClick={() => setDismissedEmptyWarning(true)}
             >
               继续使用
             </Button>,
