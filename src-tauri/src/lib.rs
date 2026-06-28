@@ -1,3 +1,4 @@
+mod company;
 mod erogamescape;
 mod feishu;
 mod moegirl;
@@ -29,6 +30,7 @@ pub fn run() {
             erogamescape::check_connectivity,
             erogamescape::query_creator_works,
             erogamescape::search_creators,
+            company::generate_company_wikitext,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

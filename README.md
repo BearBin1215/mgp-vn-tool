@@ -51,4 +51,8 @@
 
 ## License
 
+### Galgame会社条目生成
+
+通过 VNDB producer 条目与可选 Bangumi person 条目抓取会社基础信息、官网、别名、简介、Galgame 与衍生动画/音乐/书籍列表，并生成萌娘百科会社条目 wikitext。
+
 [MIT License](LICENSE)

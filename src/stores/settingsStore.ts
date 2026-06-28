@@ -40,6 +40,15 @@ interface SettingsStore {
   /** 批评空间请求超时时长（秒） */
   erogamescapeTimeout: number;
   setErogamescapeTimeout: (seconds: number) => void;
+  /** Bangumi 请求超时时长（秒） */
+  bangumiTimeout: number;
+  setBangumiTimeout: (seconds: number) => void;
+  /** Bangumi 请求重试次数 */
+  bangumiRetries: number;
+  setBangumiRetries: (n: number) => void;
+  /** Bangumi 请求重试间隔（毫秒） */
+  bangumiRetryDelay: number;
+  setBangumiRetryDelay: (ms: number) => void;
   /** 萌娘百科请求重试次数 */
   moegirlRetries: number;
   setMoegirlRetries: (n: number) => void;
@@ -135,6 +144,27 @@ const getInitialErogamescapeTimeout = async (): Promise<number> => {
   return typeof saved === 'number' && Number.isFinite(saved) ? saved : 30;
 };
 
+/** 从 Tauri store 读取保存的 Bangumi 请求超时时长 */
+const getInitialBangumiTimeout = async (): Promise<number> => {
+  const store = await storePromise;
+  const saved = await store.get<number>('bangumiTimeout');
+  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 30;
+};
+
+/** 从 Tauri store 读取保存的 Bangumi 请求重试次数 */
+const getInitialBangumiRetries = async (): Promise<number> => {
+  const store = await storePromise;
+  const saved = await store.get<number>('bangumiRetries');
+  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 2;
+};
+
+/** 从 Tauri store 读取保存的 Bangumi 请求重试间隔 */
+const getInitialBangumiRetryDelay = async (): Promise<number> => {
+  const store = await storePromise;
+  const saved = await store.get<number>('bangumiRetryDelay');
+  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 1000;
+};
+
 /** 从 Tauri store 读取保存的 Galgame 统计表应用 App ID */
 const getInitialFeishuStatsTableAppId = async (): Promise<string> => {
   const store = await storePromise;
@@ -212,6 +242,30 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     await store.set('erogamescapeTimeout', seconds);
     await store.save();
     set({ erogamescapeTimeout: seconds });
+  },
+
+  bangumiTimeout: 30,
+  setBangumiTimeout: async (seconds) => {
+    const store = await storePromise;
+    await store.set('bangumiTimeout', seconds);
+    await store.save();
+    set({ bangumiTimeout: seconds });
+  },
+
+  bangumiRetries: 2,
+  setBangumiRetries: async (n) => {
+    const store = await storePromise;
+    await store.set('bangumiRetries', n);
+    await store.save();
+    set({ bangumiRetries: n });
+  },
+
+  bangumiRetryDelay: 1000,
+  setBangumiRetryDelay: async (ms) => {
+    const store = await storePromise;
+    await store.set('bangumiRetryDelay', ms);
+    await store.save();
+    set({ bangumiRetryDelay: ms });
   },
 
   moegirlApiHost: 'mzh.moegirl.org.cn',
@@ -312,6 +366,9 @@ export const initSettings = async () => {
     codeFont,
     erogamescapeUrl,
     erogamescapeTimeout,
+    bangumiTimeout,
+    bangumiRetries,
+    bangumiRetryDelay,
     moegirlApiHost,
     moegirlJumpHost,
     feishuStatsTableAppId,
@@ -326,6 +383,9 @@ export const initSettings = async () => {
     getInitialCodeFont(),
     getInitialErogamescapeHost(),
     getInitialErogamescapeTimeout(),
+    getInitialBangumiTimeout(),
+    getInitialBangumiRetries(),
+    getInitialBangumiRetryDelay(),
     getInitialMoegirlApiHost(),
     getInitialMoegirlJumpHost(),
     getInitialFeishuStatsTableAppId(),
@@ -346,6 +406,9 @@ export const initSettings = async () => {
     codeFont,
     erogamescapeUrl,
     erogamescapeTimeout,
+    bangumiTimeout,
+    bangumiRetries,
+    bangumiRetryDelay,
     erogamescapeUsername,
     erogamescapePassword,
     moegirlApiHost,
