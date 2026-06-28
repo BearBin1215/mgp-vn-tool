@@ -1,34 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Alert, App, Button, Checkbox, Descriptions, Empty, Input, Splitter, Tooltip, Typography } from 'antd';
-import { CheckOutlined, CopyOutlined, LinkOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+import { CheckOutlined, LinkOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import Page from '@/components/page';
+import CopyButton from '@/components/CopyButton';
 import { generateCompanyWikitext, type GeneratedCompanyArticle } from '@/api/company';
-
-/** 复制生成结果到剪贴板的按钮 */
-function CopyButton({ text }: { text: string }) {
-  const { message } = App.useApp();
-  return (
-    <Tooltip title='复制到剪贴板'>
-      <Button
-        type='text'
-        size='small'
-        icon={<CopyOutlined />}
-        disabled={!text}
-        onClick={async () => {
-          try {
-            await writeText(text);
-            message.success('已复制到剪贴板');
-          } catch (e) {
-            message.error(`复制失败: ${e instanceof Error ? e.message : e}`);
-          }
-        }}
-      >
-        复制
-      </Button>
-    </Tooltip>
-  );
-}
 
 /** 从用户输入的数字或链接中解析 VNDB/Bangumi ID */
 function parseId(value: string, kind: 'vndb' | 'bangumi') {
@@ -68,6 +43,18 @@ export default function CompanyGenerator() {
   const bgmPersonId = useMemo(() => parseId(bangumiInput, 'bangumi'), [bangumiInput]);
   const bangumiInvalid = bangumiInput.trim() !== '' && !bgmPersonId;
 
+  /** 更新 VNDB 输入，同时清除上一轮生成结果，避免显示与当前输入不符的旧 wikitext */
+  const handleProducerChange = (value: string) => {
+    setProducerInput(value);
+    setResult(null);
+  };
+
+  /** 更新 Bangumi 输入，同时清除上一轮生成结果 */
+  const handleBangumiChange = (value: string) => {
+    setBangumiInput(value);
+    setResult(null);
+  };
+
   /** 根据当前输入调用后端生成条目 wikitext */
   const handleGenerate = async () => {
     if (!producerId) {
@@ -105,12 +92,12 @@ export default function CompanyGenerator() {
         <Alert
           type='warning'
           showIcon
-          message='bangumi网络波动较多，若报502请尝试留空bgm id'
+          title='bangumi网络波动较多，若报502请尝试留空bgm id'
         />
         <div className='grid grid-cols-1 lg:grid-cols-[1fr_1fr_auto] gap-2'>
           <Input
             value={producerInput}
-            onChange={(e) => setProducerInput(e.target.value)}
+            onChange={(e) => handleProducerChange(e.target.value)}
             disabled={loading}
             placeholder='VNDB producer id 或链接，例如 24 / https://vndb.org/p24'
             prefix={<LinkOutlined />}
@@ -118,7 +105,7 @@ export default function CompanyGenerator() {
           />
           <Input
             value={bangumiInput}
-            onChange={(e) => setBangumiInput(e.target.value)}
+            onChange={(e) => handleBangumiChange(e.target.value)}
             disabled={loading}
             placeholder='Bangumi person id 或链接，可留空，例如 47 / https://bgm.tv/person/47'
             prefix={<LinkOutlined />}
@@ -158,7 +145,7 @@ export default function CompanyGenerator() {
               className='mb-2'
               type='info'
               showIcon
-              message='工具生成条目为半成品，请勿直接提交萌娘百科'
+              title='工具生成条目为半成品，请勿直接提交萌娘百科'
             />
             <div className='flex items-center justify-between shrink-0 px-1 h-7'>
               <Typography.Text strong>生成结果</Typography.Text>

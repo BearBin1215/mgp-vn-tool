@@ -19,22 +19,22 @@ const TEMPLATE: &str = r#"{{欢迎编辑}}
 |image        = （此处放置bangumi获取的图片URL）
 |图片大小     = 280px
 |图片信息     = （填充公司名）LOGO
-|tabs         = 
+|tabs         =
 |公司名称     = （此处填充公司名）
 |公司别名     = （此处填充公司别名、英文名等）
 |公司类型     = Galgame会社
 |前身         =
 |后继         =
-|成立时间     = 
-|结束时间     = 
-|总部地址     = 
-|员工人数     = 
-|母公司       = 
-|子公司       = 
-|主要作品     = 
-|创办人       = 
-|相关人物     = 
-|相关公司     = 
+|成立时间     =
+|结束时间     =
+|总部地址     =
+|员工人数     =
+|母公司       =
+|子公司       =
+|主要作品     =
+|创办人       =
+|相关人物     =
+|相关公司     =
 |网址         = （此处填充公司官网）
 }}
 
@@ -76,8 +76,8 @@ const TEMPLATE: &str = r#"{{欢迎编辑}}
 
 ==外部链接与注释==
 
-<references/>
-*[（此处填充公司官网URL）|（此处填充公司名+官方网站，例如“key官方网站”）]
+<references />
+* [（此处填充公司官网URL）|（此处填充公司名+官方网站，例如“key官方网站”）]
 （其他相关链接也如上处理）
 
 [[Category:Galgame公司]]
@@ -166,6 +166,10 @@ struct VndbApiResponse {
     results: Vec<VndbApiVn>,
 }
 
+/// 根据 VNDB producer id（可选 Bangumi person id）生成会社条目 wikitext
+///
+/// 从 VNDB 抓取会社信息与作品，可选从 Bangumi 补充 Logo/别名/官网/衍生作品，
+/// 校验两侧会社一致后组装为萌百条目 wikitext 返回。
 #[tauri::command]
 pub async fn generate_company_wikitext(
     app: tauri::AppHandle,
@@ -180,6 +184,7 @@ pub async fn generate_company_wikitext(
     .await)
 }
 
+/// 将查询结果包装为统一的 `{ statusCode, result, response }` JSON
 async fn wrap_response<F, Fut>(f: F) -> Value
 where
     F: FnOnce() -> Fut,
@@ -202,6 +207,7 @@ where
     }
 }
 
+/// 生成会社条目的实际逻辑：抓取 VNDB/Bangumi 数据、校验一致性、渲染 wikitext
 async fn do_generate_company_wikitext(
     app: &tauri::AppHandle,
     producer_id: u64,
@@ -283,6 +289,7 @@ async fn do_generate_company_wikitext(
     })
 }
 
+/// 从 Tauri Store 读取 Bangumi 请求配置（超时、重试次数、重试间隔），越界值会回退默认
 fn read_bangumi_settings(app: &tauri::AppHandle) -> BangumiRequestSettings {
     let timeout_secs = settings::get_f64(app, "bangumiTimeout")
         .filter(|v| v.is_finite())
@@ -304,6 +311,7 @@ fn read_bangumi_settings(app: &tauri::AppHandle) -> BangumiRequestSettings {
     }
 }
 
+/// 用给定 client GET 请求 url，返回响应文本（不重试）
 async fn fetch_text(client: &reqwest::Client, url: &str) -> Result<String, String> {
     let resp = client
         .get(url)
@@ -319,6 +327,7 @@ async fn fetch_text(client: &reqwest::Client, url: &str) -> Result<String, Strin
     }
 }
 
+/// GET 请求 Bangumi url，对服务器错误（5xx）/超时按配置重试，成功返回响应文本
 async fn fetch_bangumi_text(
     client: &reqwest::Client,
     request_settings: &BangumiRequestSettings,
@@ -362,12 +371,17 @@ async fn fetch_bangumi_text(
     Err(last_error)
 }
 
-async fn fetch_vndb_company(client: &reqwest::Client, producer_id: u64) -> Result<VndbCompany, String> {
+/// 抓取 VNDB 会社页面，解析会社名、别名、官网、关联与发行记录
+async fn fetch_vndb_company(
+    client: &reqwest::Client,
+    producer_id: u64,
+) -> Result<VndbCompany, String> {
     let url = format!("https://vndb.org/p{producer_id}/vn");
     let html = fetch_text(client, &url).await?;
     let document = Html::parse_document(&html);
 
-    let name = first_text(&document, "main article h1").unwrap_or_else(|| format!("p{producer_id}"));
+    let name =
+        first_text(&document, "main article h1").unwrap_or_else(|| format!("p{producer_id}"));
     let center_sel = sel("main article p.center")?;
     let centers: Vec<_> = document.select(&center_sel).collect();
     let aliases = centers
@@ -376,10 +390,7 @@ async fn fetch_vndb_company(client: &reqwest::Client, producer_id: u64) -> Resul
         .unwrap_or_default();
 
     let official_website = find_link_by_text(&document, "Official website");
-    let relations = centers
-        .get(1)
-        .map(extract_relations)
-        .unwrap_or_default();
+    let relations = centers.get(1).map(extract_relations).unwrap_or_default();
     let description = first_text(&document, "main article div.description")
         .unwrap_or_default()
         .replace("[From Wikipedia]", "")
@@ -398,6 +409,7 @@ async fn fetch_vndb_company(client: &reqwest::Client, producer_id: u64) -> Resul
     })
 }
 
+/// 从「别名」文本中按行提取非空别名列表
 fn extract_aliases(text: &str) -> Vec<String> {
     text.lines()
         .flat_map(|line| {
@@ -413,6 +425,7 @@ fn extract_aliases(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// 从关联节点提取每行关联类型及其链接列表
 fn extract_relations(node: &ElementRef) -> Vec<(String, Vec<LinkInfo>)> {
     let mut output = Vec::new();
     let a_sel = Selector::parse("a[href]").unwrap();
@@ -429,13 +442,20 @@ fn extract_relations(node: &ElementRef) -> Vec<(String, Vec<LinkInfo>)> {
                 .join(" ")
         })
         .collect::<Vec<_>>();
-    for line in segments.iter().map(|s| s.trim()).filter(|line| !line.is_empty()) {
+    for line in segments
+        .iter()
+        .map(|s| s.trim())
+        .filter(|line| !line.is_empty())
+    {
         if let Some((label, _)) = line.split_once(':') {
             let links = node
                 .select(&a_sel)
                 .map(|a| LinkInfo {
                     label: element_text(&a),
-                    url: normalize_url(a.value().attr("href").unwrap_or_default(), "https://vndb.org"),
+                    url: normalize_url(
+                        a.value().attr("href").unwrap_or_default(),
+                        "https://vndb.org",
+                    ),
                 })
                 .filter(|l| line.contains(&l.label))
                 .collect::<Vec<_>>();
@@ -445,6 +465,7 @@ fn extract_relations(node: &ElementRef) -> Vec<(String, Vec<LinkInfo>)> {
     output
 }
 
+/// 从 VNDB 会社页面提取各发行的 VN id 与发售日
 fn extract_vndb_releases(document: &Html) -> Result<Vec<VndbRelease>, String> {
     let item_sel = sel("main article ul.prodvns > li")?;
     let span_sel = sel("span")?;
@@ -487,6 +508,7 @@ fn extract_vndb_releases(document: &Html) -> Result<Vec<VndbRelease>, String> {
     Ok(releases)
 }
 
+/// 批量查询 VNDB 标题 API，返回 VN id 到（原名、中文名）的映射
 async fn fetch_vndb_titles(
     client: &reqwest::Client,
     releases: &[VndbRelease],
@@ -543,6 +565,7 @@ async fn fetch_vndb_titles(
     Ok(output)
 }
 
+/// 抓取 Bangumi 人物页面，解析会社名、别名、官网与 Logo
 async fn fetch_bangumi_company(
     client: &reqwest::Client,
     request_settings: &BangumiRequestSettings,
@@ -583,6 +606,7 @@ async fn fetch_bangumi_company(
     })
 }
 
+/// 从 Bangumi 信息框提取键值对列表
 fn extract_bangumi_info(document: &Html) -> Result<Vec<(String, String)>, String> {
     let li_sel = sel("#columnCrtA .infobox_container ul#infobox > li")?;
     let tip_sel = sel("span.tip")?;
@@ -610,6 +634,7 @@ fn extract_bangumi_info(document: &Html) -> Result<Vec<(String, String)>, String
     Ok(output)
 }
 
+/// 抓取 Bangumi 人物某分类（anime/music/book）的作品列表，分页合并
 async fn fetch_bangumi_works(
     client: &reqwest::Client,
     request_settings: &BangumiRequestSettings,
@@ -644,7 +669,11 @@ async fn fetch_bangumi_works(
             let Some(title_link) = item.select(&title_sel).next() else {
                 continue;
             };
-            let href = title_link.value().attr("href").unwrap_or_default().to_string();
+            let href = title_link
+                .value()
+                .attr("href")
+                .unwrap_or_default()
+                .to_string();
             if !seen_urls.insert(href) {
                 continue;
             }
@@ -675,6 +704,7 @@ async fn fetch_bangumi_works(
     Ok(works)
 }
 
+/// 将作品分类名映射为 Bangumi subject_type 参数值
 fn bangumi_category_subject_type(category: &str) -> Option<&'static str> {
     match category {
         "book" => Some("subject_type_1"),
@@ -684,6 +714,7 @@ fn bangumi_category_subject_type(category: &str) -> Option<&'static str> {
     }
 }
 
+/// 判断 Bangumi 作品条目的 subject_type 是否与预期分类匹配
 fn bangumi_item_matches_subject_type(
     item: &ElementRef,
     subject_type_sel: &Selector,
@@ -695,11 +726,16 @@ fn bangumi_item_matches_subject_type(
     item.select(subject_type_sel).any(|span| {
         span.value()
             .attr("class")
-            .map(|class| class.split_whitespace().any(|part| part == expected_subject_type))
+            .map(|class| {
+                class
+                    .split_whitespace()
+                    .any(|part| part == expected_subject_type)
+            })
             .unwrap_or(false)
     })
 }
 
+/// 从 Bangumi 分页导航提取最大页码
 fn extract_bangumi_max_page(document: &Html) -> usize {
     let Ok(page_sel) = Selector::parse(".page_inner a.p[href]") else {
         return 1;
@@ -714,7 +750,12 @@ fn extract_bangumi_max_page(document: &Html) -> usize {
         .unwrap_or(1)
 }
 
-fn ensure_same_company(vndb: &VndbCompany, bangumi: &BangumiCompany, force: bool) -> Result<(), String> {
+/// 校验 VNDB 与 Bangumi 会社是否同一主体（名称/官网匹配），force 为 true 时跳过校验
+fn ensure_same_company(
+    vndb: &VndbCompany,
+    bangumi: &BangumiCompany,
+    force: bool,
+) -> Result<(), String> {
     let vndb_names = normalized_names(&vndb.name, &vndb.aliases);
     let bgm_names = normalized_names(&bangumi.name, &bangumi.aliases);
     let name_match = !vndb_names.is_disjoint(&bgm_names);
@@ -735,6 +776,7 @@ fn ensure_same_company(vndb: &VndbCompany, bangumi: &BangumiCompany, force: bool
     }
 }
 
+/// 将 VNDB/Bangumi 数据与作品列表组装为完整的会社条目 wikitext
 fn render_wikitext(
     vndb: &VndbCompany,
     bangumi: Option<&BangumiCompany>,
@@ -775,16 +817,21 @@ fn render_wikitext(
         .replace("（此处填充公司别名、英文名等）", &aliases)
         .replace("（此处填充公司官网）", &website_text)
         .replace("（此处填充公司介绍）", &vndb.description)
-        .replace("（此处填充公司关系和其他所有未在本模板中列出具体展示位置的信息）", &relations);
+        .replace(
+            "（此处填充公司关系和其他所有未在本模板中列出具体展示位置的信息）",
+            &relations,
+        );
 
-    if let (Some(start), Some(end)) = (text.find("== 作品列表 =="), text.find("{{Galgame公司}}")) {
+    if let (Some(start), Some(end)) = (text.find("== 作品列表 =="), text.find("{{Galgame公司}}"))
+    {
         text.replace_range(start..end, &format!("{works}\n\n"));
     }
 
-    let placeholder = "*[（此处填充公司官网URL）|（此处填充公司名+官方网站，例如“key官方网站”）]\n（其他相关链接也如上处理）";
+    let placeholder = "* [（此处填充公司官网URL） （此处填充公司名+官方网站，例如“key官方网站”）]\n（其他相关链接也如上处理）";
     text.replace(placeholder, &links)
 }
 
+/// 生成「关联会社/系列」章节 wikitext
 fn render_relations(vndb: &VndbCompany, bangumi: Option<&BangumiCompany>) -> String {
     let mut lines = Vec::new();
     for (label, links) in &vndb.relations {
@@ -799,7 +846,10 @@ fn render_relations(vndb: &VndbCompany, bangumi: Option<&BangumiCompany>) -> Str
     }
     if let Some(bgm) = bangumi {
         for (label, value) in &bgm.info_items {
-            if !matches!(label.as_str(), "别名" | "英文名" | "简体中文名" | "主页" | "官网") {
+            if !matches!(
+                label.as_str(),
+                "别名" | "英文名" | "简体中文名" | "主页" | "官网"
+            ) {
                 lines.push(format!("Bangumi {label}: {value}"));
             }
         }
@@ -807,6 +857,7 @@ fn render_relations(vndb: &VndbCompany, bangumi: Option<&BangumiCompany>) -> Str
     lines.join("\n")
 }
 
+/// 生成各分类「作品」章节 wikitext（游戏/动画/音乐/书籍），空分类省略
 fn render_works(galgames: &[Work], anime: &[Work], music: &[Work], book: &[Work]) -> String {
     [
         ("Galgame", galgames),
@@ -819,7 +870,11 @@ fn render_works(galgames: &[Work], anime: &[Work], music: &[Work], book: &[Work]
         let body = if works.is_empty() {
             String::from("暂无")
         } else {
-            works.iter().map(render_work_line).collect::<Vec<_>>().join("\n")
+            works
+                .iter()
+                .map(render_work_line)
+                .collect::<Vec<_>>()
+                .join("\n")
         };
         format!("=== {title} ===\n\n{body}")
     })
@@ -828,8 +883,23 @@ fn render_works(galgames: &[Work], anime: &[Work], music: &[Work], book: &[Work]
     .pipe(|body| format!("== 作品列表 ==\n\n{body}"))
 }
 
+/// 含假名（平假名/片假名）时包装为 `{{lj|...}}`，否则原样返回
+///
+/// 与前端 `wrapLj`（src/utils/text.ts）保持一致的判断逻辑。
+fn wrap_lj(text: &str) -> String {
+    let has_kana = text
+        .chars()
+        .any(|c| ('\u{3041}'..='\u{3096}').contains(&c) || ('\u{30a1}'..='\u{30f6}').contains(&c));
+    if has_kana {
+        format!("{{{{lj|{text}}}}}")
+    } else {
+        text.to_string()
+    }
+}
+
+/// 生成单个作品行：`*《原名》（中文名）（日期）`，原名按需 `{{lj|}}` 包装
 fn render_work_line(work: &Work) -> String {
-    let mut line = format!("*《{{{{lj|{}}}}}》", work.original_title);
+    let mut line = format!("*《{}》", wrap_lj(&work.original_title));
     if let Some(chinese) = &work.chinese_title {
         if !chinese.is_empty() && chinese != &work.original_title {
             line.push_str(&format!("（{chinese}）"));
@@ -843,24 +913,26 @@ fn render_work_line(work: &Work) -> String {
     line
 }
 
+/// 生成「外部链接」章节 wikitext（官网、Bangumi、VNDB 条目链接）
 fn render_external_links(vndb: &VndbCompany, bangumi: Option<&BangumiCompany>) -> String {
     let mut links = Vec::new();
     if let Some(site) = &vndb.official_website {
-        links.push(format!("*[{}|{}官方网站]", site.url, vndb.name));
+        links.push(format!("*[{} {}官方网站]", site.url, vndb.name));
     }
     if let Some(bgm) = bangumi {
         links.push(format!(
-            "*[https://bgm.tv/person/{}|{}的Bangumi条目]",
+            "*[https://bgm.tv/person/{} {}的Bangumi条目]",
             bgm.id, vndb.name
         ));
     }
     links.push(format!(
-        "*[https://vndb.org/p{}|{}的VNDB条目]",
+        "*[https://vndb.org/p{} {}的VNDB条目]",
         vndb.id, vndb.name
     ));
     links.join("\n")
 }
 
+/// 取首个匹配选择器元素的合并文本（去空白，空串视为无）
 fn first_text(document: &Html, selector: &str) -> Option<String> {
     Selector::parse(selector)
         .ok()
@@ -868,6 +940,7 @@ fn first_text(document: &Html, selector: &str) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// 取首个匹配选择器元素的指定属性值（空串视为无）
 fn first_attr(document: &Html, selector: &str, attr: &str) -> Option<String> {
     Selector::parse(selector)
         .ok()
@@ -881,6 +954,7 @@ fn first_attr(document: &Html, selector: &str, attr: &str) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// 按显示文本（忽略大小写）查找首个 `<a>` 链接
 fn find_link_by_text(document: &Html, text: &str) -> Option<LinkInfo> {
     let sel = Selector::parse("a[href]").ok()?;
     document.select(&sel).find_map(|a| {
@@ -888,7 +962,10 @@ fn find_link_by_text(document: &Html, text: &str) -> Option<LinkInfo> {
         if label.eq_ignore_ascii_case(text) {
             Some(LinkInfo {
                 label,
-                url: normalize_url(a.value().attr("href").unwrap_or_default(), "https://vndb.org"),
+                url: normalize_url(
+                    a.value().attr("href").unwrap_or_default(),
+                    "https://vndb.org",
+                ),
             })
         } else {
             None
@@ -896,6 +973,7 @@ fn find_link_by_text(document: &Html, text: &str) -> Option<LinkInfo> {
     })
 }
 
+/// 合并元素文本，去除首尾空白并将内部连续空白折叠为单个空格
 fn element_text(node: &ElementRef) -> String {
     node.text()
         .map(str::trim)
@@ -907,6 +985,7 @@ fn element_text(node: &ElementRef) -> String {
         .join(" ")
 }
 
+/// 将协议相对/根相对 URL 补全为绝对 URL
 fn normalize_url(url: &str, base: &str) -> String {
     if url.starts_with("//") {
         format!("https:{url}")
@@ -917,6 +996,7 @@ fn normalize_url(url: &str, base: &str) -> String {
     }
 }
 
+/// 将名称与别名归一化后收集为去重集合，用于一致性比对
 fn normalized_names(name: &str, aliases: &[String]) -> HashSet<String> {
     std::iter::once(name)
         .chain(aliases.iter().map(String::as_str))
@@ -925,14 +1005,18 @@ fn normalized_names(name: &str, aliases: &[String]) -> HashSet<String> {
         .collect()
 }
 
+/// 归一化名称：转小写、去除空白与常见分隔符，用于名称比对
 fn normalize_name(value: &str) -> String {
     value
         .to_lowercase()
         .chars()
-        .filter(|c| !c.is_whitespace() && !matches!(c, '-' | '_' | '・' | '･' | '.' | ',' | '，' | '。'))
+        .filter(|c| {
+            !c.is_whitespace() && !matches!(c, '-' | '_' | '・' | '･' | '.' | ',' | '，' | '。')
+        })
         .collect()
 }
 
+/// 归一化网址：去协议、去 www、去尾斜杠、转小写，用于官网比对
 fn normalize_website(url: &str) -> String {
     url.trim()
         .trim_start_matches("https://")
@@ -942,10 +1026,12 @@ fn normalize_website(url: &str) -> String {
         .to_lowercase()
 }
 
+/// 解析 CSS 选择器，失败时返回带选择器的错误信息
 fn sel(selector: &str) -> Result<Selector, String> {
     Selector::parse(selector).map_err(|e| format!("选择器解析失败 {selector}: {e:?}"))
 }
 
+/// 从文本中提取日期，支持 `YYYY-MM-DD`、`YYYY/MM/DD`、`YYYY年M月D日` 等格式，输出 `YYYY-MM-DD`
 fn extract_date(text: &str) -> Option<String> {
     let normalized = text.replace('/', "-");
     let chars: Vec<char> = normalized.chars().collect();
@@ -960,7 +1046,11 @@ fn extract_date(text: &str) -> Option<String> {
                 .trim_start_matches('-')
                 .split('-')
                 .take(2)
-                .map(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>())
+                .map(|s| {
+                    s.chars()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect::<String>()
+                })
                 .filter(|s| !s.is_empty())
                 .collect::<Vec<_>>();
             return Some(match nums.as_slice() {
@@ -971,12 +1061,20 @@ fn extract_date(text: &str) -> Option<String> {
         }
         if rest.starts_with('年') {
             let after_year = rest.trim_start_matches('年');
-            let month: String = after_year.chars().take_while(|c| c.is_ascii_digit()).collect();
+            let month: String = after_year
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
             if month.is_empty() {
                 return Some(year);
             }
-            let after_month = after_year.trim_start_matches(month.as_str()).trim_start_matches('月');
-            let day: String = after_month.chars().take_while(|c| c.is_ascii_digit()).collect();
+            let after_month = after_year
+                .trim_start_matches(month.as_str())
+                .trim_start_matches('月');
+            let day: String = after_month
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
             return Some(if day.is_empty() {
                 format!("{year}-{}", pad2(&month))
             } else {
@@ -988,6 +1086,7 @@ fn extract_date(text: &str) -> Option<String> {
     None
 }
 
+/// 将单数字符串前补 0 为两位
 fn pad2(value: &str) -> String {
     if value.len() == 1 {
         format!("0{value}")
@@ -996,6 +1095,7 @@ fn pad2(value: &str) -> String {
     }
 }
 
+/// 为所有类型提供 `pipe` 方法，便于链式传递值给闭包
 trait Pipe: Sized {
     fn pipe<T>(self, f: impl FnOnce(Self) -> T) -> T {
         f(self)

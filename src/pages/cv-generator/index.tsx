@@ -2,10 +2,10 @@ import { useState, useRef, useMemo } from 'react';
 import { Button, App, Table, Result, Splitter, Typography, Tooltip, Spin, Modal } from 'antd';
 import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
-import { CheckOutlined, CopyOutlined, ImportOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { CheckOutlined, ImportOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router';
-import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import Page from '@/components/page';
+import CopyButton from '@/components/CopyButton';
 import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/SearchInput';
 import {
   useArticleStore,
@@ -20,29 +20,6 @@ import { shokushuDetailLabels, gameConnectionKindLabels } from '@/lib/erogamesca
 import { PENDING_SELL_DATE } from '@/utils/constants';
 import { normalizePunctuation, buildJapaneseNameTemplate, resolveInputId, generateExternalLinksWikitext } from '@/utils/text';
 import { generateCVWikitext, generateMusicWikitable, buildConnectionsMap } from './generateWikitext';
-
-function CopyButton({ text }: { text: string }) {
-  const { message } = App.useApp();
-  return (
-    <Tooltip title='复制到剪贴板'>
-      <Button
-        type='text'
-        size='small'
-        icon={<CopyOutlined />}
-        onClick={async () => {
-          try {
-            await writeText(text);
-            message.success('已复制到剪贴板');
-          } catch (e) {
-            message.error(`复制失败: ${e instanceof Error ? e.message : e}`);
-          }
-        }}
-      >
-        复制
-      </Button>
-    </Tooltip>
-  );
-}
 
 function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
