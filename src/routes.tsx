@@ -1,10 +1,12 @@
 import {
   AudioOutlined,
   BarChartOutlined,
+  BankOutlined,
   SettingOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import CvGenerator from '@/pages/cv-generator';
+import CompanyGenerator from '@/pages/company-generator';
 import ArticleStats from '@/pages/article-stats';
 import About from '@/pages/about';
 import Settings from '@/pages/settings';
@@ -44,6 +46,14 @@ export const routes: RouteConfig[] = [
     component: CvGenerator,
     label: '里界声优条目生成',
     icon: <AudioOutlined />,
+    position: 'top',
+    keepAlive: true,
+  },
+  {
+    path: '/company-generator',
+    component: CompanyGenerator,
+    label: 'Galgame会社条目生成',
+    icon: <BankOutlined />,
     position: 'top',
     keepAlive: true,
   },
