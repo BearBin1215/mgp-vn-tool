@@ -52,7 +52,7 @@ export const routes: RouteConfig[] = [
   {
     path: '/company-generator',
     component: CompanyGenerator,
-    label: 'Galgame会社条目生成',
+    label: '会社条目生成',
     icon: <BankOutlined />,
     position: 'top',
     keepAlive: true,

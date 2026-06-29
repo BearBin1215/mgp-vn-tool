@@ -1,8 +1,10 @@
-mod company;
+mod bangumi;
 mod erogamescape;
 mod feishu;
+mod http;
 mod moegirl;
 mod settings;
+mod vndb;
 
 use tauri::window::Color;
 use tauri::Manager;
@@ -30,7 +32,9 @@ pub fn run() {
             erogamescape::check_connectivity,
             erogamescape::query_creator_works,
             erogamescape::search_creators,
-            company::query_company_data,
+            vndb::query_vndb_producer,
+            vndb::search_vndb_producers,
+            bangumi::query_bangumi_company,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

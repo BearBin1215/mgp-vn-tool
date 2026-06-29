@@ -43,7 +43,9 @@ mgp-vn-tool/
 │   ├── api/                    # API 封装
 │   │   ├── erogamescape.ts     # 批评空间 API 封装
 │   │   ├── feishu.ts           # 飞书 API 封装
-│   │   └── moegirl.ts          # 萌娘百科 API 封装
+│   │   ├── moegirl.ts          # 萌娘百科 API 封装
+│   │   ├── vndb.ts             # VNDB API 封装（含 VndbWork 类型）
+│   │   └── bangumi.ts          # Bangumi API 封装（含 BangumiWork 类型）
 │   ├── assets/                 # 静态资源
 │   ├── components/             # 共享组件
 │   │   ├── layout/             # 布局组件（Layout + Menu）
@@ -79,6 +81,8 @@ mgp-vn-tool/
 │   │   ├── erogamescape.rs     # 批评空间 API
 │   │   ├── feishu.rs           # 飞书 API
 │   │   ├── moegirl.rs          # 萌娘百科 API
+│   │   ├── vndb.rs             # VNDB API（含 Work 结构体）
+│   │   ├── bangumi.rs          # Bangumi API（含 BangumiWork 结构体）
 │   │   └── main.rs             # 入口
 │   ├── capabilities/           # Tauri 权限配置
 │   ├── tauri.conf.json         # Tauri 核心配置
