@@ -1,35 +1,49 @@
 import { useNavigate, useLocation } from 'react-router';
 import { Layout as AntLayout, Menu as AntMenu, Divider, BorderBeam } from 'antd';
 import type { MenuProps } from 'antd';
-import { routes } from '@/routes';
+import { routes, type RouteConfig } from '@/routes';
 
-const menuItems = routes
-  .filter((r) => r.path !== '/' && (r.position ?? 'top') === 'top')
-  .map((r) => ({ text: r.label!, icon: r.icon!, path: r.path }));
+const topRoutes = routes.filter((r) => r.path !== '/' && (r.position ?? 'top') === 'top');
+const bottomRoutes = routes.filter((r) => r.path !== '/' && (r.position ?? 'bottom') === 'bottom');
 
-const bottomMenuItems = routes
-  .filter((r) => r.path !== '/' && (r.position ?? 'bottom') === 'bottom')
-  .map((r) => ({ text: r.label!, icon: r.icon!, path: r.path }));
+/** 将路由配置转为 antd Menu 的 items，二级菜单分组以 label 作为 key */
+function buildMenuItems(configs: RouteConfig[]): MenuProps['items'] {
+  return configs.map((r) => {
+    if (r.children) {
+      return {
+        key: r.label!,
+        icon: r.icon,
+        label: r.label,
+        children: buildMenuItems(r.children),
+      };
+    }
+    return {
+      key: r.path!,
+      icon: r.icon,
+      label: r.label,
+    };
+  });
+}
+
+/** 收集所有二级菜单分组的 key（用于默认展开） */
+function collectGroupKeys(configs: RouteConfig[]): string[] {
+  return configs.filter((r) => r.children).map((r) => r.label!);
+}
+
+const topItems = buildMenuItems(topRoutes);
+const bottomItems = buildMenuItems(bottomRoutes);
+const topOpenKeys = collectGroupKeys(topRoutes);
 
 /** 应用左侧菜单 */
 export default function LayoutMenu() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const topItems: MenuProps['items'] = menuItems.map((item) => ({
-    key: item.path,
-    icon: item.icon,
-    label: item.text,
-  }));
-
-  const bottomItems: MenuProps['items'] = bottomMenuItems.map((item) => ({
-    key: item.path,
-    icon: item.icon,
-    label: item.text,
-  }));
-
   const handleClick: MenuProps['onClick'] = ({ key }) => {
-    navigate(String(key));
+    // 仅叶子菜单（路径）触发导航，分组标题不处理
+    if (key.startsWith('/')) {
+      navigate(key);
+    }
   };
 
   return (
@@ -61,6 +75,7 @@ export default function LayoutMenu() {
           className='border-0!'
           mode='inline'
           selectedKeys={[location.pathname]}
+          defaultOpenKeys={topOpenKeys}
           items={topItems}
           onClick={handleClick}
         />
