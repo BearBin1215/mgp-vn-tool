@@ -3,11 +3,11 @@ import { ConfigProvider, App as AntApp, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import Layout from '@/components/layout';
 import KeepAlive from '@/components/KeepAlive';
-import { routes } from '@/routes';
+import { flatRoutes } from '@/routes';
 import { useSettingsStore } from '@/stores/settingsStore';
 import './App.css';
 
-const keepAliveRoutes = routes.map((r) => ({ path: r.path, element: <r.component />, keepAlive: r.keepAlive }));
+const keepAliveRoutes = flatRoutes.map((r) => ({ path: r.path, element: <r.component />, keepAlive: r.keepAlive }));
 
 export default function App() {
   const colorMode = useSettingsStore((s) => s.colorMode);

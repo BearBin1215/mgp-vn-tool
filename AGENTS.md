@@ -173,6 +173,8 @@ export const routes: RouteConfig[] = [
 ];
 ```
 
+菜单支持顶级和一级折叠，具体写法见routers.tsx。
+
 ### 前后端通信
 
 前端通过 Tauri `invoke()` 调用 Rust 命令。不同 API 的响应处理方式不同：

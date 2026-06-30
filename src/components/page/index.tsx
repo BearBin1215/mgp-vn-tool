@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router';
 import { Layout as AntLayout, Typography } from 'antd';
-import { routes } from '@/routes';
+import { flatRoutes } from '@/routes';
 
 interface PageProps {
   /** 页顶右侧的操作按钮区域 */
@@ -18,7 +18,7 @@ interface PageProps {
 
 export default function Page({ actions, subtitle, padding = true, className, children }: PageProps) {
   const location = useLocation();
-  const label = routes.find((r) => r.path === location.pathname)?.label || '';
+  const label = flatRoutes.find((r) => r.path === location.pathname)?.label || '';
 
   return (
     <>
