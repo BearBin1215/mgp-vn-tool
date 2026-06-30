@@ -26,6 +26,6 @@ export interface BangumiCompanyData {
 }
 
 /** 根据 Bangumi person id 抓取会社信息与各分类作品列表 */
-export function queryBangumiCompany(bgmPersonId: number): Promise<BangumiCompanyData> {
+export function queryBangumiCompany(bgmPersonId: number) {
   return invoke<BangumiCompanyData>('query_bangumi_company', { bgmPersonId });
 }

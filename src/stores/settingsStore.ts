@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import moegirl from '@/api/moegirl';
-import { DEFAULT_FEISHU_APP_ID } from '@/utils/constants';
+import { DEFAULT_USER_AGENT, DEFAULT_FEISHU_APP_ID } from '@/utils/constants';
 import { type ErogamescapeUrl, type MoegirlHost } from '@/lib/types';
 import { loadConfigStore } from '@/lib/configStore';
 import { useMoegirlStore } from './moegirlStore';
@@ -115,12 +115,10 @@ const getInitialMoegirlJumpHost = async (): Promise<MoegirlHost | 'same'> => {
   return saved || 'same';
 };
 
-const DEFAULT_MOEGIRL_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
-
 /** 从 Tauri store 读取保存的萌百 User-Agent 设置 */
 const getInitialMoegirlUserAgent = async (): Promise<string> => {
   const store = await storePromise;
-  return (await store.get<string>('moegirlUserAgent')) || DEFAULT_MOEGIRL_USER_AGENT;
+  return (await store.get<string>('moegirlUserAgent')) || DEFAULT_USER_AGENT;
 };
 
 /** 从 Tauri store 读取保存的萌百请求重试次数 */
@@ -252,7 +250,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     set({ bangumiTimeout: seconds });
   },
 
-  bangumiRetries: 2,
+  bangumiRetries: 1,
   setBangumiRetries: async (n) => {
     const store = await storePromise;
     await store.set('bangumiRetries', n);
@@ -284,7 +282,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     set({ moegirlJumpHost: host });
   },
 
-  moegirlUserAgent: DEFAULT_MOEGIRL_USER_AGENT,
+  moegirlUserAgent: DEFAULT_USER_AGENT,
   setMoegirlUserAgent: async (ua) => {
     const store = await storePromise;
     await store.set('moegirlUserAgent', ua);

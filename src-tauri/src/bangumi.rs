@@ -43,9 +43,6 @@ pub struct BangumiCompanyData {
     book: Vec<BangumiWork>,
 }
 
-/// 作品日期获取失败时追加到 wikitext 行尾的注释
-const BANGUMI_DATE_MISSING_NOTE: &str = "<!-- Bangumi 条目信息获取失败，日期缺失 -->";
-
 /// Bangumi v0 API 基地址
 const API_BASE: &str = "https://api.bgm.tv";
 
@@ -347,7 +344,7 @@ async fn build_works_by_category(
                         name,
                         name_cn,
                         date: None,
-                        note: Some(BANGUMI_DATE_MISSING_NOTE.to_string()),
+                        note: Some("<!-- Bangumi 条目信息获取失败，日期缺失 -->".to_string()),
                     }
                 }
             };

@@ -12,7 +12,7 @@ interface TokenQueryResponse {
 const tokenCache = new Map<string, string>();
 
 const moegirl = {
-  get(params: ApiParams): Promise<Record<string, unknown>> {
+  get(params: ApiParams) {
     const { moegirlApiHost: host, moegirlUserAgent: userAgent } = useSettingsStore.getState();
     return invoke<Record<string, unknown>>('moegirl_request', {
       host,
@@ -22,7 +22,7 @@ const moegirl = {
     });
   },
 
-  post(params: ApiParams): Promise<Record<string, unknown>> {
+  post(params: ApiParams) {
     const { moegirlApiHost: host, moegirlUserAgent: userAgent } = useSettingsStore.getState();
     return invoke<Record<string, unknown>>('moegirl_request', {
       host,

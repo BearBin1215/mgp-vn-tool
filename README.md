@@ -52,7 +52,13 @@
 
 ### 会社条目生成
 
-通过 VNDB producer 条目与 Bangumi person 条目（可选）取会社基础信息、官网、别名、简介、Galgame 与衍生动画/音乐/书籍列表，并生成萌娘百科会社条目 wikitext。
+- 根据 VNDB、Bangumi 数据生成萌娘百科Galgame会社条目 wikitext。
+- VNDB producer 条目获取会社基础信息、官网、别名、简介、游戏作品。
+- （可选）Bangumi person 条目获取会社衍生动画、音乐、书籍列表。
+
+| 会社搜索 | 生成结果 |
+| ---- | ---- |
+| ![会社搜索](docs/images/会社条目生成-搜索.jpg) | ![代码生成结果](docs/images/会社条目生成-结果.jpg) |
 
 ## License
 

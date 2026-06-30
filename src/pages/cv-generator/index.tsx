@@ -6,6 +6,7 @@ import { CheckOutlined, ImportOutlined, QuestionCircleOutlined } from '@ant-desi
 import { useNavigate } from 'react-router';
 import Page from '@/components/page';
 import CopyButton from '@/components/CopyButton';
+import EmptyPlaceholder from '@/components/EmptyPlaceholder';
 import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/SearchInput';
 import {
   useArticleStore,
@@ -413,6 +414,11 @@ export default function CvGenerator() {
             </pre>
           </div>
         </div>
+      )}
+
+      {/* 无任何数据时展示空状态占位 */}
+      {!(acting.length > 0 || music.length > 0) && !wikitext && (
+        <EmptyPlaceholder description='输入名称或批评空间创作者 id 后开始生成声优条目 wikitext' />
       )}
 
       <HelpModal open={helpModalOpen} onClose={() => setHelpModalOpen(false)} />

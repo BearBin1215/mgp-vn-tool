@@ -46,11 +46,11 @@ export interface VndbProducerSearchResult {
 }
 
 /** 根据 VNDB producer id 抓取制作组织信息与开发作品列表 */
-export function queryVndbProducer(producerId: number): Promise<VndbProducerData> {
+export function queryVndbProducer(producerId: number) {
   return invoke<VndbProducerData>('query_vndb_producer', { producerId });
 }
 
 /** 按名称搜索 VNDB producer，返回最多 10 个匹配项 */
-export function searchVndbProducers(keyword: string): Promise<VndbProducerSearchResult[]> {
+export function searchVndbProducers(keyword: string) {
   return invoke<VndbProducerSearchResult[]>('search_vndb_producers', { keyword });
 }

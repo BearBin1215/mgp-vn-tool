@@ -77,12 +77,13 @@ mgp-vn-tool/
 ├── src-tauri/                  # Tauri 后端
 │   ├── src/
 │   │   ├── lib.rs              # Tauri 配置和 Rust API 命令
+│   │   ├── http.rs             # 网络请求模块
 │   │   ├── settings.rs         # 统一从 Tauri Store 读取 settings.json
 │   │   ├── erogamescape.rs     # 批评空间 API
 │   │   ├── feishu.rs           # 飞书 API
 │   │   ├── moegirl.rs          # 萌娘百科 API
-│   │   ├── vndb.rs             # VNDB API（含 Work 结构体）
-│   │   ├── bangumi.rs          # Bangumi API（含 BangumiWork 结构体）
+│   │   ├── vndb.rs             # VNDB API
+│   │   ├── bangumi.rs          # Bangumi API
 │   │   └── main.rs             # 入口
 │   ├── capabilities/           # Tauri 权限配置
 │   ├── tauri.conf.json         # Tauri 核心配置
@@ -91,7 +92,9 @@ mgp-vn-tool/
 ├── docs/                       # 文档
 │   ├── images/                 # 文档用图片
 │   ├── moegirl_api.md          # 萌娘百科 API 说明
-│   └── erogamescape_api.md     # 批评空间 API 说明
+│   ├── erogamescape_api.md     # 批评空间 API 说明
+│   ├── vndb_api.md             # VNDB API 说明
+│   └── bangumi_api.md          # Bangumi API 说明
 ├── CONTRIBUTING.md             # 协作指南
 ├── package.json                # 前端依赖
 ├── eslint.config.ts            # eslint 配置
@@ -116,6 +119,7 @@ mgp-vn-tool/
 - 组件命名和导出使用 `export default function ComponentName()`
 - 组件使用PascalCase命名法，hooks以`use`开头
 - 共享组件放在 `src/components/` 目录，仅单页面使用的组件和对应页面的入口`index.tsx`放在同一目录
+- 共享组件props要求使用 `interface` 定义，除 className、disabled 等通用参数外每个参数都要有对应的 jsdoc 注释
 - 需要flex布局时，静态布局使用 div + tailwindcss（`<div className='flex'></div>`），仅在需要动态参数时使用antd的`Flex`组件
 
 antd 的 `message`、`notification`、`modal` 静态方法使用 `App` 组件提供的实例以消费上下文：
