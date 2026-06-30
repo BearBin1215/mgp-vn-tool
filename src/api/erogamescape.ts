@@ -81,13 +81,13 @@ export interface CreatorWorksResult {
 }
 
 /** 根据创作者id读取参与作品信息 */
-export async function queryCreatorWorks(creatorId: number): Promise<CreatorWorksResult> {
+export async function queryCreatorWorks(creatorId: number) {
   const res = await invoke<ErogamescapeResponse<CreatorWorksResult>>('query_creator_works', { creatorId });
   return unwrap(res);
 }
 
 /** 根据关键词搜索创作者 */
-export async function searchCreators(keyword: string): Promise<CreatorSearchResult[]> {
+export async function searchCreators(keyword: string) {
   const res = await invoke<ErogamescapeResponse<CreatorSearchResult[]>>('search_creators', { keyword });
   return unwrap(res);
 }

@@ -2,13 +2,12 @@
   "name": "mgp-vn-tool",
   "description": "萌百视觉小说研究会条目工具",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
@@ -52,6 +51,7 @@
     "tsx": "^4.22.4",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.61.0",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vite-plugin-checker": "^0.14.4"
   }
 }

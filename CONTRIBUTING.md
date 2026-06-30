@@ -83,6 +83,7 @@ pnpm tauri build
 - 严格遵循 [eslint 规则](/eslint.config.ts)，提交前执行`pnpm lint`或在开发时安装eslint插件（用VS Code打开本仓库时会自动推荐安装）
 - 每个函数开头都需要用 jsdoc 说明作用
 - 共享组件放在 `src/components/` 目录，仅单页面使用的组件和对应页面的入口`index.tsx`放在同一目录
+- 共享组件props要求使用 `interface` 定义，除 className、disabled 等通用参数外每个参数都要有对应的 jsdoc 注释
 - 需要flex布局时，静态布局使用 div + tailwindcss（`<div className='flex'></div>`），仅在需要动态参数时使用antd的`Flex`组件
 
 ### 样式
