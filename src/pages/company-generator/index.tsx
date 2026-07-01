@@ -1,17 +1,19 @@
 import { useMemo, useRef, useState } from 'react';
-import { App, Button, Descriptions, Input, Modal, Result, Splitter, Table, Tooltip, Typography } from 'antd';
+import { App, Button, Descriptions, Input, Splitter, Spin, Table, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { CheckOutlined, LinkOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router';
+import { CheckOutlined, LinkOutlined } from '@ant-design/icons';
 import Page from '@/components/page';
-import CopyButton from '@/components/CopyButton';
+import CodePanel from '@/components/CodePanel';
 import EmptyPlaceholder from '@/components/EmptyPlaceholder';
+import HelpButton from '@/components/HelpButton';
+import EmptyArticleWarning from '@/components/EmptyArticleWarning';
 import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/SearchInput';
 import { queryVndbProducer, searchVndbProducers, type VndbProducerData, type VndbWork } from '@/api/vndb';
 import { queryBangumiCompany, type BangumiCompanyData, type BangumiWork } from '@/api/bangumi';
 import { useArticleStore } from '@/stores/articleStore';
 import { buildGameArticleMap } from '@/utils/articleMap';
-import { resolveInputId } from '@/utils/text';
+import { resolveInputId, formatError } from '@/utils/text';
+import { toTableData } from '@/utils/table';
 import { generateCompanyWikitext, ensureSameCompany, type CompanyData } from './generateWikitext';
 
 /** queryCompanyData 的返回：聚合数据 + 可选 Bangumi 数据源的失败原因（降级时非 null） */
@@ -55,9 +57,6 @@ async function queryCompanyData(
     bangumiError,
   };
 }
-
-/** 将任意值格式化为可读的错误信息字符串 */
-const formatError = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** 从用户输入的数字或链接中解析 Bangumi person id */
 function parseBangumiId(value: string): number | null {
@@ -181,34 +180,9 @@ const bangumiWorkColumns: TableColumnsType<TableBangumiWork> = [
   },
 ];
 
-/** 为列表补充 key 字段，供 Table dataSource 使用 */
-const toTableData = <T,>(records: T[]): (T & { key: string })[] =>
-  records.map((r, i) => ({ ...r, key: String(i) }));
-
-function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return (
-    <Modal
-      open={open}
-      title='使用帮助'
-      footer={null}
-      onCancel={onClose}
-      width={620}
-    >
-      <ul className='pl-4 m-0 list-disc'>
-        <li>VNDB 为必填项，用于生成会社基础信息与 Galgame 作品列表。</li>
-        <li>Bangumi 为可选项，用于补充 Logo、别名、官网和衍生作品（动画、音乐、书籍）。</li>
-        <li>Bangumi 网络环境较差，请求失败时会自动跳过，仅以 VNDB 数据生成条目。</li>
-        <li>作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。</li>
-        <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
-      </ul>
-    </Modal>
-  );
-}
-
 /** Galgame 会社条目生成页面 */
 export default function CompanyGenerator() {
   const { message, modal } = App.useApp();
-  const navigate = useNavigate();
   const articles = useArticleStore((s) => s.articles);
   const updatedAt = useArticleStore((s) => s.updatedAt);
 
@@ -222,8 +196,6 @@ export default function CompanyGenerator() {
   const [wikitext, setWikitext] = useState('');
   // 用户在「未获取条目数据」提示页点击「继续使用」后标记，本会话内不再提示（页面级，不跨页面共享）
   const [dismissedEmptyWarning, setDismissedEmptyWarning] = useState(false);
-  // 显示帮助弹窗
-  const [helpModalOpen, setHelpModalOpen] = useState(false);
 
   // 右侧原始数据表格所需的数据（补充 key 字段）
   const tableData = useMemo(() => ({
@@ -295,7 +267,7 @@ export default function CompanyGenerator() {
 
       // Bangumi 为可选数据源：用户填了 id 但请求失败降级为空时，非阻断提示（含失败原因）
       if (bgmPersonId && bangumiError) {
-        message.warning(`Bangumi 数据获取失败，已仅以 VNDB 数据生成：${formatError(bangumiError)}`);
+        message.warning(`Bangumi 数据获取失败，已仅以 VNDB 数据生成：${formatError(bangumiError)}`, 5);
       }
 
       // 前端一致性校验：不一致时弹确认框，用户可选择继续或中止
@@ -327,38 +299,22 @@ export default function CompanyGenerator() {
 
   if (!updatedAt && !dismissedEmptyWarning) {
     return (
-      <>
-        <Page
-          actions={
-            <Tooltip title='使用帮助'>
-              <Button
-                type='text'
-                icon={<QuestionCircleOutlined />}
-                onClick={() => setHelpModalOpen(true)}
-              />
-            </Tooltip>
-          }
-        >
-          <Result
-            status='warning'
-            title='未获取条目数据'
-            subTitle='条目统计数据为空，生成条目时可能无法正常生成作品内链。建议先前往条目统计页面获取数据。'
-            extra={[
-              <Button
-                key='continue'
-                type='primary'
-                onClick={() => setDismissedEmptyWarning(true)}
-              >
-                继续使用
-              </Button>,
-              <Button key='fetch' onClick={() => navigate('/article-stats')}>
-                前往获取数据
-              </Button>,
-            ]}
-          />
-        </Page>
-        <HelpModal open={helpModalOpen} onClose={() => setHelpModalOpen(false)} />
-      </>
+      <Page
+        actions={
+          <HelpButton>
+            <li>VNDB 为必填项，用于生成会社基础信息与 Galgame 作品列表。</li>
+            <li>Bangumi 为可选项，用于补充 Logo、别名、官网和衍生作品（动画、音乐、书籍）。</li>
+            <li>Bangumi 网络环境较差，请求失败时会自动跳过，仅以 VNDB 数据生成条目。</li>
+            <li>作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。</li>
+            <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
+          </HelpButton>
+        }
+      >
+        <EmptyArticleWarning
+          subTitle='条目统计数据为空，生成条目时可能无法正常生成作品内链。建议先前往条目统计页面获取数据。'
+          onDismiss={() => setDismissedEmptyWarning(true)}
+        />
+      </Page>
     );
   }
 
@@ -366,13 +322,13 @@ export default function CompanyGenerator() {
     <Page
       className='flex flex-col'
       actions={
-        <Tooltip title='使用帮助'>
-          <Button
-            type='text'
-            icon={<QuestionCircleOutlined />}
-            onClick={() => setHelpModalOpen(true)}
-          />
-        </Tooltip>
+        <HelpButton>
+          <li>VNDB 为必填项，用于生成会社基础信息与 Galgame 作品列表。</li>
+          <li>Bangumi 为可选项，用于补充 Logo、别名、官网和衍生作品（动画、音乐、书籍）。</li>
+          <li>Bangumi 网络环境较差，请求失败时会自动跳过，仅以 VNDB 数据生成条目。</li>
+          <li>作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。</li>
+          <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
+        </HelpButton>
       }
     >
       <div className='flex flex-col gap-3 mb-3 shrink-0'>
@@ -410,27 +366,19 @@ export default function CompanyGenerator() {
         </div>
       </div>
 
-      {data ? (
+      {loading && (
+        <div className='flex-1 flex items-center justify-center'>
+          <Spin description='正在生成会社条目...' />
+        </div>
+      )}
+      {!loading && data && (
         <Splitter className='flex-1 min-h-0 px-4 pb-4'>
           <Splitter.Panel
             defaultSize='60%'
             min='30%'
             className='flex flex-col min-w-0'
           >
-            <div className='flex items-center justify-between shrink-0 px-1 h-6'>
-              <Typography.Text strong>生成结果</Typography.Text>
-              <CopyButton text={wikitext} />
-            </div>
-            <pre
-              className={`
-                m-0 p-2 flex-1 min-h-0
-                text-sm overflow-auto whitespace-pre-wrap leading-relaxed
-                border border-(--ant-color-border)
-                bg-(--ant-color-bg-elevated)
-              `}
-            >
-              {wikitext}
-            </pre>
+            <CodePanel variant='inset' text={wikitext} />
           </Splitter.Panel>
 
           <Splitter.Panel
@@ -530,11 +478,10 @@ export default function CompanyGenerator() {
             </div>
           </Splitter.Panel>
         </Splitter>
-      ) : (
+      )}
+      {!loading && !data && (
         <EmptyPlaceholder description='输入 VNDB 公司条目后开始生成会社条目 wikitext' />
       )}
-
-      <HelpModal open={helpModalOpen} onClose={() => setHelpModalOpen(false)} />
     </Page>
   );
 }

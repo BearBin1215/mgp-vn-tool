@@ -1,23 +1,17 @@
 import dayjs from 'dayjs';
-import type { GameConnection, GameRecord } from '@/api/erogamescape';
-import type { PageInfo } from '@/stores/articleStore';
+import { groupBy, uniq } from 'lodash-es';
+import type { CreatorWorksResult, GameConnection, GameRecord } from '@/api/erogamescape';
+import type { PageInfo } from '@/api/moegirl';
 import { PENDING_SELL_DATE } from '@/utils/constants';
-import { normalizePunctuation, wrapLj } from '@/utils/text';
+import { buildJapaneseNameTemplate, generateExternalLinksWikitext, normalizePunctuation, wrapLj } from '@/utils/text';
 
 /** 游戏关联映射，key 为 normalizePunctuation(subjectGameName) */
 export type ConnectionsMap = Map<string, GameConnection[]>;
 
 /** 根据关联列表构建按 subject 游戏名分组的映射 */
 export function buildConnectionsMap(connections: GameConnection[]): ConnectionsMap {
-  const map: ConnectionsMap = new Map();
-  for (const c of connections) {
-    const key = normalizePunctuation(c.subjectGameName);
-    if (!map.has(key)) {
-      map.set(key, []);
-    }
-    map.get(key)!.push(c);
-  }
-  return map;
+  const grouped = groupBy(connections, (c) => normalizePunctuation(c.subjectGameName));
+  return new Map(Object.entries(grouped));
 }
 
 /**
@@ -99,7 +93,7 @@ export function generateMusicWikitable(
  *
  * 作品名通过 gameMap 查询条目统计添加内链，角色名通过 pageInfoMap 查询萌百页面信息添加内链
  */
-export function generateCVWikitext(
+export function buildActingWikitext(
   records: GameRecord[],
   gameMap: Map<string, string>,
   pageInfoMap?: Map<string, PageInfo>,
@@ -110,21 +104,14 @@ export function generateCVWikitext(
   // 按发售日排序
   const sorted = [...records].sort((a, b) => a.sellDay.localeCompare(b.sellDay));
 
-  /** 各年份出演作品表 */
-  const yearGameMap = new Map<string, GameRecord[]>();
-  const tbdRecords: GameRecord[] = [];
-  for (const record of sorted) {
-    // 批评空间上 2050-01-01 就是待定
-    if (record.sellDay === PENDING_SELL_DATE) {
-      tbdRecords.push(record);
-      continue;
-    }
-    const year = record.sellDay.substring(0, 4);
-    if (!yearGameMap.has(year)) {
-      yearGameMap.set(year, []);
-    }
-    yearGameMap.get(year)!.push(record);
-  }
+  /** 各年份出演作品表：先分离待定记录，再按年份分组 */
+  const tbdRecords = sorted.filter((r) => r.sellDay === PENDING_SELL_DATE);
+  const yearGameMap = new Map(
+    Object.entries(groupBy(
+      sorted.filter((r) => r.sellDay !== PENDING_SELL_DATE),
+      (r) => r.sellDay.substring(0, 4),
+    )),
+  );
   if (tbdRecords.length > 0) {
     yearGameMap.set('待定', tbdRecords);
   }
@@ -137,19 +124,13 @@ export function generateCVWikitext(
     lines.push(`'''${year === '待定' ? '待定' : `${year}年`}'''`);
 
     // 同一年内按游戏名分组，同一游戏的多个角色用顿号分隔，多平台合并
-    const byGame = new Map<string, GameRecord[]>();
-    for (const r of yearRecords) {
-      if (!byGame.has(r.gameName)) {
-        byGame.set(r.gameName, []);
-      }
-      byGame.get(r.gameName)!.push(r);
-    }
+    const byGame = groupBy(yearRecords, (r) => r.gameName);
 
-    for (const [gameName, chars] of byGame) {
+    for (const [gameName, chars] of Object.entries(byGame)) {
       const gameDisplay = resolveGameDisplay(gameName, gameMap, connectionsMap, wrapLj);
 
       // 收集所有平台（去重），非 PC 平台显示括号注明平台
-      const platforms = [...new Set(chars.map((c) => c.model).filter(Boolean))];
+      const platforms = uniq(chars.map((c) => c.model).filter(Boolean));
       const notPCPlatforms = platforms.filter((p) => p !== 'Windows' && p !== 'PC');
       const platformTag = notPCPlatforms.length > 0 ? `（${notPCPlatforms.join('、')}）` : '';
 
@@ -222,4 +203,86 @@ export function generateCVWikitext(
   }
 
   return lines.join('\n');
+}
+
+/**
+ * 组装声优条目完整 wikitext
+ *
+ * 声优信息模板 + 引言 + 出演作品 + 音乐作品 + 注释及外部链接。
+ * pageInfoMap 缺省时角色名不加内链（渐进生成的中间结果），传入后角色名按萌百页面信息加内链。
+ * @param result 批评空间创作者作品查询结果
+ * @param gameArticleMap 萌百条目映射（normalizePunctuation 游戏名 → 条目标题），用于游戏名内链
+ * @param pageInfoMap 角色名页面信息映射，缺省时角色名无内链
+ */
+export function generateCVWikitext(
+  result: CreatorWorksResult,
+  gameArticleMap: Map<string, string>,
+  pageInfoMap?: Map<string, PageInfo>,
+): string {
+  const sections: string[] = [];
+
+  // 欢迎编辑模板
+  sections.push('{{欢迎编辑}}');
+
+  // 长期关注及更新模板：最近2年内>3部作品 且 最近1年内>=1部作品
+  const allRecords = [...result.acting, ...result.music];
+  const currentYear = dayjs().year();
+  const countRecentWorks = (yearsAgo: number) =>
+    allRecords.filter((r) => {
+      if (!r.sellDay || r.sellDay === PENDING_SELL_DATE) { return false; }
+      return dayjs(r.sellDay, 'YYYY-MM-DD', true).year() >= currentYear - yearsAgo;
+    }).length;
+  if (countRecentWorks(2) > 3 && countRecentWorks(1) >= 1) {
+    sections.push('{{长期关注及更新}}');
+  }
+
+  const { creatorInfo } = result;
+  const connectionsMap = buildConnectionsMap(result.gameConnections);
+  const nameWithFurigana = creatorInfo.furigana
+    ? buildJapaneseNameTemplate(creatorInfo.name, creatorInfo.furigana)
+    : creatorInfo.name;
+  sections.push(
+    '{{声优信息',
+    `|姓名=${nameWithFurigana}`,
+    '|image=',
+    '|图片信息=',
+    '|其它艺名=',
+    '|昵称=',
+    '|性别=女',
+    '|国籍=日本',
+    '|配演语言=日语',
+    '|出身地区=',
+    '|所属公司=',
+    '|出道角色=',
+    '|代表角色=',
+    '|本体=',
+    '}}',
+    `'''${creatorInfo.name}'''是日本的女性声优，多从事[[成人游戏]]的配音工作。`,
+    '',
+    '== 出演作品 ==',
+    "主要角色以'''粗体'''显示。",
+    '',
+    '=== 游戏 ===',
+    buildActingWikitext(result.acting, gameArticleMap, pageInfoMap, connectionsMap),
+  );
+
+  const musicText = generateMusicWikitable(result.music, gameArticleMap, connectionsMap);
+  if (musicText) {
+    sections.push('== 音乐作品 ==', musicText);
+  }
+
+  // 注释及外部链接
+  const externalLinks = generateExternalLinksWikitext(creatorInfo);
+  sections.push(
+    '',
+    '{{R-18作品声优索引|女}}',
+    '',
+    '== 注释及外部链接 ==',
+    '<references />',
+  );
+  if (externalLinks) {
+    sections.push(externalLinks);
+  }
+
+  return sections.join('\n');
 }

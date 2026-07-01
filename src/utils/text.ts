@@ -1,5 +1,6 @@
+import dayjs from 'dayjs';
 import type { CreatorInfo } from '@/api/erogamescape';
-import type { PageInfo } from '@/stores/articleStore';
+import type { PageInfo } from '@/api/moegirl';
 
 /** 半角感叹号和问号转换为全角 */
 export const normalizePunctuation = (text: string) => {
@@ -40,6 +41,8 @@ export const kataToHira = (text: string) => {
  * 当声优名为「汉字姓＋假名名」时（如「天季ひより」，假名「アマキヒヨリ」），
  * 可据名字中最后一个汉字的位置切出假名尾缀（名的书写形式），再从假名中剥离出姓的读音，
  * 生成 `{{日本人名|天季|あまき|ひより}}`；其余情况退化为 `{{日本人名|姓名|假名}}`。
+ * @param name 姓名
+ * @param furigana 假名
  */
 export const buildJapaneseNameTemplate = (name: string, furigana: string) => {
   const hira = kataToHira(furigana);
@@ -77,6 +80,7 @@ export const wrapLj = (text: string) => {
  * 根据创作者信息生成 wikitext 外部链接列表
  *
  * 每个非空字段生成一行 `* [url text]` 格式的 wikitext。
+ * @param info 创作者基础信息
  */
 export function generateExternalLinksWikitext(info: Partial<CreatorInfo>): string {
   const lines: string[] = [];
@@ -135,3 +139,19 @@ export const resolveInternalLink = (
   }
   return `[[${resolveTitle(title, pageInfoMap, categories)}]]`;
 };
+
+/**
+ * 格式化日期字符串为中文格式 `YYYY年M月D日`
+ *
+ * 空值返回空串；无效日期原样返回。
+ * @param date YYYY-MM-DD 格式日期字符串
+ */
+export const formatDateCN = (date: string | null): string => {
+  if (!date) { return ''; }
+  const d = dayjs(date, 'YYYY-MM-DD', true);
+  return d.isValid() ? d.format('YYYY年M月D日') : date;
+};
+
+/** 将任意值格式化为可读的错误信息字符串 */
+export const formatError = (e: unknown): string =>
+  e instanceof Error ? e.message : String(e);

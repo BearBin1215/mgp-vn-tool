@@ -1,7 +1,7 @@
-import dayjs from 'dayjs';
+import { groupBy, uniq } from 'lodash-es';
 import type { VndbProducer, VndbWork } from '@/api/vndb';
 import type { BangumiCompany, BangumiWork } from '@/api/bangumi';
-import { normalizePunctuation, wrapLj } from '@/utils/text';
+import { normalizePunctuation, wrapLj, formatDateCN } from '@/utils/text';
 
 /** 会社条目生成的原始数据（前端渲染 wikitext 所需） */
 export interface CompanyData {
@@ -70,11 +70,7 @@ function resolveOriginalDisplayWithLink(title: string, gameMap: Map<string, stri
 }
 
 /** 格式化作品发行日期为 `YYYY年M月D日`，无日期返回空串 */
-const formatDate = (date: string | null): string => {
-  if (!date) { return ''; }
-  const d = dayjs(date, 'YYYY-MM-DD', true);
-  return d.isValid() ? d.format('YYYY年M月D日') : date;
-};
+const formatDate = (date: string | null): string => formatDateCN(date);
 
 /**
  * 生成单个作品行：`*《原名》（译名）（日期）`。
@@ -124,8 +120,8 @@ interface WorkGroup {
 
 /** 比较两个发售日，空/无效日期排末尾 */
 function compareByDate(a: VndbWork, b: VndbWork): number {
-  const ta = a.date ? dayjs(a.date, 'YYYY-MM-DD', true).valueOf() || Infinity : Infinity;
-  const tb = b.date ? dayjs(b.date, 'YYYY-MM-DD', true).valueOf() || Infinity : Infinity;
+  const ta = a.date ? new Date(a.date).getTime() || Infinity : Infinity;
+  const tb = b.date ? new Date(b.date).getTime() || Infinity : Infinity;
   return ta - tb;
 }
 
@@ -165,30 +161,18 @@ function groupWorksByRelation(works: VndbWork[]): WorkGroup[] {
     return grandparent !== null && grandparent !== undefined;
   };
 
-  const derivedByParent = new Map<string, VndbWork[]>();
-  const roots: VndbWork[] = [];
-  for (const work of works) {
-    if (isRoot(work.id)) {
-      roots.push(work);
-    } else {
-      const parent = parentOf.get(work.id)!;
-      const siblings = derivedByParent.get(parent);
-      if (siblings) {
-        siblings.push(work);
-      } else {
-        derivedByParent.set(parent, [work]);
-      }
-    }
-  }
+  const roots = works.filter((w) => isRoot(w.id));
+  const derivedWorks = works.filter((w) => !isRoot(w.id));
+  const derivedByParent = groupBy(derivedWorks, (w) => parentOf.get(w.id)!);
 
   roots.sort(compareByDate);
-  for (const list of derivedByParent.values()) {
+  for (const list of Object.values(derivedByParent)) {
     list.sort(compareByDate);
   }
 
   return roots.map((main) => ({
     main,
-    derived: derivedByParent.get(main.id) ?? [],
+    derived: derivedByParent[main.id] ?? [],
     mainNeedsNote: multiOrig.has(main.id),
   }));
 }
@@ -247,7 +231,7 @@ export function generateCompanyWikitext(data: CompanyData, gameMap: Map<string, 
   const { vndb, bangumi } = data;
 
   // 合并去重别名（VNDB + Bangumi），用顿号连接
-  const aliases = [...new Set([...vndb.aliases, ...(bangumi?.aliases ?? [])])].join('、');
+  const aliases = uniq([...vndb.aliases, ...(bangumi?.aliases ?? [])]).join('、');
 
   // 官网：VNDB 优先，回退 Bangumi
   const website = vndb.official_website ?? bangumi?.official_website ?? null;
