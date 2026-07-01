@@ -47,19 +47,29 @@ mgp-vn-tool/
 │   │   ├── vndb.ts             # VNDB API 封装（含 VndbWork 类型）
 │   │   └── bangumi.ts          # Bangumi API 封装（含 BangumiWork 类型）
 │   ├── assets/                 # 静态资源
+│   ├── icons/                  # 图标组件目录
 │   ├── components/             # 共享组件
 │   │   ├── layout/             # 布局组件（Layout + Menu）
 │   │   ├── page/               # 页面外壳组件
-│   │   ├── SearchInput/        # 带防抖的名称/id 搜索输入框
+│   │   ├── CodePanel.tsx       # 代码展示面板
+│   │   ├── CopyButton.tsx      # 复制按钮
+│   │   ├── DataTablePanel.tsx  # 原始数据表面板
+│   │   ├── EmptyArticleWarning.tsx # 本地条目数据为空提醒
+│   │   ├── EmptyPlaceholder.tsx    # 空状态占位组件
+│   │   ├── ExternalLink.tsx    # 外部链接
+│   │   ├── HelpButton.tsx      # 打开帮助弹窗按钮
 │   │   ├── KeepAlive.tsx       # 页面状态缓存组件
 │   │   └── MoegirlLink.tsx     # 萌百链接组件
+│   │   └── SearchInput.tsx     # 带防抖的名称/id 搜索输入框
 │   ├── lib/                    # 工具库
 │   │   ├── types.ts            # 共享类型定义
+│   │   ├── configStore.ts      # 配置存储
 │   │   ├── moegirlDict.ts      # 萌百中文映射（用户组等）
 │   │   └── erogamescapeDict.ts # 批评空间中文映射（职种等）
 │   ├── utils/                  # 纯工具函数
 │   │   ├── articleMap.ts       # 批评空间数据映射等
 │   │   ├── constants.ts        # 常量定义
+│   │   ├── table.ts            # 表格工具函数
 │   │   └── text.ts             # 文本处理工具
 │   ├── pages/                  # 页面组件
 │   │   ├── about/              # 关于页面（首页）
@@ -110,7 +120,7 @@ mgp-vn-tool/
 ### TypeScript
 
 - 遵循`eslint.config.ts`内的ESLint规则（2空格缩进、分号结尾、优先单引号等）
-- 涉及复杂逻辑需添加注释；每个函数开头都需要用jsdoc说明作用
+- 涉及复杂逻辑需添加注释，每个函数开头都需要用jsdoc说明作用，utils内的复杂工具函数需要给每个参数添加对应的`@param`
 - 禁止未使用的变量和参数（`_` 前缀可忽略）
 - 工具函数优先检查lodash库是否提供
 

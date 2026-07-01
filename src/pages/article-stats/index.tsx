@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { uniq } from 'lodash-es';
 import {
   Table,
   Button,
@@ -209,7 +210,7 @@ export default function ArticleStats() {
 
   /** 制作组织集合，用于条件过滤选项 */
   const allBrands = useMemo(
-    () => [...new Set(articles.map((a) => a.brand).filter(Boolean))].sort(),
+    () => uniq(articles.map((a) => a.brand).filter(Boolean)).sort(),
     [articles],
   );
 
@@ -225,7 +226,7 @@ export default function ArticleStats() {
   }, [articles]);
 
   const allCategories = useMemo(() => {
-    return [...new Set([...presetCategories, ...articles.flatMap((a) => a.categories)])]
+    return uniq([...presetCategories, ...articles.flatMap((a) => a.categories)])
       .sort((a, b) => (categoryCounts.get(b) || 0) - (categoryCounts.get(a) || 0));
   }, [articles, categoryCounts]);
 

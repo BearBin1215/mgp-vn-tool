@@ -1,10 +1,9 @@
-import dayjs from 'dayjs';
-import { groupBy } from 'lodash-es';
+import { groupBy, uniq } from 'lodash-es';
 import type { WorkDetail, MusicCreatorDetail, StaffRecord } from '@/api/erogamescape';
-import type { PageInfo } from '@/stores/articleStore';
+import type { PageInfo } from '@/api/moegirl';
 import { platformLink, platformCategory } from '@/lib/erogamescapeDict';
 import { PENDING_SELL_DATE } from '@/utils/constants';
-import { normalizePunctuation, wrapLj, resolveTitle, resolveInternalLink } from '@/utils/text';
+import { normalizePunctuation, wrapLj, resolveTitle, resolveInternalLink, formatDateCN } from '@/utils/text';
 
 /** 制作组织有效分类：内链解析时仅采纳属于这些分类的页面 */
 const VALID_BRAND_CATEGORIES = ['Galgame公司', '日本游戏制作组织', 'BL游戏公司', '同人社团'];
@@ -37,7 +36,7 @@ const buildPublisherText = (detail: WorkDetail, pageInfoMap?: Map<string, PageIn
     (t) => t.brand,
   );
   for (const [brand, transplants] of Object.entries(portBrands)) {
-    const codes = [...new Set(transplants.map((t) => t.model).filter(Boolean))];
+    const codes = uniq(transplants.map((t) => t.model).filter(Boolean));
     parts.push(`${resolveInternalLink(brand, pageInfoMap, VALID_BRAND_CATEGORIES)}（${codes.join('、')}）`);
   }
   return parts.join('<br>');
@@ -46,8 +45,7 @@ const buildPublisherText = (detail: WorkDetail, pageInfoMap?: Map<string, PageIn
 /** 格式化发售日期（待定哨兵值显示为「待定」） */
 const formatSellDay = (sellday: string): string => {
   if (!sellday || sellday === PENDING_SELL_DATE) { return '待定'; }
-  const d = dayjs(sellday, 'YYYY-MM-DD', true);
-  return d.isValid() ? d.format('YYYY年M月D日') : sellday;
+  return formatDateCN(sellday);
 };
 
 /**
@@ -250,15 +248,8 @@ const buildStaff = (detail: WorkDetail, pageInfoMap?: Map<string, PageInfo>): st
 
   // 其他职种：shubetu=7 且 shubetuDetail=1，按 shubetuDetailName 分组
   const others = staff.filter((s) => s.shubetu === '7' && s.shubetuDetail === '1' && s.shubetuDetailName);
-  const otherGroups = new Map<string, typeof staff>();
-  for (const s of others) {
-    const label = s.shubetuDetailName;
-    if (!otherGroups.has(label)) {
-      otherGroups.set(label, []);
-    }
-    otherGroups.get(label)!.push(s);
-  }
-  for (const [label, persons] of otherGroups) {
+  const otherGroups = groupBy(others, (s) => s.shubetuDetailName);
+  for (const [label, persons] of Object.entries(otherGroups)) {
     buildLine(label, '7', persons);
   }
 
@@ -366,16 +357,9 @@ const buildMusic = (entries: MusicEntry[], pageInfoMap?: Map<string, PageInfo>) 
   const lines: string[] = ['== 相关音乐 =='];
 
   // 按分类标签分组，保持原始顺序
-  const byCategory = new Map<string, MusicEntry[]>();
-  for (const e of entries) {
-    const key = e.categoryLabel || '其他';
-    if (!byCategory.has(key)) {
-      byCategory.set(key, []);
-    }
-    byCategory.get(key)!.push(e);
-  }
+  const byCategory = groupBy(entries, (e) => e.categoryLabel || '其他');
 
-  for (const [label, items] of byCategory) {
+  for (const [label, items] of Object.entries(byCategory)) {
     for (const e of items) {
       lines.push(`* ${label}《${wrapLj(e.songName)}》`);
       // 演唱优先用 music.php 详情的歌手名，回退 SQL 的歌手名

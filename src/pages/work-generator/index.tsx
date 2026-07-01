@@ -1,10 +1,13 @@
 import { useState, useRef, useMemo } from 'react';
-import { App, Button, Input, Modal, Tooltip, Typography, Spin, Table, Splitter } from 'antd';
+import { uniq } from 'lodash-es';
+import { App, Button, Input, Modal, Splitter } from 'antd';
 import type { InputRef, TableColumnsType } from 'antd';
-import { CheckOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { CheckOutlined } from '@ant-design/icons';
 import Page from '@/components/page';
-import CopyButton from '@/components/CopyButton';
+import CodePanel from '@/components/CodePanel';
 import EmptyPlaceholder from '@/components/EmptyPlaceholder';
+import HelpButton from '@/components/HelpButton';
+import DataTablePanel from '@/components/DataTablePanel';
 import MoegirlLink from '@/components/MoegirlLink';
 import SearchInput, { type SearchInputOption } from '@/components/SearchInput';
 import {
@@ -16,8 +19,9 @@ import {
   type WorkTransplant,
 } from '@/api/erogamescape';
 import { shokushuLabels, shokushuDetailLabels, platforms } from '@/lib/erogamescapeDict';
-import { fetchPageInfo, type PageInfo } from '@/stores/articleStore';
+import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
 import { resolveInputId, normalizePunctuation } from '@/utils/text';
+import { toTableData } from '@/utils/table';
 import { PENDING_SELL_DATE } from '@/utils/constants';
 import { generateWorkWikitext, parseStaffName } from './generateWikitext';
 
@@ -25,7 +29,6 @@ type TableStaffRecord = StaffRecord & { key: string };
 type TableTransplant = WorkTransplant & { key: string };
 type TableSequel = { name: string; key: string };
 
-/** STAFF/CAST/音乐 原始数据列 */
 const staffColumns: TableColumnsType<TableStaffRecord> = [
   {
     title: '职种',
@@ -82,36 +85,11 @@ const sequelColumns: TableColumnsType<TableSequel> = [
   { title: '游戏名', dataIndex: 'name', key: 'name' },
 ];
 
-/** 为记录追加 antd Table 所需的稳定 key */
-const toTableData = <T,>(records: T[]) => records.map((r, i) => ({ ...r, key: String(i) }));
-
-/** 帮助弹窗 */
-function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return (
-    <Modal
-      open={open}
-      title='使用帮助'
-      footer={null}
-      onCancel={onClose}
-      width={620}
-    >
-      <ul className='pl-4 m-0 list-disc'>
-        <li>本功能以 <MoegirlLink title='Template:页面格式/视觉小说'>Template:页面格式/视觉小说</MoegirlLink> 为模板，生成后可按个人习惯调整格式、措辞等。</li>
-        <li>数据来自批评空间，使用前建议前往设置调整批评空间相关网络设置。</li>
-        <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
-      </ul>
-    </Modal>
-  );
-}
-
 export default function WorkGenerator() {
   const { message } = App.useApp();
 
   const [searchValue, setSearchValue] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  // 显示帮助弹窗
-  const [helpModalOpen, setHelpModalOpen] = useState(false);
 
   // 生成中、未获取到数据状态
   const [generating, setGenerating] = useState(false);
@@ -120,7 +98,6 @@ export default function WorkGenerator() {
   // 当前渐进生成阶段，驱动遮罩文案
   const [genPhase, setGenPhase] = useState<'wiki' | 'music' | null>(null);
 
-  // 批评空间原始数据
   const [workDetail, setWorkDetail] = useState<WorkDetail | null>(null);
 
   // STAFF/CAST/音乐 记录：shubetu=5 为声优（CAST），6 为歌手（音乐），其余为 STAFF，分表格展示
@@ -130,7 +107,6 @@ export default function WorkGenerator() {
     }
     return {
       castTableData: toTableData(workDetail.staff.filter((s) => s.shubetu === '5')),
-      // STAFF 表排除歌手(6)
       staffTableData: toTableData(workDetail.staff.filter((s) => !['5', '6'].includes(s.shubetu))),
       musicStaffTableData: toTableData(workDetail.staff.filter((s) => s.shubetu === '6')),
       transplantTableData: toTableData(workDetail.transplants),
@@ -213,7 +189,7 @@ export default function WorkGenerator() {
         ...detail.staff.filter((s) => ['5', '6'].includes(s.shubetu)).map((s) => parseStaffName(s.name).main),
         ...staffMainNames,
       ].filter(Boolean);
-      const uniqueNames = [...new Set(namesToQuery)];
+      const uniqueNames = uniq(namesToQuery);
       let pageInfoMap: Map<string, PageInfo> | undefined;
       if (uniqueNames.length > 0) {
         try {
@@ -252,13 +228,12 @@ export default function WorkGenerator() {
     <Page
       className='flex flex-col'
       actions={
-        <Tooltip title='使用帮助'>
-          <Button
-            type='text'
-            icon={<QuestionCircleOutlined />}
-            onClick={() => setHelpModalOpen(true)}
-          />
-        </Tooltip>
+        <HelpButton>
+          <li>本功能以 <MoegirlLink title='Template:页面格式/视觉小说'>Template:页面格式/视觉小说</MoegirlLink> 为模板，生成后可按个人习惯调整格式、措辞等。</li>
+          <li>数据来自批评空间，使用前建议前往设置调整批评空间相关网络设置。</li>
+          <li>批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。</li>
+          <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
+        </HelpButton>
       }
     >
       <div className='flex gap-2 shrink-0 mb-2'>
@@ -281,7 +256,6 @@ export default function WorkGenerator() {
         </Button>
       </div>
 
-      {/* 生成结果 */}
       {hasSourceData && (
         <Splitter className='flex-1 min-h-0 px-4 pb-4'>
           {/* 左侧：生成代码 */}
@@ -290,27 +264,12 @@ export default function WorkGenerator() {
             min='30%'
             className='flex flex-col min-w-0'
           >
-            <div className='flex items-center justify-between shrink-0 px-1 h-6'>
-              <Typography.Text strong>生成结果</Typography.Text>
-              <CopyButton text={wikitext} />
-            </div>
-            <div className='relative flex-1 min-h-0'>
-              <pre
-                className={`
-                  m-0 p-2 h-full
-                  text-sm overflow-auto whitespace-pre-wrap leading-relaxed
-                  border border-(--ant-color-border)
-                  bg-(--ant-color-bg-elevated)
-                `}
-              >
-                {wikitext}
-              </pre>
-              {regenerating && (
-                <div className='absolute inset-0 flex items-center justify-center bg-(--ant-color-bg-elevated)/60 backdrop-blur-[1px]'>
-                  <Spin description={genPhase === 'wiki' ? '正在查询萌娘百科信息...' : '正在获取音乐详情...'} />
-                </div>
-              )}
-            </div>
+            <CodePanel
+              variant='inset'
+              text={wikitext}
+              loading={regenerating}
+              loadingDescription={genPhase === 'wiki' ? '正在查询萌娘百科信息...' : '正在获取音乐详情...'}
+            />
           </Splitter.Panel>
 
           {/* 右侧：批评空间原始数据 */}
@@ -321,66 +280,16 @@ export default function WorkGenerator() {
             collapsible={{ start: true, showCollapsibleIcon: true }}
             className='flex flex-col min-w-0'
           >
-            <div className='flex items-center justify-between shrink-0 px-1 h-6'>
-              <Typography.Text strong>批评空间原始数据</Typography.Text>
-            </div>
-            <div className='overflow-auto flex-1 min-h-0 border border-(--ant-color-border)'>
-              {castTableData.length > 0 && (
-                <>
-                  <Typography.Text strong>CAST</Typography.Text>
-                  <Table
-                    columns={staffColumns}
-                    dataSource={castTableData}
-                    size='small'
-                    pagination={false}
-                  />
-                </>
-              )}
-              {staffTableData.length > 0 && (
-                <>
-                  <Typography.Text strong>STAFF</Typography.Text>
-                  <Table
-                    columns={staffColumns}
-                    dataSource={staffTableData}
-                    size='small'
-                    pagination={false}
-                  />
-                </>
-              )}
-              {musicStaffTableData.length > 0 && (
-                <>
-                  <Typography.Text strong>关联音乐</Typography.Text>
-                  <Table
-                    columns={staffColumns}
-                    dataSource={musicStaffTableData}
-                    size='small'
-                    pagination={false}
-                  />
-                </>
-              )}
-              {transplantTableData.length > 0 && (
-                <>
-                  <Typography.Text strong>移植版</Typography.Text>
-                  <Table
-                    columns={transplantColumns}
-                    dataSource={transplantTableData}
-                    size='small'
-                    pagination={false}
-                  />
-                </>
-              )}
-              {sequelTableData.length > 0 && (
-                <>
-                  <Typography.Text strong>续作</Typography.Text>
-                  <Table
-                    columns={sequelColumns}
-                    dataSource={sequelTableData}
-                    size='small'
-                    pagination={false}
-                  />
-                </>
-              )}
-            </div>
+            <DataTablePanel
+              header='批评空间原始数据'
+              sections={[
+                { title: 'CAST', columns: staffColumns, dataSource: castTableData },
+                { title: 'STAFF', columns: staffColumns, dataSource: staffTableData },
+                { title: '关联音乐', columns: staffColumns, dataSource: musicStaffTableData },
+                { title: '移植版', columns: transplantColumns, dataSource: transplantTableData },
+                { title: '续作', columns: sequelColumns, dataSource: sequelTableData },
+              ]}
+            />
           </Splitter.Panel>
         </Splitter>
       )}
@@ -389,32 +298,16 @@ export default function WorkGenerator() {
       {!hasSourceData && wikitext && (
         <div className='flex-1 min-h-0 px-4 pb-4'>
           <div className='flex flex-col h-full'>
-            <div className='flex items-center justify-between mb-2 shrink-0 px-1'>
-              <Typography.Text strong>生成结果</Typography.Text>
-              <CopyButton text={wikitext} />
-            </div>
-            <div className='relative flex-1 min-h-0'>
-              <pre
-                className={`
-                  m-0 p-4 h-full
-                  text-sm overflow-auto whitespace-pre-wrap leading-relaxed
-                  bg-(--ant-color-bg-elevated)
-                  border border-(--ant-color-border) rounded-lg
-                `}
-              >
-                {wikitext}
-              </pre>
-              {regenerating && (
-                <div className='absolute inset-0 flex items-center justify-center bg-(--ant-color-bg-elevated)/60 backdrop-blur-[1px]'>
-                  <Spin description={genPhase === 'wiki' ? '正在查询萌娘百科信息...' : '正在获取音乐详情...'} />
-                </div>
-              )}
-            </div>
+            <CodePanel
+              variant='standalone'
+              text={wikitext}
+              loading={regenerating}
+              loadingDescription={genPhase === 'wiki' ? '正在查询萌娘百科信息...' : '正在获取音乐详情...'}
+            />
           </div>
         </div>
       )}
 
-      {/* 无任何数据时展示空状态占位 */}
       {!hasSourceData && !wikitext && (
         <EmptyPlaceholder />
       )}
@@ -439,7 +332,6 @@ export default function WorkGenerator() {
         />
       </Modal>
 
-      <HelpModal open={helpModalOpen} onClose={() => setHelpModalOpen(false)} />
     </Page>
   );
 }
