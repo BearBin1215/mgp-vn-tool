@@ -50,6 +50,7 @@ mgp-vn-tool/
 │   ├── components/             # 共享组件
 │   │   ├── layout/             # 布局组件（Layout + Menu）
 │   │   ├── page/               # 页面外壳组件
+│   │   ├── SearchInput/        # 带防抖的名称/id 搜索输入框
 │   │   ├── KeepAlive.tsx       # 页面状态缓存组件
 │   │   └── MoegirlLink.tsx     # 萌百链接组件
 │   ├── lib/                    # 工具库
@@ -64,6 +65,7 @@ mgp-vn-tool/
 │   │   ├── about/              # 关于页面（首页）
 │   │   ├── article-stats/      # 条目统计
 │   │   ├── cv-generator/       # 声优条目生成
+│   │   ├── work-generator/     # 作品条目生成
 │   │   ├── company-generator/  # 会社条目生成
 │   │   └── settings/           # 设置页面
 │   ├── stores/                 # Zustand 状态管理及对应持久化存储
@@ -101,7 +103,7 @@ mgp-vn-tool/
 └── vite.config.ts              # Vite 配置
 ```
 
-新建页面/组件/工具函数等文件后，将对应内容写入这里。
+页面/组件/工具函数等结构变动后，将对应内容写入这里。
 
 ## 编码规范
 
@@ -116,6 +118,7 @@ mgp-vn-tool/
 
 - 遵循`eslint.config.ts`内的ESLint规则（禁用冗余Fragment、组件单行最多2参数等）
 - 遵循React提倡的**保持组件纯粹**原则，每个组件都必须是纯函数
+- 组件内变量、函数、hooks定义按功能归类分组排序
 - 组件命名和导出使用 `export default function ComponentName()`
 - 组件使用PascalCase命名法，hooks以`use`开头
 - 共享组件放在 `src/components/` 目录，仅单页面使用的组件和对应页面的入口`index.tsx`放在同一目录

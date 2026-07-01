@@ -2449,6 +2449,7 @@ dependencies = [
 name = "mgp-vn-tool"
 version = "0.2.0"
 dependencies = [
+ "futures-util",
  "keyring",
  "log",
  "reqwest 0.12.28",

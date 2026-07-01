@@ -149,7 +149,7 @@ export function generateCVWikitext(
       const gameDisplay = resolveGameDisplay(gameName, gameMap, connectionsMap, wrapLj);
 
       // 收集所有平台（去重），非 PC 平台显示括号注明平台
-      const platforms = [...new Set(chars.map((c) => c.model?.trim()).filter(Boolean))];
+      const platforms = [...new Set(chars.map((c) => c.model).filter(Boolean))];
       const notPCPlatforms = platforms.filter((p) => p !== 'Windows' && p !== 'PC');
       const platformTag = notPCPlatforms.length > 0 ? `（${notPCPlatforms.join('、')}）` : '';
 

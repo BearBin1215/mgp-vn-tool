@@ -5,12 +5,14 @@ import { isNumeric } from '@/utils/text';
 
 /** 搜索下拉选项 */
 export interface SearchInputOption {
-  /** 选项展示值（选中后填入输入框） */
+  /** 选项唯一键（用于内部区分同名条目，需唯一） */
   value: string;
   /** 下拉项展示内容 */
   label: React.ReactNode;
   /** 选项对应的实体 id */
   id: string;
+  /** 选中后填入输入框的显示文本，未提供时回退到 value */
+  display?: string;
 }
 
 /** 通过 ref 暴露的命令式接口 */
@@ -59,6 +61,8 @@ export default function SearchInput({
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 请求序号：仅采纳最近一次搜索的结果，避免并发搜索的旧响应覆盖新响应
   const reqGenRef = useRef(0);
+  // 选中标记：记录刚选中项的唯一键，供 handleChange 识别并保留显示文本而非唯一键
+  const selectingRef = useRef<string | null>(null);
 
   // 组件卸载时清理挂起的防抖定时器，避免卸载后仍触发搜索 setState
   useEffect(() => () => {
@@ -146,13 +150,24 @@ export default function SearchInput({
 
   /** 输入值变化（输入与选中都会触发） */
   const handleChange = (v: string) => {
+    // 选中后 antd 会以 option.value（唯一键）触发 onChange，此时保留 onSelect 已回填的显示文本
+    if (selectingRef.current !== null) {
+      selectingRef.current = null;
+      return;
+    }
     setValue(v);
     onValueChange?.(v);
   };
 
-  /** 选中某项时记录对应 id */
+  /** 选中某项时记录对应 id，并将显示文本回填输入框 */
   const handleSelect = (_v: string, option: SearchInputOption) => {
+    const display = option.display ?? option.value;
+    // 选中后 onChange 会以 option.value（唯一键）触发，此处先回填显示文本
+    setValue(display);
+    onValueChange?.(display);
     onIdChange?.(option.id);
+    // 标记下一次 onChange 为选中回填，避免被 option.value 覆盖
+    selectingRef.current = option.value;
   };
 
   return (

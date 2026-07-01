@@ -1,4 +1,5 @@
 import type { CreatorInfo } from '@/api/erogamescape';
+import type { PageInfo } from '@/stores/articleStore';
 
 /** 半角感叹号和问号转换为全角 */
 export const normalizePunctuation = (text: string) => {
@@ -93,3 +94,44 @@ export function generateExternalLinksWikitext(info: Partial<CreatorInfo>): strin
   }
   return lines.join('\n');
 }
+
+
+/**
+ * 根据页面信息返回规范标题
+ * @param title 标题
+ * @param pageInfoMap 通过萌娘百科接口获取到的页面信息
+ * @param categories 仅指定分类下页面处理重定向
+ */
+export const resolveTitle = (
+  title: string,
+  pageInfoMap?: Map<string, PageInfo>,
+  categories: string[] = [],
+): string => {
+  if (!title) {
+    return '';
+  }
+  const info = pageInfoMap?.get(title);
+  if (info && info.pageId !== null && (categories.length === 0 || info.categories.some((c) => categories.includes(c)))) {
+    return info.title;
+  }
+  return title;
+};
+
+/**
+ * 解析内链
+ *
+ * 固定添加内链（不管页面是否存在）：复用 resolveTitle 取规范标题作内链。
+ * @param title 标题
+ * @param pageInfoMap 通过萌娘百科接口获取到的页面信息
+ * @param categories 仅指定分类下页面处理重定向
+ */
+export const resolveInternalLink = (
+  title: string,
+  pageInfoMap?: Map<string, PageInfo>,
+  categories: string[] = [],
+): string => {
+  if (!title) {
+    return '';
+  }
+  return `[[${resolveTitle(title, pageInfoMap, categories)}]]`;
+};
