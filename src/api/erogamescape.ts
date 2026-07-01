@@ -40,6 +40,18 @@ export interface CreatorSearchResult {
   musicCount: number;
 }
 
+/** 批评空间作品（游戏）搜索结果 */
+export interface GameSearchResult {
+  /** 作品 id（后端按字符串返回） */
+  id: string;
+  /** 游戏名（gamelist.gamename） */
+  gamename: string;
+  /** 发售日期（gamelist.sellday） */
+  sellday: string;
+  /** 制作组织名（brandlist.brandname） */
+  brandname: string;
+}
+
 /** 批评空间创作者信息 */
 export interface CreatorInfo {
   name: string;
@@ -89,5 +101,87 @@ export async function queryCreatorWorks(creatorId: number) {
 /** 根据关键词搜索创作者 */
 export async function searchCreators(keyword: string) {
   const res = await invoke<ErogamescapeResponse<CreatorSearchResult[]>>('search_creators', { keyword });
+  return unwrap(res);
+}
+
+/** 根据关键词搜索作品 */
+export async function searchGames(keyword: string): Promise<GameSearchResult[]> {
+  const res = await invoke<ErogamescapeResponse<GameSearchResult[]>>('search_games', { keyword });
+  return unwrap(res);
+}
+
+/** 批评空间作品移植版信息（用于补充平台与发行商） */
+export interface WorkTransplant {
+  /** 移植版平台（批评空间 model） */
+  model: string;
+  /** 移植版发售日期（gamelist.sellday） */
+  sellday: string;
+  /** 移植版制作组织名 */
+  brand: string;
+}
+
+/** 批评空间作品详情（queryWorkDetail 返回） */
+export interface WorkDetail {
+  /** 游戏名（原名） */
+  gamename: string;
+  /** 发售日期（gamelist.sellday） */
+  sellday: string;
+  /** 平台（批评空间 model，通常为首发平台如 PC） */
+  model: string;
+  /** 游戏官方主页URL（gamelist.shoukai） */
+  shoukai: string;
+  /** DLsite 作品ID（gamelist.dlsite_id） */
+  dlsiteId: string;
+  /** DLsite 站点域段（gamelist.dlsite_domain，如 maniax/home），用于拼接作品页 URL */
+  dlsiteDomain: string;
+  /** 作品 twitter（gamelist.twitter，账号名或完整URL） */
+  twitter: string;
+  /** 制作组织名（brandlist.brandname） */
+  brand: string;
+  /** 移植版列表（transplant 关联） */
+  transplants: WorkTransplant[];
+  /** 续作游戏名列表（sequel 关联） */
+  sequels: string[];
+  /** STAFF/CAST 列表（shubetu=5 声优 → CAST；1/2/3/7 → STAFF） */
+  staff: StaffRecord[];
+}
+
+/** 批评空间作品 STAFF/CAST 记录 */
+export interface StaffRecord {
+  /** 职种：1:原画 2:编剧 3:音乐 5:声优 6:歌手 7:其他 */
+  shubetu: string;
+  /** 担当区分：1:主要 2:次要 3:其他 */
+  shubetuDetail: string;
+  /** 职种细分名（声优为角色名，歌手为`OP曲「曲名」`格式，其他职种为职种名） */
+  shubetuDetailName: string;
+  /** 创作者名 */
+  name: string;
+}
+
+/** 根据作品 id 读取作品详情（含移植/续作关联） */
+export async function queryWorkDetail(workId: number) {
+  const res = await invoke<ErogamescapeResponse<WorkDetail>>('query_work_detail', { workId });
+  return unwrap(res);
+}
+
+/** 批评空间音乐创作者详情（per-song 作词/作曲/编曲/歌手，来自 music.php 详情页） */
+export interface MusicCreatorDetail {
+  /** 音乐 id */
+  musicId: string;
+  /** 曲名（来自作品页 #music_summary_main） */
+  songName: string;
+  /** 歌手名列表（多人时每个为一项） */
+  singer: string[];
+  /** 作词列表（未获取到为空数组） */
+  lyricist: string[];
+  /** 作曲列表（未获取到为空数组） */
+  composer: string[];
+  /** 编曲列表（未获取到为空数组） */
+  arranger: string[];
+}
+
+/** 获取作品的音乐详情（爬 game.php + music.php，最大 3 并发，部分失败不阻断） */
+export async function queryWorkMusicDetail(workId: number) {
+  const res = await invoke<ErogamescapeResponse<MusicCreatorDetail[]>>('query_work_music_detail', { workId });
   return unwrap(res);
 }

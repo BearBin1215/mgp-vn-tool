@@ -197,9 +197,9 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
       <ul className='pl-4 m-0 list-disc'>
         <li>VNDB 为必填项，用于生成会社基础信息与 Galgame 作品列表。</li>
         <li>Bangumi 为可选项，用于补充 Logo、别名、官网和衍生作品（动画、音乐、书籍）。</li>
-        <li>填写 Bangumi 时需输入 person id 或条目链接，二者会进行一致性校验，不一致时会弹出警告供确认。</li>
-        <li>Bangumi 请求失败时会自动降级，仅以 VNDB 数据生成条目，并以非阻断提示告知失败原因。</li>
-        <li>作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等可能需要手动补充。</li>
+        <li>Bangumi 网络环境较差，请求失败时会自动跳过，仅以 VNDB 数据生成条目。</li>
+        <li>作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。</li>
+        <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
       </ul>
     </Modal>
   );
@@ -421,7 +421,14 @@ export default function CompanyGenerator() {
               <Typography.Text strong>生成结果</Typography.Text>
               <CopyButton text={wikitext} />
             </div>
-            <pre className='bg-(--ant-color-bg-elevated) border border-(--ant-color-border) p-2 text-sm overflow-auto whitespace-pre-wrap m-0 leading-relaxed flex-1 min-h-0'>
+            <pre
+              className={`
+                m-0 p-2 flex-1 min-h-0
+                text-sm overflow-auto whitespace-pre-wrap leading-relaxed
+                border border-(--ant-color-border)
+                bg-(--ant-color-bg-elevated)
+              `}
+            >
               {wikitext}
             </pre>
           </Splitter.Panel>

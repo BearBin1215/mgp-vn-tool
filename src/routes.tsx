@@ -7,8 +7,10 @@ import {
   SettingOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
+import { GameIcon } from '@/icons';
 import CvGenerator from '@/pages/cv-generator';
 import CompanyGenerator from '@/pages/company-generator';
+import WorkGenerator from '@/pages/work-generator';
 import ArticleStats from '@/pages/article-stats';
 import About from '@/pages/about';
 import Settings from '@/pages/settings';
@@ -67,6 +69,13 @@ export const routes: RouteConfig[] = [
     icon: <AppstoreOutlined />,
     position: 'top',
     children: [
+      {
+        path: '/work-generator',
+        component: WorkGenerator,
+        label: '作品条目生成',
+        icon: <GameIcon />,
+        keepAlive: true,
+      },
       {
         path: '/cv-generator',
         component: CvGenerator,

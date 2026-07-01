@@ -198,8 +198,6 @@ export const fetchPageInfo = async (titles: string[]): Promise<Map<string, PageI
     do {
       const params = {
         action: 'query',
-        format: 'json',
-        formatversion: 2,
         prop: ['info', 'categories'],
         titles: batch,
         redirects: '1',

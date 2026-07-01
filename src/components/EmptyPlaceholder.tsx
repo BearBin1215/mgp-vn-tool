@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react';
 import { Empty } from 'antd';
 
 interface EmptyPlaceholderProps {
   /** 空状态提示文案 */
-  description: string;
+  description?: ReactNode;
 }
 
 /** 空状态占位：用于在尚未生成数据时占据内容区 */
@@ -15,7 +16,7 @@ export default function EmptyPlaceholder({ description }: EmptyPlaceholderProps)
         bg-(--ant-color-bg-container)
       `}
     >
-      <Empty description={description} />
+      <Empty description={description ?? null} />
     </div>
   );
 }

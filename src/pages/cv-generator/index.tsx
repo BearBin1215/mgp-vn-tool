@@ -33,10 +33,11 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     >
       <ul className='pl-4 m-0 list-disc'>
         <li>作品内链根据条目统计及重定向页判断添加，出现续作、特殊符号等会导致判断不到，需要手动添加。</li>
-        <li>角色内链根据名称获取站内页面名称，遇到假名等就查不到。</li>
-        <li>声优信息模板和大家族模板默认填写女性，如果是男性声优要自己改。</li>
-        <li>批评空间提供的声优名假名不带空格；“汉字姓＋假名名”的形式已自动拆分为 <code>{'{{日本人名|姓|姓假名|名}}'}</code>，其余情况仍需自行调整</li>
+        <li>角色内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。</li>
+        <li>声优信息模板、序言、大家族模板默认填写女性，如果是男性声优要自己改。</li>
+        <li>批评空间提供的声优名假名不带空格；“汉字姓＋假名名”的形式已自动拆分，其余情况仍需自行调整</li>
         <li>批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。</li>
+        <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
       </ul>
     </Modal>
   );
@@ -124,9 +125,10 @@ export default function CvGenerator() {
   const handleFetchOptions = async (keyword: string): Promise<SearchInputOption[]> => {
     const results = await searchCreators(keyword);
     return results.map((item) => ({
-      value: item.name,
+      value: item.id,
       label: `${item.name} - 配音${item.voiceCount}丨音乐${item.musicCount}`,
       id: item.id,
+      display: item.name,
     }));
   };
 
@@ -342,7 +344,14 @@ export default function CvGenerator() {
               <Typography.Text strong>生成结果</Typography.Text>
               <CopyButton text={wikitext} />
             </div>
-            <pre className='bg-(--ant-color-bg-elevated) border border-(--ant-color-border) p-2 text-sm overflow-auto whitespace-pre-wrap m-0 leading-relaxed flex-1 min-h-0'>
+            <pre
+              className={`
+                m-0 p-2 flex-1 min-h-0
+                text-sm overflow-auto whitespace-pre-wrap leading-relaxed
+                border border-(--ant-color-border)
+                bg-(--ant-color-bg-elevated)
+              `}
+            >
               {wikiLoading ? (
                 <div className='flex items-center justify-center h-full'>
                   <Spin description='正在查询角色页面信息...' />
