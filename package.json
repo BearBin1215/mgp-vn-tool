@@ -14,7 +14,7 @@
     "bump": "tsx scripts/bump-version.ts"
   },
   "dependencies": {
-    "@ant-design/icons": "6.2.5",
+    "@ant-design/icons": "^6.3.2",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-clipboard-manager": "~2.3.2",
     "@tauri-apps/plugin-dialog": "~2.7.1",
@@ -23,13 +23,11 @@
     "@tauri-apps/plugin-store": "^2.4.3",
     "@tauri-apps/plugin-window-state": "~2.4.1",
     "antd": "^6.5.0",
-    "clsx": "^2.1.1",
     "dayjs": "^1.11.21",
     "lodash-es": "^4.18.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router": "^7.18.1",
-    "tailwind-merge": "^3.6.0",
+    "react-router": "^8.1.0",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
@@ -45,7 +43,6 @@
     "@types/semver": "^7.7.1",
     "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^10.6.0",
-    "globals": "^17.7.0",
     "semver": "^7.8.5",
     "tailwindcss": "^4.3.2",
     "tsx": "^4.22.4",
