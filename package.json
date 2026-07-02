@@ -28,7 +28,7 @@
     "lodash-es": "^4.18.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router": "^7.17.0",
+    "react-router": "^8.1.0",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
   },
