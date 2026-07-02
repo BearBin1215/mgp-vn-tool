@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 
 use futures_util::stream::StreamExt;
+use scraper::Element;
 use serde_json::Value;
 
 use crate::settings;
@@ -460,6 +461,7 @@ async fn do_search_creators(app: &tauri::AppHandle, keyword: &str) -> Result<Val
            (SELECT COUNT(*) FROM shokushu s WHERE s.creater = c.id AND s.shubetu = 6) AS music_count \
          FROM createrlist c \
          WHERE c.name LIKE '%{safe_keyword}%' \
+           AND (SELECT COUNT(*) FROM shokushu s WHERE s.creater = c.id AND s.shubetu = 5) >= 1 \
          LIMIT 10;"
     );
 
@@ -790,40 +792,40 @@ fn parse_music_summary(html: &str) -> Result<Vec<(String, String, String)>, Stri
 
 /// 从 music.php 详情页 HTML 解析作词/作曲/编曲/歌手
 ///
-/// 批评空间音乐详情页基本信息区用 table 布局，每行 `th:标签 td:值`。
-/// 遍历所有 tr 的单元格序列，匹配关键字取作词作曲等。
+/// 批评空间音乐详情页创作者信息区为 `table#creaters_information_table`，每行固定
+/// `th:类型 td:名称`。仅在该表内遍历，按首列标签把名称写入对应字段。
 /// 每个字段值按 `<a>` 标签拆分为多个创作者（用 `<br>` 分隔的情况）。
 /// 返回 `(singer, lyricist, composer, arranger)`，每个为 Vec<String>，未找到的为空数组。
 fn parse_music_detail(html: &str) -> (Vec<String>, Vec<String>, Vec<String>, Vec<String>) {
     let document = scraper::Html::parse_document(html);
-    let tr_sel = scraper::Selector::parse("tr").unwrap();
-    let cell_sel = scraper::Selector::parse("td,th").unwrap();
+    // #creaters_information_table 为固定选择器，解析失败视为编码错误直接 panic
+    let container_sel = scraper::Selector::parse("#creaters_information_table").unwrap();
+    let th_sel = scraper::Selector::parse("tr > th:first-child").unwrap();
 
     let mut singer: Vec<String> = Vec::new();
     let mut lyricist: Vec<String> = Vec::new();
     let mut composer: Vec<String> = Vec::new();
     let mut arranger: Vec<String> = Vec::new();
 
-    for tr in document.select(&tr_sel) {
-        let cells: Vec<scraper::ElementRef> = tr.select(&cell_sel).collect();
-        if cells.len() < 2 {
-            continue;
-        }
-        // 仅处理 th 开头的行（基本信息区），跳过关联游戏等数据行
-        if cells[0].value().name() != "th" {
-            continue;
-        }
-        let label = cells[0].text().collect::<String>().trim().to_string();
-        let value = extract_names_from_cell(cells[1]);
-        if value.is_empty() {
-            continue;
-        }
-        match label.as_str() {
-            "歌" => singer = value,
-            "作詞" | "作词" => lyricist = value,
-            "作曲" => composer = value,
-            "編曲" | "编曲" => arranger = value,
-            _ => {}
+    // 仅在创作者信息表内遍历：th:first-child 即类型标签，其后首个 td 为名称
+    for container in document.select(&container_sel) {
+        for th in container.select(&th_sel) {
+            let Some(td) = th.next_sibling_element().and_then(|el| {
+                if el.value().name() == "td" { Some(el) } else { None }
+            }) else {
+                continue;
+            };
+            let value = extract_names_from_cell(td);
+            if value.is_empty() {
+                continue;
+            }
+            match th.text().collect::<String>().trim() {
+                "歌" => singer = value,
+                "作詞" | "作词" => lyricist = value,
+                "作曲" => composer = value,
+                "編曲" | "编曲" => arranger = value,
+                _ => {}
+            }
         }
     }
 
