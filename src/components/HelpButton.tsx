@@ -25,7 +25,9 @@ export default function HelpButton({ children }: HelpButtonProps) {
         onCancel={() => setHelpModalOpen(false)}
         width={620}
       >
-        {children}
+        <ul className='pl-4 m-0 list-disc'>
+          {children}
+        </ul>
       </Modal>
     </Tooltip>
   );

@@ -150,6 +150,9 @@ const initialValues: FilterValues = {
 type FilterPanel = 'filter' | 'category' | null;
 
 export default function ArticleStats() {
+  const { message, modal } = App.useApp();
+  const navigate = useNavigate();
+
   // ─── Store 数据 ───
   const articles = useArticleStore((s) => s.articles);
   const updatedAt = useArticleStore((s) => s.updatedAt);
@@ -161,16 +164,6 @@ export default function ArticleStats() {
 
   // 显示的筛选区
   const [activePanel, setActivePanel] = useState<FilterPanel>('filter');
-
-  // ─── 条件筛选 ───
-  const [form] = Form.useForm<FilterValues>();
-  const [filterValues, setFilterValues] = useState<FilterValues>(initialValues);
-
-  // ─── 分类筛选 ───
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [categoryMode, setCategoryMode] = useState<'and' | 'or'>('or');
-  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-  const [categorySearch, setCategorySearch] = useState('');
 
   // ─── 表格容器高度（随窗口动态调整） ───
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -207,6 +200,16 @@ export default function ArticleStats() {
       }
     });
   }, []);
+
+  // ─── 条件筛选 ───
+  const [form] = Form.useForm<FilterValues>();
+  const [filterValues, setFilterValues] = useState<FilterValues>(initialValues);
+
+  // ─── 分类筛选 ───
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [categoryMode, setCategoryMode] = useState<'and' | 'or'>('or');
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
 
   /** 制作组织集合，用于条件过滤选项 */
   const allBrands = useMemo(
@@ -266,9 +269,6 @@ export default function ArticleStats() {
       return true;
     });
   }, [articles, filterValues, selectedCategories, categoryMode]);
-
-  const { message, modal } = App.useApp();
-  const navigate = useNavigate();
 
   /** 更新数据 */
   const handleRefresh = async () => {
@@ -476,7 +476,6 @@ export default function ArticleStats() {
           size='small'
           bordered={false}
           pagination={{
-            simple: true,
             pageSize: articlePageSize,
             showTotal: (total) => `共 ${total} 条`,
             onChange: (_page: number, pageSize: number) => {
