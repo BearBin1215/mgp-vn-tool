@@ -5,9 +5,17 @@ updates:
     directory: "/src-tauri"
     schedule:
       interval: "monthly"
+    groups:
+      cargo:
+        patterns:
+          - "*"
 
   # 前端依赖
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "monthly"
+    groups:
+      npm:
+        patterns:
+          - "*"
