@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # 后端依赖
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "monthly"
+
+  # 前端依赖
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
