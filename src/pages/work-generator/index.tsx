@@ -188,6 +188,8 @@ export default function WorkGenerator() {
         ...detail.transplants.map((t) => t.brand),
         ...detail.staff.filter((s) => ['5', '6'].includes(s.shubetu)).map((s) => parseStaffName(s.name).main),
         ...staffMainNames,
+        // 会社大家族模板：与各链接同一批查询 Template:{会社名} 是否存在
+        ...(detail.brand ? [`Template:${detail.brand}`] : []),
       ].filter(Boolean);
       const uniqueNames = uniq(namesToQuery);
       let pageInfoMap: Map<string, PageInfo> | undefined;
@@ -232,6 +234,7 @@ export default function WorkGenerator() {
           <li>本功能以 <MoegirlLink title='Template:页面格式/视觉小说'>Template:页面格式/视觉小说</MoegirlLink> 为模板，生成后可按个人习惯调整格式、措辞等。</li>
           <li>数据来自批评空间，使用前建议前往设置调整批评空间相关网络设置。</li>
           <li>批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。</li>
+          <li>STAFF、CAST等内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。</li>
           <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
         </HelpButton>
       }

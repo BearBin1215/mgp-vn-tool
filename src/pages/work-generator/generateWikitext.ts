@@ -218,10 +218,10 @@ const buildCast = (detail: WorkDetail, pageInfoMap?: Map<string, PageInfo>) => {
  * 生成 STAFF 章节 wikitext
  *
  * 从 staff 中过滤 shubetu IN (1,2,3,7)，按职种生成各行：
- * - 编剧(shubetu=2)、音乐(shubetu=3)：全部人员
- * - 原画(shubetu=1)：shubetuDetailName 非 SD原画
- * - SD原画(shubetu=1)：shubetuDetailName 为 SD原画
- * - 其他(shubetu=7)：仅 shubetuDetail=1（主要），按 shubetuDetailName 分组各行
+ * - 编剧（shubetu=2)、音乐(shubetu=3)：全部人员
+ * - 原画（shubetu=1、shubetuDetailName 非 SD原画）
+ * - SD原画（shubetu=1、shubetuDetailName 为 SD原画）
+ * - 其他（shubetu=7）：仅 shubetuDetail=1（主要），按 shubetuDetailName 分组各行
  *
  * 人员内链按职种分类解析、别名写注释，同一职种多人用顿号连接。无 STAFF 数据时返回空字符串。
  */
@@ -362,7 +362,7 @@ const buildMusic = (entries: MusicEntry[], pageInfoMap?: Map<string, PageInfo>) 
   for (const [label, items] of Object.entries(byCategory)) {
     for (const e of items) {
       lines.push(`* ${label}《${wrapLj(e.songName)}》`);
-      // 演唱优先用 music.php 详情的歌手名，回退 SQL 的歌手名
+      // 演唱优先用 music.php 详情的歌手名，覆盖 SQL 获取到的歌手名
       const singers = e.creators?.singer ?? e.singers;
       lines.push(`:演唱：${joinMusicNames(singers, pageInfoMap)}`);
       if (e.creators?.composer.length) {
@@ -374,7 +374,7 @@ const buildMusic = (entries: MusicEntry[], pageInfoMap?: Map<string, PageInfo>) 
       if (e.creators?.arranger.length) {
         lines.push(`:编曲：${joinMusicNames(e.creators.arranger, pageInfoMap)}`);
       }
-      // 创作者信息获取失败（已尝试 music.php 但未匹配到）时加注释提示
+      // 创作者信息获取失败（已请求 music.php 但失败或未匹配到）时加注释提示
       if (!e.creators) {
         lines.push('<!-- 作曲、作词信息获取失败 -->');
       }
@@ -388,9 +388,7 @@ const buildMusic = (entries: MusicEntry[], pageInfoMap?: Map<string, PageInfo>) 
 /**
  * 生成注释及外部链接章节的外部链接行
  *
- * 按官网 → DLsite → twitter 顺序生成，各字段非空才输出对应行。
- * shoukai/twitter 直接取字段原值作 URL；DLsite 拼成完整 maniax 作品页 URL。
- * 全部为空时返回空数组
+ * 按官网 → DLsite → twitter 顺序生成，各字段非空才输出对应行。全部为空时返回空数组
  */
 const buildExternalLinks = (detail: WorkDetail): string[] => {
   const links: string[] = [];
@@ -421,31 +419,44 @@ const buildBrandCategories = (detail: WorkDetail, pageInfoMap?: Map<string, Page
 /**
  * 生成平台分类行（多个 `[[分类:XX游戏]]` 同行空格分隔）
  *
- * 原作平台 + 移植版平台去重，仅收录萌百有对应分类的平台（platformCategory 非 null），
- * 未匹配的代码跳过。无任何可生成分类时返回空字符串。
+ * 原作平台 + 移植版平台去重，无任何可生成分类时返回空字符串。
  */
 const buildPlatformCategories = (detail: WorkDetail): string => {
   const cats: string[] = [];
   const pushCat = (model: string) => {
     const name = platformCategory(model);
-    if (name && !cats.includes(name)) { cats.push(name); }
+    if (name && !cats.includes(name)) {
+      cats.push(name);
+    }
   };
   pushCat(detail.model);
-  for (const t of detail.transplants) { pushCat(t.model); }
-  if (cats.length === 0) { return ''; }
+  for (const t of detail.transplants) {
+    pushCat(t.model);
+  }
+  if (cats.length === 0) {
+    return '';
+  }
   return cats.map((c) => `[[分类:${c}游戏]]`).join('');
+};
+
+/** 生成会社大家族模板行 */
+const buildFamilyTemplate = (detail: WorkDetail, pageInfoMap?: Map<string, PageInfo>): string => {
+  console.log(detail.brand, pageInfoMap);
+  /** 会社大家族模板缺失注释（已查询但未找到对应 Template:{会社}） */
+  const FAMILY_TEMPLATE_MISSING = '<!-- 未获取到对应会社的大家族模板，需要手动确认 -->';
+  // 有页面信息但无会社：无法判定，给提示
+  if (!detail.brand || !pageInfoMap) {
+    return FAMILY_TEMPLATE_MISSING;
+  }
+  const info = pageInfoMap.get(`Template:${detail.brand}`);
+  return info && info.pageId !== null ? `{{${detail.brand}}}` : FAMILY_TEMPLATE_MISSING;
 };
 
 /**
  * 生成作品条目完整wikitext
- *
- * 参考 cv-generator 的拼接方式，逐段 push 而非整体模板替换：
- * - infobox 段保留未涉及字段（image 等）的原注释
- * - 简介引言、CAST/STAFF 等后续章节各自成段，便于后续按章节扩展
- *
  * @param detail 作品详情（含移植/续作关联）
  * @param articleName 用户输入的条目名
- * @param pageInfoMap 制作组织页面信息映射（用于内链重定向解析）
+ * @param pageInfoMap 制作组织页面信息映射（用于内链、重定向解析）
  */
 export function generateWorkWikitext(
   detail: WorkDetail,
@@ -455,35 +466,33 @@ export function generateWorkWikitext(
 ): string {
   const sections: string[] = [];
 
-  // 序言各移植版发行说明行，无有效移植版时为空字符串
+  /** 序言各移植版发行说明行，无有效移植版时为空字符串 */
   const publisherLines = buildPublisherLines(detail, pageInfoMap);
-  // CAST 章节，无 CAST 数据时为空字符串
+  /** CAST 章节，无 CAST 数据时为空字符串 */
   const castText = buildCast(detail, pageInfoMap);
-  // STAFF 章节，无 STAFF 数据时为空字符串
+  /** STAFF 章节，无 STAFF 数据时为空字符串 */
   const staffText = buildStaff(detail, pageInfoMap);
-  // 相关音乐章节：从 shubetu=6 记录解析，按 music.php 详情补充创作者
+  /** 相关音乐章节：从 shubetu=6 记录解析，按 music.php 详情补充创作者 */
   const musicEntries = buildMusicEntries(detail.staff, musicCreatorDetails);
   const musicText = buildMusic(musicEntries, pageInfoMap);
-  // 外部链接章节行，无任何外链时为空数组
+  /** 外部链接，无任何外链时为空数组 */
   const externalLinks = buildExternalLinks(detail);
-  // 平台分类，无对应分类时为空字符串
+  /** 平台分类，无对应分类时为空字符串 */
   const platformCats = buildPlatformCategories(detail);
-  // 制作组织分类，无制作组织时为空字符串
+  /** 制作组织分类，无制作组织时为空字符串 */
   const brandCats = buildBrandCategories(detail, pageInfoMap);
+  /** 大家族模板行：Template:{开发商} 存在则加入，否则注释提示 */
+  const familyTemplate = buildFamilyTemplate(detail, pageInfoMap);
 
   // 页顶说明与欢迎编辑
-  sections.push(
-    '<!-- 编辑前可以参照其他类似条目作参考，完成后请将所有在“<! --  -- >”的文字删去，包括符号和这句话，你可以通过【显示预览】观看编辑的排版效果。 -->',
-    '<!-- 这个模板较为复杂，如果你无法弄清楚各个项目的作用，可以先阅读[[Help:视觉小说专题编辑指南/作品条目编辑指南]]”。 -->',
-    '{{欢迎编辑}}<!-- 此模板可以更换为作品或制作组织的系列页顶 -->',
-  );
+  sections.push('{{欢迎编辑}}');
 
   // infobox
   sections.push(buildInfobox(detail, articleName, pageInfoMap));
 
   // infobox 后说明与引言模板
   sections.push(
-    '<!-- 上面模板中不使用的项目，编辑说明中注明“删去”的可以删掉，其余项目留空即可。 -->',
+    '',
     '{{Cquote|<!-- 此处填入官网首页的引言，添加与否视需要而定，不需要则删除此行。 -->}}',
     '',
   );
@@ -497,10 +506,8 @@ export function generateWorkWikitext(
   const titleArticleName = wrapLj(articleName);
   sections.push(
     `《'''${titleArticleName}'''》${langJaPart}是由${resolveInternalLink(detail.brand, pageInfoMap, VALID_BRAND_CATEGORIES)}制作发行的一款恋爱[[冒险游戏]]，于${formatSellDay(detail.sellday)}发售。`,
-    // 序言：有移植版时生成各移植版发行说明，无移植版保留模板注释
-    ...(publisherLines
-      ? [publisherLines]
-      : ['<!-- 如果作品有多个版本，则在一句话介绍的下方添加如下内容 -->', 'XX版由[[发行商]]代理，于XXXX年X月XX日发行。']),
+    // 序言：有移植版时生成各移植版发行说明
+    publisherLines,
   );
 
   // 简介及后续章节（保留模板注释，待后续填充）
@@ -564,8 +571,8 @@ export function generateWorkWikitext(
     '<!-- 游戏在美少女游戏大赏或萌系游戏大赏等奖项的评选中获奖，可以在此处列举，不需要请删去此章节。 -->',
     '',
     '<!-- 最后：其他项目（章节目录、路线攻略、设定及用语、考据内容等）添加与否视需求而定。对于不需要的项目，请删除对应的章节标题。 -->',
-    '<!-- 这里放大家族模板，可以是{{作品名}}或{{游戏制作组织名字}}，通常能在同类条目找到，作品大家族模板放置于制作组织模板之前。 -->',
     '<!-- 可以使用{{背景图片}}等模板对条目进行一定的美化。 -->',
+    familyTemplate,
     '',
     '== 注释及外部链接 ==',
     '<references />',

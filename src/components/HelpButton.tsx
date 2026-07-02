@@ -7,7 +7,7 @@ interface HelpButtonProps {
   children: ReactNode;
 }
 
-/** 使用帮助按钮，点击后通过 App.useApp().modal 弹出统一样式的帮助弹窗 */
+/** 使用帮助按钮，点击后弹出统一样式的帮助弹窗 */
 export default function HelpButton({ children }: HelpButtonProps) {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
 
