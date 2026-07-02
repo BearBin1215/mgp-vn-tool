@@ -127,16 +127,15 @@ export default function TemplateLinkModal({ open, onClose, onSelect }: TemplateL
         />
         <div className='overflow-auto flex-1 min-h-0'>
           <Table
+            loading={loading}
             columns={columns}
             dataSource={filteredLinks.map((l, i) => ({ ...l, key: String(i) }))}
             size='small'
             pagination={{
-              simple: true,
               pageSize,
               showTotal: (total) => `共 ${total} 条`,
               onChange: (_page, size) => setPageSize(size),
             }}
-            locale={{ emptyText: loading ? '加载中...' : '暂无数据' }}
           />
         </div>
       </div>
