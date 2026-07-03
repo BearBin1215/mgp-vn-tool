@@ -3,7 +3,15 @@ import type { WorkDetail, MusicCreatorDetail, StaffRecord } from '@/api/erogames
 import type { PageInfo } from '@/api/moegirl';
 import { platformLink, platformCategory } from '@/lib/erogamescapeDict';
 import { PENDING_SELL_DATE } from '@/utils/constants';
-import { normalizePunctuation, wrapLj, resolveTitle, resolveInternalLink, formatDateCN } from '@/utils/text';
+import {
+  normalizePunctuation,
+  wrapLj,
+  resolveTitle,
+  resolveInternalLink,
+  resolveOptionalInternalLink,
+  resolveFamilyTemplate,
+  formatDateCN,
+} from '@/utils/text';
 
 /** 制作组织有效分类：内链解析时仅采纳属于这些分类的页面 */
 const VALID_BRAND_CATEGORIES = ['Galgame公司', '日本游戏制作组织', 'BL游戏公司', '同人社团'];
@@ -14,12 +22,12 @@ const VALID_VOICE_ACTOR_CATEGORIES = ['配音演员', 'R-18作品配音演员'];
 /** 音乐相关人员（歌手/作词/作曲/编曲）内链解析的有效分类，符合其一即可 */
 const MUSIC_CATEGORIES = ['作曲家', '作词家', '歌手', '音乐人'];
 
-/** STAFF 职种在站内的目标页面属于此处分类时会处理重定向等；空数组表示不解析（固定红链） */
+/** STAFF 职种有效分类：内链解析时仅采纳属于这些分类的页面；空数组表示不检查分类，页面存在即加内链 */
 const STAFF_CATEGORY_MAP: Record<string, string[]> = {
   1: ['插画家', '原画师', '漫画家'], // 原画/SD原画
   2: ['编剧', '作家'], // 编剧
   3: MUSIC_CATEGORIES, // 音乐
-  7: [], // 其他职种：不解析
+  7: [], // 其他职种：不检查分类，页面存在即加内链
 };
 
 /**
@@ -106,7 +114,7 @@ const buildPublisherLines = (detail: WorkDetail, pageInfoMap?: Map<string, PageI
     }
     return `${head}，于${formatSellDay(g.sellday)}发行`;
   });
-  return `\n${sentences.join('；')}。`;
+  return `\n${sentences.join('；')}。\n`;
 };
 
 /** 生成 Video Game Infobox 段（多行模板字面量，未涉及字段保留注释） */
@@ -131,30 +139,30 @@ const buildInfobox = (
   return [
     '{{Video Game Infobox',
     `|标题         = ${articleName}`,
-    '|image        =<!-- 此处只需填入文件名，不用再外加[[]]和file:，若需要展示差分则选用下方的tabs并删去此参数 -->',
+    '|image        =',
     '|图片大小     =',
     '|图片信息     =',
-    '|tabs         =<!-- 此项一般在展示各版本或系列作品的封面时使用，无需展示多张图片时可删去此参数 -->',
+    '|tabs         =',
     `|原名         = ${wrapLj(detail.gamename)}`,
-    '|官方译名     =<!-- 作品的官方译名，没有官方代理中文的外文作品请勿擅自填写 -->',
-    '|常用译名     =<!-- 作品的民间译名以及常用简称 -->',
+    '|官方译名     =',
+    '|常用译名     =',
     '|类型         = [[ADV]]',
     `|平台         = ${platformText}`,
-    '|分级         =<!-- 使用{{游戏分级}}模板，请确保分级机构正确，不是所有PC游戏都走EOCS分级 -->',
-    '|适龄提示     =<!-- 一般大陆作品填写此项 -->',
+    '|分级         =',
+    '|适龄提示     =',
     `|开发         = ${resolveInternalLink(detail.brand, pageInfoMap, VALID_BRAND_CATEGORIES)}`,
     `|发行         = ${buildPublisherText(detail, pageInfoMap)}<!-- 不一定和开发相同 -->`,
-    '|总监         =<!-- 以下内容按照官网或游戏ED信息填写 -->',
+    '|总监         =',
     '|制作人       =',
     '|设计师       =',
     '|角色设计     =',
     '|编剧         =',
     '|程序         =',
     '|美工         =',
-    '|音乐         =<!-- 以上内容按照官网或游戏ED信息填写 -->',
-    '|引擎         =<!-- 游戏的引擎，不确认时可以不填 -->',
+    '|音乐         =',
+    '|引擎         =',
     `|发行时间     = ${buildReleaseDateText(detail)}`,
-    '|改编载体     =<!-- 若有动画、漫画等衍生作品则在此处填写 -->',
+    '|改编载体     =',
     `|相关作品     = ${sequelText}`,
     '}}',
   ].join('\n');
@@ -237,7 +245,7 @@ const buildStaff = (detail: WorkDetail, pageInfoMap?: Map<string, PageInfo>): st
   const buildLine = (label: string, shubetu: string, persons: StaffRecord[]) => {
     if (persons.length === 0) { return; }
     const categories = STAFF_CATEGORY_MAP[shubetu] ?? [];
-    const links = persons.map((p) => resolveInternalLink(parseStaffName(p.name).main, pageInfoMap, categories)).join('、');
+    const links = persons.map((person) => resolveOptionalInternalLink(parseStaffName(person.name).main, pageInfoMap, categories)).join('、');
     lines.push(`* ${label}：${links}`);
   };
 
@@ -287,7 +295,7 @@ interface MusicEntry {
  * - 带 角色名+分类 前缀的解析为 <角色名><分类>
  * - 无「」时整体作为曲名，分类标签留空
  */
-const parseMusicStaffName = (detailName: string) => {
+export const parseMusicStaffName = (detailName: string) => {
   const match = detailName.match(/^(.+)「(.+)」$/);
   if (!match) {
     return { categoryLabel: '', songName: detailName };
@@ -342,7 +350,7 @@ const buildMusicEntries = (
 const joinMusicNames = (
   names: string[],
   pageInfoMap?: Map<string, PageInfo>,
-) => names.map((n) => resolveInternalLink(parseStaffName(n).main, pageInfoMap, MUSIC_CATEGORIES)).join('、');
+) => names.map((name) => resolveOptionalInternalLink(parseStaffName(name).main, pageInfoMap, MUSIC_CATEGORIES)).join('、');
 
 /** 生成相关音乐章节
  *
@@ -361,7 +369,12 @@ const buildMusic = (entries: MusicEntry[], pageInfoMap?: Map<string, PageInfo>) 
 
   for (const [label, items] of Object.entries(byCategory)) {
     for (const e of items) {
-      lines.push(`* ${label}《${wrapLj(e.songName)}》`);
+      // 曲名内链：页面存在且分类含"音乐"关键词时添加内链
+      const songInfo = pageInfoMap?.get(e.songName);
+      const songLink = songInfo && songInfo.pageId !== null && songInfo.categories.some((c) => c.includes('音乐'))
+        ? `[[${songInfo.title}]]`
+        : wrapLj(e.songName);
+      lines.push(`* ${label}《${songLink}》`);
       // 演唱优先用 music.php 详情的歌手名，覆盖 SQL 获取到的歌手名
       const singers = e.creators?.singer ?? e.singers;
       lines.push(`:演唱：${joinMusicNames(singers, pageInfoMap)}`);
@@ -439,21 +452,7 @@ const buildPlatformCategories = (detail: WorkDetail): string => {
   return cats.map((c) => `[[分类:${c}游戏]]`).join('');
 };
 
-/** 生成会社大家族模板行 */
-const buildFamilyTemplate = (detail: WorkDetail, pageInfoMap?: Map<string, PageInfo>): string => {
-  console.log(detail.brand, pageInfoMap);
-  /** 会社大家族模板缺失注释（已查询但未找到对应 Template:{会社}） */
-  const FAMILY_TEMPLATE_MISSING = '<!-- 未获取到对应会社的大家族模板，需要手动确认 -->';
-  // 有页面信息但无会社：无法判定，给提示
-  if (!detail.brand || !pageInfoMap) {
-    return FAMILY_TEMPLATE_MISSING;
-  }
-  const info = pageInfoMap.get(`Template:${detail.brand}`);
-  return info && info.pageId !== null ? `{{${detail.brand}}}` : FAMILY_TEMPLATE_MISSING;
-};
-
-/**
- * 生成作品条目完整wikitext
+/** 生成完整作品条目 wikitext
  * @param detail 作品详情（含移植/续作关联）
  * @param articleName 用户输入的条目名
  * @param pageInfoMap 制作组织页面信息映射（用于内链、重定向解析）
@@ -481,8 +480,10 @@ export function generateWorkWikitext(
   const platformCats = buildPlatformCategories(detail);
   /** 制作组织分类，无制作组织时为空字符串 */
   const brandCats = buildBrandCategories(detail, pageInfoMap);
+  /** 会社大家族模板缺失注释（已查询但未找到对应 Template:{会社}） */
+  const FAMILY_TEMPLATE_MISSING = '<!-- 未获取到对应会社的大家族模板，需要手动确认 -->';
   /** 大家族模板行：Template:{开发商} 存在则加入，否则注释提示 */
-  const familyTemplate = buildFamilyTemplate(detail, pageInfoMap);
+  const familyTemplate = resolveFamilyTemplate(detail.brand, pageInfoMap) ?? FAMILY_TEMPLATE_MISSING;
 
   // 页顶说明与欢迎编辑
   sections.push('{{欢迎编辑}}');
@@ -512,28 +513,17 @@ export function generateWorkWikitext(
 
   // 简介及后续章节（保留模板注释，待后续填充）
   sections.push(
-    '',
     '== 简介 ==',
     '<!-- 此处通常记录 官方 所介绍的剧情简介',
     '',
     '也可以另外介绍作品的其他相关内容，如作品的地位等。 -->',
-    '',
-    '<!-- 下方的 登场角色 和 CAST 选择其一进行介绍即可',
-    '在填写声优信息时请严格按照{{R-18作品声优索引}}文档的规定设置链接。-->',
-    '== 登场角色 ==',
-    '<!-- 此处对作品的登场角色进行介绍，不需要请删去此章节。',
-    '',
-    '可以使用定义表、{{tabs}}、{{Main Characters Infolist}}等多种方式进行编写 -->',
     '',
     // CAST：有数据时生成，无数据保留模板注释
     ...(castText
       ? [castText]
       : [
         '== CAST ==',
-        '<!-- 此处列举登场角色所对应的声优',
-        '若角色较多建议使用{{columns-list}}分列显示',
-        '若移植版或衍生作品有不同声优则使用斜杠，并注明：',
-        '"声优如有不同，按PC/移植版排列。"-->',
+        '<!-- 未获取到声优信息，需要自行确认 -->',
       ]),
     '',
     // STAFF：有数据时生成，无数据保留模板注释
@@ -541,8 +531,7 @@ export function generateWorkWikitext(
       ? [staffText]
       : [
         '== STAFF ==',
-        '<!-- 此处列举作品的制作人员',
-        '若制作人员较多建议使用{{columns-list}}分列显示-->',
+        '<!-- 未获取到制作人员信息，需要自行确认 -->',
       ]),
     '',
     // 相关音乐：有详情时生成，无详情保留模板注释
@@ -565,27 +554,25 @@ export function generateWorkWikitext(
       '',
     ]),
     '== 衍生作品 ==',
-    '<!-- 游戏的衍生作品，如动画、漫画、小说、广播剧等，视情况保留此章节 -->',
+    '',
     '',
     '== 评价 ==',
-    '<!-- 游戏在美少女游戏大赏或萌系游戏大赏等奖项的评选中获奖，可以在此处列举，不需要请删去此章节。 -->',
     '',
-    '<!-- 最后：其他项目（章节目录、路线攻略、设定及用语、考据内容等）添加与否视需求而定。对于不需要的项目，请删除对应的章节标题。 -->',
-    '<!-- 可以使用{{背景图片}}等模板对条目进行一定的美化。 -->',
+    '',
     familyTemplate,
     '',
     '== 注释及外部链接 ==',
     '<references />',
-    ...(externalLinks.length > 0 ? externalLinks : ['<!-- 此处至少应写上官网链接。 -->']),
+    ...(externalLinks.length > 0 ? externalLinks : ['<!-- 未获取到官网链接 -->']),
     '',
     '[[分类:日本游戏作品]]',
     // 平台分类：根据作品平台生成，无对应分类时保留注释占位
-    ...(platformCats ? [platformCats] : ['<!-- 本行填写平台分类，按照游戏的平台填写，如[[分类:Windows游戏]]，有多少个平台作品就写什么平台的分类 -->']),
+    ...(platformCats ? [platformCats] : ['<!-- 未获取到操作系统/平台信息 -->']),
     // 制作组织分类根据制作组织生成，无时保留注释占位
-    ...(brandCats ? [brandCats] : ['<!-- 本行填写制作组织分类，格式为[[分类:XX作品]] -->']),
+    ...(brandCats ? [brandCats] : ['<!-- 未获取到制作组织信息 -->']),
     `[[分类:${articleName}|*]]`,
-    '<!-- 本行填写类型分类，如[[分类:视觉小说]]、[[分类:恋爱冒险游戏]]等，按照[[Help:视觉小说专题编辑指南/作品条目编辑指南]]的说明进行填写 -->',
-    '<!-- 本行填写题材分类，视觉小说常见的题材有[[分类:校园题材]]、[[分类:青春题材]]、[[分类:奇幻题材]]等，视作品内容填写 -->',
+    '<!-- 类型分类 -->',
+    '<!-- 题材分类 -->',
   );
 
   return sections.join('\n');

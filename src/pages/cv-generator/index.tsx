@@ -272,7 +272,7 @@ export default function CvGenerator() {
       )}
 
       {!hasSourceData && !wikitext && (
-        <EmptyPlaceholder description='输入名称或批评空间创作者 id 后开始生成声优条目 wikitext' />
+        <EmptyPlaceholder />
       )}
 
       <TemplateLinkModal

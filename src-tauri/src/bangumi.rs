@@ -82,6 +82,39 @@ pub async fn query_bangumi_company(
     })
 }
 
+/// Bangumi 人物搜索结果（前端展示所需）
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BangumiPersonSearchResult {
+    id: u64,
+    name: String,
+}
+
+/// Bangumi 人物搜索响应
+#[derive(Debug, Deserialize)]
+struct BangumiSearchPersonResponse {
+    data: Vec<BangumiPersonSearchResult>,
+}
+
+/// 按名称搜索 Bangumi producer（career 固定为 producer）
+#[tauri::command]
+pub async fn search_bangumi_persons(
+    app: tauri::AppHandle,
+    keyword: String,
+) -> Result<Vec<BangumiPersonSearchResult>, String> {
+    let settings = read_bangumi_settings(&app);
+    let client = crate::http::build_client(Duration::from_secs(settings.timeout_secs))?;
+    let url = format!("{API_BASE}/v0/search/persons");
+    let body = serde_json::json!({
+        "keyword": keyword,
+        "filter": {
+            "career": ["producer"]
+        }
+    });
+    let resp: BangumiSearchPersonResponse =
+        post_bangumi_api(&client, &settings, &url, &body).await?;
+    Ok(resp.data)
+}
+
 /// 从 Tauri Store 读取 Bangumi 请求配置（超时、重试次数、重试间隔），越界值会回退默认
 fn read_bangumi_settings(app: &tauri::AppHandle) -> BangumiRequestSettings {
     let timeout_secs = settings::get_f64(app, "bangumiTimeout")
@@ -107,16 +140,40 @@ fn read_bangumi_settings(app: &tauri::AppHandle) -> BangumiRequestSettings {
 /// GET 请求 Bangumi v0 API 并反序列化为 T，对服务器错误（5xx）/超时按配置重试
 ///
 /// 4xx 立即失败（不重试）；其余网络错误与 5xx 重试。
-async fn fetch_bangumi_json<T: DeserializeOwned>(
+async fn fetch_bangumi_api<T: DeserializeOwned>(
     client: &reqwest::Client,
     request_settings: &BangumiRequestSettings,
     url: &str,
+) -> Result<T, String> {
+    fetch_bangumi_request(client, request_settings, url, |c| c.get(url)).await
+}
+
+/// POST 请求 Bangumi v0 API 并反序列化为 T，对服务器错误（5xx）/超时按配置重试
+///
+/// 4xx 立即失败（不重试）；其余网络错误与 5xx 重试。
+async fn post_bangumi_api<T: DeserializeOwned>(
+    client: &reqwest::Client,
+    request_settings: &BangumiRequestSettings,
+    url: &str,
+    body: &Value,
+) -> Result<T, String> {
+    fetch_bangumi_request(client, request_settings, url, |c| c.post(url).json(body)).await
+}
+
+/// 执行 Bangumi v0 API 请求并反序列化为 T，对服务器错误（5xx）/超时按配置重试
+///
+/// 4xx 立即失败（不重试）；其余网络错误与 5xx 重试。
+async fn fetch_bangumi_request<T: DeserializeOwned>(
+    client: &reqwest::Client,
+    request_settings: &BangumiRequestSettings,
+    url: &str,
+    build: impl Fn(&reqwest::Client) -> reqwest::RequestBuilder,
 ) -> Result<T, String> {
     let attempts = request_settings.retries + 1;
     let mut last_error = String::new();
 
     for attempt in 0..attempts {
-        let resp = client.get(url).send().await;
+        let resp = build(client).send().await;
         match resp {
             Ok(resp) => {
                 let status = resp.status();
@@ -214,7 +271,7 @@ async fn fetch_bangumi_company(
     person_id: u64,
 ) -> Result<BangumiCompany, String> {
     let url = format!("{API_BASE}/v0/persons/{person_id}");
-    let person: BangumiApiPerson = fetch_bangumi_json(client, request_settings, &url).await?;
+    let person: BangumiApiPerson = fetch_bangumi_api(client, request_settings, &url).await?;
 
     let mut aliases = Vec::new();
     let mut official_website = None;
@@ -298,7 +355,7 @@ async fn fetch_bangumi_subjects(
 ) -> Result<Vec<BangumiApiSubjectItem>, String> {
     let url = format!("{API_BASE}/v0/persons/{person_id}/subjects");
     let subjects: Vec<BangumiApiSubjectItem> =
-        fetch_bangumi_json(client, request_settings, &url).await?;
+        fetch_bangumi_api(client, request_settings, &url).await?;
 
     let mut seen = HashSet::new();
     Ok(subjects
@@ -331,7 +388,7 @@ async fn build_works_by_category(
             .filter(|s| !s.is_empty())
             .map(str::to_string);
         let work =
-            match fetch_bangumi_json::<BangumiApiSubject>(client, request_settings, &url).await {
+            match fetch_bangumi_api::<BangumiApiSubject>(client, request_settings, &url).await {
                 Ok(detail) => BangumiWork {
                     name,
                     name_cn,

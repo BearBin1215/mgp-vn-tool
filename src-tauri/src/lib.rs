@@ -38,6 +38,7 @@ pub fn run() {
             vndb::query_vndb_producer,
             vndb::search_vndb_producers,
             bangumi::query_bangumi_company,
+            bangumi::search_bangumi_persons,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

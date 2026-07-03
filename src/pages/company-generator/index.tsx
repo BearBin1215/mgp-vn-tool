@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
-import { App, Button, Descriptions, Input, Splitter, Spin, Table, Typography } from 'antd';
+import { App, Button, Descriptions, Splitter, Spin, Table, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { CheckOutlined, LinkOutlined } from '@ant-design/icons';
+import { CheckOutlined } from '@ant-design/icons';
 import Page from '@/components/page';
 import CodePanel from '@/components/CodePanel';
 import EmptyPlaceholder from '@/components/EmptyPlaceholder';
@@ -9,7 +9,14 @@ import HelpButton from '@/components/HelpButton';
 import EmptyArticleWarning from '@/components/EmptyArticleWarning';
 import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/SearchInput';
 import { queryVndbProducer, searchVndbProducers, type VndbProducerData, type VndbWork } from '@/api/vndb';
-import { queryBangumiCompany, type BangumiCompanyData, type BangumiWork } from '@/api/bangumi';
+import {
+  queryBangumiCompany,
+  searchBangumiPersons,
+  type BangumiCompanyData,
+  type BangumiPersonSearchResult,
+  type BangumiWork,
+} from '@/api/bangumi';
+import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
 import { useArticleStore } from '@/stores/articleStore';
 import { buildGameArticleMap } from '@/utils/articleMap';
 import { resolveInputId, formatError } from '@/utils/text';
@@ -188,9 +195,11 @@ export default function CompanyGenerator() {
 
   const gameArticleMap = useMemo(() => buildGameArticleMap(articles), [articles]);
   const searchInputRef = useRef<SearchInputHandle>(null);
+  const bangumiInputRef = useRef<SearchInputHandle>(null);
   const [searchValue, setSearchValue] = useState('');
   const [selectedProducerId, setSelectedProducerId] = useState<string | null>(null);
-  const [bangumiInput, setBangumiInput] = useState('');
+  const [bangumiSearchValue, setBangumiSearchValue] = useState('');
+  const [selectedBangumiPersonId, setSelectedBangumiPersonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<CompanyData | null>(null);
   const [wikitext, setWikitext] = useState('');
@@ -206,8 +215,13 @@ export default function CompanyGenerator() {
   }), [data]);
 
   const producerId = resolveInputId(selectedProducerId, searchValue);
-  const bgmPersonId = useMemo(() => parseBangumiId(bangumiInput), [bangumiInput]);
-  const bangumiInvalid = bangumiInput.trim() !== '' && !bgmPersonId;
+  const bgmPersonId = useMemo(() => {
+    if (selectedBangumiPersonId) {
+      return Number(selectedBangumiPersonId);
+    }
+    return parseBangumiId(bangumiSearchValue);
+  }, [selectedBangumiPersonId, bangumiSearchValue]);
+  const bangumiInvalid = bangumiSearchValue.trim() !== '' && !bgmPersonId;
 
   /** 名称搜索：调用 VNDB 接口并映射为下拉选项 */
   const handleFetchProducerOptions = async (keyword: string): Promise<SearchInputOption[]> => {
@@ -233,17 +247,34 @@ export default function CompanyGenerator() {
     setWikitext('');
   };
 
-  /** 更新 Bangumi 输入，同时清除上一轮生成结果 */
-  const handleBangumiChange = (value: string) => {
-    setBangumiInput(value);
+  /** Bangumi 名称搜索：调用 Bangumi 接口并映射为下拉选项 */
+  const handleFetchBangumiOptions = async (keyword: string): Promise<SearchInputOption[]> => {
+    const results = await searchBangumiPersons(keyword);
+    return results.map((item: BangumiPersonSearchResult) => ({
+      value: item.name,
+      label: item.name,
+      id: String(item.id),
+    }));
+  };
+
+  /** Bangumi 输入变化（手动输入/选中/清空）时清除上一轮生成结果 */
+  const handleBangumiValueChange = (value: string) => {
+    setBangumiSearchValue(value);
+    setData(null);
+    setWikitext('');
+  };
+
+  /** Bangumi 选中项 id 变化时清除上一轮生成结果 */
+  const handleBangumiIdChange = (id: string | null) => {
+    setSelectedBangumiPersonId(id);
     setData(null);
     setWikitext('');
   };
 
   /** 渲染 wikitext 并展示 */
-  const render = (companyData: CompanyData) => {
+  const render = (companyData: CompanyData, pageInfoMap?: Map<string, PageInfo>) => {
     setData(companyData);
-    setWikitext(generateCompanyWikitext(companyData, gameArticleMap));
+    setWikitext(generateCompanyWikitext(companyData, gameArticleMap, pageInfoMap));
   };
 
   /** 根据当前输入抓取数据并生成条目 wikitext */
@@ -259,6 +290,7 @@ export default function CompanyGenerator() {
 
     // 取消可能挂起的搜索，避免生成期间输入框残留搜索中提示
     searchInputRef.current?.cancelPendingSearch();
+    bangumiInputRef.current?.cancelPendingSearch();
     setLoading(true);
     setData(null);
     setWikitext('');
@@ -268,6 +300,16 @@ export default function CompanyGenerator() {
       // Bangumi 为可选数据源：用户填了 id 但请求失败降级为空时，非阻断提示（含失败原因）
       if (bgmPersonId && bangumiError) {
         message.warning(`Bangumi 数据获取失败，已仅以 VNDB 数据生成：${formatError(bangumiError)}`, 5);
+      }
+
+      // 查询会社大家族模板页面信息（Template:{会社名}）
+      let pageInfoMap: Map<string, PageInfo> | undefined;
+      if (companyData.vndb.name) {
+        try {
+          pageInfoMap = await fetchPageInfo([`Template:${companyData.vndb.name}`]);
+        } catch {
+          message.warning('获取会社大家族模板信息失败，将跳过模板');
+        }
       }
 
       // 前端一致性校验：不一致时弹确认框，用户可选择继续或中止
@@ -280,7 +322,7 @@ export default function CompanyGenerator() {
             okText: '仍要继续',
             cancelText: '取消',
             onOk: () => {
-              render(companyData);
+              render(companyData, pageInfoMap);
               message.success('生成完成');
             },
           });
@@ -288,7 +330,7 @@ export default function CompanyGenerator() {
         }
       }
 
-      render(companyData);
+      render(companyData, pageInfoMap);
       message.success('生成完成');
     } catch (e) {
       message.error(`生成失败: ${formatError(e)}`);
@@ -342,13 +384,14 @@ export default function CompanyGenerator() {
             disabled={loading}
             placeholder='通过名称搜索 VNDB 会社，或直接输入 producer id'
           />
-          <Input
-            value={bangumiInput}
-            onChange={(e) => handleBangumiChange(e.target.value)}
+          <SearchInput
+            ref={bangumiInputRef}
+            className='w-full'
+            fetchOptions={handleFetchBangumiOptions}
+            onValueChange={handleBangumiValueChange}
+            onIdChange={handleBangumiIdChange}
             disabled={loading}
-            placeholder='Bangumi person id 或链接，可留空，例如 47 / https://bgm.tv/person/47'
-            prefix={<LinkOutlined />}
-            status={bangumiInvalid ? 'error' : undefined}
+            placeholder='通过名称搜索 Bangumi 会社，或直接输入 person id / 链接'
           />
           <Button
             type='primary'
