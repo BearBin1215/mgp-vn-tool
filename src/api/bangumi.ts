@@ -25,6 +25,17 @@ export interface BangumiCompanyData {
   book: BangumiWork[];
 }
 
+/** Bangumi 人物搜索结果项 */
+export interface BangumiPersonSearchResult {
+  id: number;
+  name: string;
+}
+
+/** 按名称搜索 Bangumi producer（career 固定为 producer） */
+export function searchBangumiPersons(keyword: string) {
+  return invoke<BangumiPersonSearchResult[]>('search_bangumi_persons', { keyword });
+}
+
 /** 根据 Bangumi person id 抓取会社信息与各分类作品列表 */
 export function queryBangumiCompany(bgmPersonId: number) {
   return invoke<BangumiCompanyData>('query_bangumi_company', { bgmPersonId });

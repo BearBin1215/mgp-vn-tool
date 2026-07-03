@@ -104,7 +104,7 @@ export function generateExternalLinksWikitext(info: Partial<CreatorInfo>): strin
  * 根据页面信息返回规范标题
  * @param title 标题
  * @param pageInfoMap 通过萌娘百科接口获取到的页面信息
- * @param categories 仅指定分类下页面处理重定向
+ * @param categories 仅指定分类下页面处理重定向，留空则不检查分类
  */
 export const resolveTitle = (
   title: string,
@@ -127,7 +127,7 @@ export const resolveTitle = (
  * 固定添加内链（不管页面是否存在）：复用 resolveTitle 取规范标题作内链。
  * @param title 标题
  * @param pageInfoMap 通过萌娘百科接口获取到的页面信息
- * @param categories 仅指定分类下页面处理重定向
+ * @param categories 仅指定分类下页面处理重定向，留空则不检查分类
  */
 export const resolveInternalLink = (
   title: string,
@@ -138,6 +138,45 @@ export const resolveInternalLink = (
     return '';
   }
   return `[[${resolveTitle(title, pageInfoMap, categories)}]]`;
+};
+
+/**
+ * 按萌百页面信息为标题添加内链。
+ *
+ * 页面信息未获取、页面不存在或分类不匹配时，仅返回 `wrapLj` 包装后的显示文本，不添加内链。
+ * @param title 页面标题或显示文本
+ * @param pageInfoMap 通过萌娘百科接口获取到的页面信息
+ * @param categories 仅指定分类下页面处理重定向，留空则不检查分类
+ */
+export const resolveOptionalInternalLink = (
+  title: string,
+  pageInfoMap: Map<string, PageInfo> | undefined,
+  categories: string[] = [],
+): string => {
+  if (!pageInfoMap) {
+    return wrapLj(title);
+  }
+  const info = pageInfoMap.get(title);
+  if (!info || info.pageId === null || (categories.length > 0 && !info.categories.some((c) => categories.includes(c)))) {
+    return wrapLj(title);
+  }
+  return `[[${info.title}]]`;
+};
+
+/**
+ * 解析大家族模板：当 `Template:{name}` 存在于 pageInfoMap 中时返回 `{{name}}`，否则返回 null。
+ * @param name 模板名称（不含 `Template:` 前缀）
+ * @param pageInfoMap 通过萌娘百科接口获取到的页面信息
+ */
+export const resolveFamilyTemplate = (
+  name: string,
+  pageInfoMap?: Map<string, PageInfo>,
+): string | null => {
+  if (!name || !pageInfoMap) {
+    return null;
+  }
+  const info = pageInfoMap.get(`Template:${name}`);
+  return info && info.pageId !== null ? `{{${name}}}` : null;
 };
 
 /**

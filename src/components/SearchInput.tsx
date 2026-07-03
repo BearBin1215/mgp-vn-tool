@@ -1,6 +1,7 @@
 import { useImperativeHandle, useRef, useState, useEffect } from 'react';
 import type { Ref } from 'react';
 import { App, AutoComplete, Input } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import { isNumeric } from '@/utils/text';
 
 /** 搜索下拉选项 */
@@ -182,7 +183,7 @@ export default function SearchInput({
     >
       <Input
         disabled={disabled}
-        suffix={searching ? <span className='text-xs text-gray-400'>搜索中...</span> : <span />}
+        suffix={searching ? <LoadingOutlined spin /> : <span />}
       />
     </AutoComplete>
   );

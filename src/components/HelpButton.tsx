@@ -12,12 +12,14 @@ export default function HelpButton({ children }: HelpButtonProps) {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
 
   return (
-    <Tooltip title='使用帮助'>
-      <Button
-        type='text'
-        icon={<QuestionCircleOutlined />}
-        onClick={() => setHelpModalOpen(true)}
-      />
+    <>
+      <Tooltip title='使用帮助'>
+        <Button
+          type='text'
+          icon={<QuestionCircleOutlined />}
+          onClick={() => setHelpModalOpen(true)}
+        />
+      </Tooltip>
       <Modal
         open={helpModalOpen}
         title='使用帮助'
@@ -29,6 +31,6 @@ export default function HelpButton({ children }: HelpButtonProps) {
           {children}
         </ul>
       </Modal>
-    </Tooltip>
+    </>
   );
 }

@@ -1,7 +1,8 @@
 import { groupBy, uniq } from 'lodash-es';
 import type { VndbProducer, VndbWork } from '@/api/vndb';
 import type { BangumiCompany, BangumiWork } from '@/api/bangumi';
-import { normalizePunctuation, wrapLj, formatDateCN } from '@/utils/text';
+import type { PageInfo } from '@/api/moegirl';
+import { normalizePunctuation, wrapLj, formatDateCN, resolveFamilyTemplate } from '@/utils/text';
 
 /** 会社条目生成的原始数据（前端渲染 wikitext 所需） */
 export interface CompanyData {
@@ -227,11 +228,18 @@ function buildExternalLinks(vndb: VndbProducer): string {
  * 参考 cv-generator 的拼接方式，逐段组装。会社名固定红链 `[[名]]`，
  * 作品名按 gameMap 解析内链（条目统计），日期用 dayjs 格式化。
  */
-export function generateCompanyWikitext(data: CompanyData, gameMap: Map<string, string>): string {
+export function generateCompanyWikitext(
+  data: CompanyData,
+  gameMap: Map<string, string>,
+  pageInfoMap?: Map<string, PageInfo>,
+): string {
   const { vndb, bangumi } = data;
 
   // 合并去重别名（VNDB + Bangumi），用顿号连接
   const aliases = uniq([...vndb.aliases, ...(bangumi?.aliases ?? [])]).join('、');
+
+  // 大家族模板：Template:{会社名} 存在则加入
+  const familyTemplate = resolveFamilyTemplate(vndb.name, pageInfoMap) ?? '';
 
   // 官网：VNDB 优先，回退 Bangumi
   const website = vndb.official_website ?? bangumi?.official_website ?? null;
@@ -275,6 +283,7 @@ export function generateCompanyWikitext(data: CompanyData, gameMap: Map<string, 
     '',
     buildWorks(data, gameMap),
     '',
+    ...(familyTemplate ? [familyTemplate] : []),
     '{{Galgame公司}}',
     '',
     '== 外部链接与注释 ==',

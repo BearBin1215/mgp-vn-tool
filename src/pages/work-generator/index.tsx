@@ -23,7 +23,7 @@ import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
 import { resolveInputId, normalizePunctuation } from '@/utils/text';
 import { toTableData } from '@/utils/table';
 import { PENDING_SELL_DATE } from '@/utils/constants';
-import { generateWorkWikitext, parseStaffName } from './generateWikitext';
+import { generateWorkWikitext, parseStaffName, parseMusicStaffName } from './generateWikitext';
 
 type TableStaffRecord = StaffRecord & { key: string };
 type TableTransplant = WorkTransplant & { key: string };
@@ -178,16 +178,20 @@ export default function WorkGenerator() {
       setWikitext(generateWorkWikitext(detail, name));
       setGenPhase('wiki');
 
-      // 收集制作组织名、声优名、歌手名与 STAFF 人员主名（编剧/原画/SD原画/音乐），查询萌百页面信息用于内链重定向解析
+      // 收集制作组织名、声优名、歌手名、STAFF 人员主名（编剧/原画/SD原画/音乐）与音乐曲名，查询萌百页面信息用于内链重定向解析
       // 其他职种（shubetu=7）不解析内链，故不纳入查询
       const staffMainNames = detail.staff
         .filter((s) => ['1', '2', '3'].includes(s.shubetu))
         .map((s) => parseStaffName(s.name).main);
+      const songNames = detail.staff
+        .filter((s) => s.shubetu === '6')
+        .map((s) => parseMusicStaffName(s.shubetuDetailName).songName);
       const namesToQuery = [
         detail.brand,
         ...detail.transplants.map((t) => t.brand),
         ...detail.staff.filter((s) => ['5', '6'].includes(s.shubetu)).map((s) => parseStaffName(s.name).main),
         ...staffMainNames,
+        ...songNames,
         // 会社大家族模板：与各链接同一批查询 Template:{会社名} 是否存在
         ...(detail.brand ? [`Template:${detail.brand}`] : []),
       ].filter(Boolean);
@@ -220,9 +224,10 @@ export default function WorkGenerator() {
       }
     } catch (e) {
       message.error(`查询失败: ${e instanceof Error ? e.message : e}`);
+      setRegenerating(false);
+      setGenPhase(null);
     } finally {
       setGenerating(false);
-      setRegenerating(false);
     }
   };
 
