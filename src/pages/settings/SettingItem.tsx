@@ -18,7 +18,7 @@ export default function SettingItem({ label, description, children }: SettingIte
         <div>{label}</div>
         {description && <Typography.Text type='secondary' className='text-xs'>{description}</Typography.Text>}
       </div>
-      <div className='flex-[0_0_280px] flex justify-end'>
+      <div className='flex-[0_0_240px] flex justify-end'>
         {children}
       </div>
     </div>
