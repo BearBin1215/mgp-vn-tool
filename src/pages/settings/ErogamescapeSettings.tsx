@@ -83,7 +83,16 @@ export default function ErogamescapeSettings() {
             }
             description='批评空间（erogamescape）访问地址'
           >
-            <Space>
+            <div className='flex gap-1 w-60'>
+              <Select
+                value={erogamescapeUrl}
+                onChange={setErogamescapeHost}
+                options={[
+                  { value: 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/', label: 'erogamescape.dyndns.org' },
+                  { value: 'https://erogamescape.org/~ap2/ero/toukei_kaiseki/', label: 'erogamescape.org' },
+                  { value: 'https://ero.plumz.me', label: 'ero.plumz.me（镜像站）' },
+                ]}
+              />
               <Tooltip title='检测连通性'>
                 <Button
                   variant='text'
@@ -93,17 +102,7 @@ export default function ErogamescapeSettings() {
                   loading={checking}
                 />
               </Tooltip>
-              <Select
-                className='w-60!'
-                value={erogamescapeUrl}
-                onChange={setErogamescapeHost}
-                options={[
-                  { value: 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/', label: 'erogamescape.dyndns.org' },
-                  { value: 'https://erogamescape.org/~ap2/ero/toukei_kaiseki/', label: 'erogamescape.org' },
-                  { value: 'https://ero.plumz.me', label: 'ero.plumz.me（镜像站）' },
-                ]}
-              />
-            </Space>
+            </div>
           </SettingItem>
           <SettingItem
             label={
