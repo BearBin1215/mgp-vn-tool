@@ -96,7 +96,8 @@ async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), St
 /// 从 HTML 中解析 `#query_result_main` 表格，返回 (列名列表, 数据行列表)
 ///
 /// 页面中可能存在多个表格，需要跳过数据表定义表格（表头为"列名/型/内容"），
-/// 只提取实际查询结果的数据表格。
+/// 只提取实际查询结果的数据表格。若未找到数据表格但容器内存在错误提示（如 SQL 执行
+/// 成本超限），返回该提示文本作为错误，以便上层透传给前端。
 fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
     let document = scraper::Html::parse_document(html);
     let table_selector =
@@ -104,6 +105,7 @@ fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Str
     let tr_selector = scraper::Selector::parse("tr").unwrap();
     let th_selector = scraper::Selector::parse("th").unwrap();
     let td_selector = scraper::Selector::parse("td").unwrap();
+    let p_selector = scraper::Selector::parse("p").unwrap();
     let tables: Vec<_> = document.select(&table_selector).collect();
 
     for table in &tables {
@@ -143,6 +145,17 @@ fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Str
 
         if !data_rows.is_empty() {
             return Ok((headers, data_rows));
+        }
+    }
+
+    // 未找到数据表格时，检查容器内是否有错误提示。批评空间查询失败（如 SQL 执行成本
+    // 超限、语法错误）时会返回 <div id="query_result_main"><p>错误信息</p></div>
+    for table in &tables {
+        if let Some(p) = table.select(&p_selector).next() {
+            let msg = p.text().collect::<String>().trim().to_string();
+            if !msg.is_empty() {
+                return Err(msg);
+            }
         }
     }
 
@@ -454,14 +467,19 @@ pub async fn search_creators(app: tauri::AppHandle, keyword: String) -> Result<V
 async fn do_search_creators(app: &tauri::AppHandle, keyword: &str) -> Result<Value, String> {
     // 转义单引号（关键词由用户输入）
     let safe_keyword = escape_sql_like(keyword);
+    // 使用 JOIN + GROUP BY 替代多个相关子查询，避免对每个候选 creater 重复扫描 shokushu 表：
+    // - INNER JOIN + shubetu IN (5,6) 一次扫描同时统计声优与音乐数
+    // - HAVING voice_count >= 1 过滤出有声优作品的创作者（等价于原 WHERE 子查询）
+    // - LIMIT 在聚合后应用，候选集已被 LIKE 收敛
     let sql = format!(
-        "SELECT \
-           c.id, c.name, \
-           (SELECT COUNT(*) FROM shokushu s WHERE s.creater = c.id AND s.shubetu = 5) AS voice_count, \
-           (SELECT COUNT(*) FROM shokushu s WHERE s.creater = c.id AND s.shubetu = 6) AS music_count \
+        "SELECT c.id, c.name, \
+            SUM(CASE WHEN s.shubetu = 5 THEN 1 ELSE 0 END) AS voice_count, \
+            SUM(CASE WHEN s.shubetu = 6 THEN 1 ELSE 0 END) AS music_count \
          FROM createrlist c \
+         JOIN shokushu s ON s.creater = c.id AND s.shubetu IN (5, 6) \
          WHERE c.name LIKE '%{safe_keyword}%' \
-           AND (SELECT COUNT(*) FROM shokushu s WHERE s.creater = c.id AND s.shubetu = 5) >= 1 \
+         GROUP BY c.id, c.name \
+         HAVING SUM(CASE WHEN s.shubetu = 5 THEN 1 ELSE 0 END) >= 1 \
          LIMIT 10;"
     );
 
