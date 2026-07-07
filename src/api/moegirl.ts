@@ -62,7 +62,8 @@ const moegirl = {
   /** 先获取 token，再携带 token 发起 POST 请求 */
   async postWithToken(tokenType: string, params: ApiParams): Promise<Record<string, unknown>> {
     const token = await moegirl.getToken(tokenType);
-    return moegirl.post({ ...params, [`${tokenType}token`]: token });
+    const tokenField = tokenType === 'login' ? 'logintoken' : 'token';
+    return moegirl.post({ ...params, [tokenField]: token });
   },
 
   /** 检查登录状态 */
