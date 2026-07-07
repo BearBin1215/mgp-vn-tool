@@ -1,9 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 
-/** VNDB 单部作品（原名、中文名、发行日期、VN id、关联关系） */
+/** VNDB 作品信息 */
 export interface VndbWork {
+  /** 原名 */
   original_title: string;
+  /** 中文名 */
   chinese_title: string | null;
+  /** 发行日期 */
   date: string | null;
   /** VN id（如 "v32269"），用于关联层级判定 */
   id: string;
@@ -17,7 +20,9 @@ export interface VndbWork {
 export interface VndbProducer {
   id: number;
   name: string;
+  /** 别名 */
   aliases: string[];
+  /** 组织介绍 */
   description: string;
   /** 官网链接 */
   official_website: string | null;
@@ -27,9 +32,11 @@ export interface VndbProducer {
   youtube: string | null;
 }
 
-/** VNDB producer 查询结果（制作组织信息 + 开发作品列表） */
+/** VNDB producer 查询结果 */
 export interface VndbProducerData {
+  /** 制作组织信息 */
   producer: VndbProducer;
+  /** 作品列表 */
   galgames: VndbWork[];
 }
 
@@ -40,6 +47,7 @@ export interface VndbProducerSearchResult {
   name: string;
   /** 原文（假名等）名称，无则 null */
   original: string | null;
+  /** 别名 */
   aliases: string[];
   /** producer 类型：co(会社)/in(个人)/ng(同人团体) */
   type: string | null;

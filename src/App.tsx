@@ -21,7 +21,7 @@ export default function App() {
         algorithm: colorMode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
           fontFamily: uiFont || undefined,
-          fontFamilyCode: codeFont || undefined,
+          fontFamilyCode: codeFont || 'monospace',
         },
         components: {
           Card: {
