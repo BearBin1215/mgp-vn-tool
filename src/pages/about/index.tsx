@@ -3,12 +3,12 @@ import { Card, Typography, Space, Button, App, Tooltip } from 'antd';
 import { GithubOutlined, UserOutlined, InfoCircleOutlined, ToolOutlined, FolderOpenOutlined, EditOutlined, CommentOutlined, SyncOutlined } from '@ant-design/icons';
 import { openUrl, openPath } from '@tauri-apps/plugin-opener';
 import { appConfigDir, appLocalDataDir } from '@tauri-apps/api/path';
-import { version } from '../../../package.json';
 import Page from '@/components/page';
 import MoegirlLink from '@/components/MoegirlLink';
 import ExternalLink from '@/components/ExternalLink';
-import AboutItem from './AboutItem';
 import avatar from '@/assets/BearBin.jpg';
+import { version } from '../../../package.json';
+import AboutItem from './AboutItem';
 
 export default function About() {
   const { message, modal } = App.useApp();

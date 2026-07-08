@@ -3,6 +3,7 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import stylistic from '@stylistic/eslint-plugin';
 import eslintReact from '@eslint-react/eslint-plugin';
+import { importX } from 'eslint-plugin-import-x';
 
 export default defineConfig(
   globalIgnores([
@@ -28,6 +29,7 @@ export default defineConfig(
     plugins: {
       '@stylistic': stylistic,
       '@react': eslintReact,
+      'import-x': importX,
     },
     rules: {
       'curly': 2,
@@ -117,6 +119,17 @@ export default defineConfig(
       '@stylistic/quote-props': [1, 'as-needed', { unnecessary: true, numbers: false }],
       '@stylistic/semi': [2, 'always'],
       '@stylistic/spaced-comment': 2,
+
+      // import 插件很多用于检查导入导出是否有效的，本仓库有 TS 检查，
+      // 因此这个插件只用于检查格式、弃用依赖等
+      'import-x/order': [2, {
+        groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+        pathGroups: [{ pattern: '@/**', group: 'internal' }],
+        pathGroupsExcludedImportTypes: ['builtin'],
+      }],
+      'import-x/no-deprecated': 2,
+      'import-x/no-duplicates': [2, { 'prefer-inline': true }],
+      'import-x/newline-after-import': [2, { considerComments: true }],
     },
   },
 );

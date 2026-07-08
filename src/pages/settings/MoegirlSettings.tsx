@@ -1,6 +1,6 @@
+import { useState } from 'react';
 import { Card, Button, Typography, Space, Select, Popover, Input, InputNumber } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { useState } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useMoegirlStore } from '@/stores/moegirlStore';
 import { groupLabels } from '@/lib/moegirlDict';

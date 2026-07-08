@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
-import { Button, App, Splitter } from 'antd';
-import type { TableColumnsType } from 'antd';
+import { Button, App, Splitter, type TableColumnsType } from 'antd';
 import { CheckOutlined, ImportOutlined } from '@ant-design/icons';
+import { useArticleStore } from '@/stores/articleStore';
 import Page from '@/components/page';
 import CodePanel from '@/components/CodePanel';
 import EmptyPlaceholder from '@/components/EmptyPlaceholder';
@@ -9,18 +9,21 @@ import HelpButton from '@/components/HelpButton';
 import EmptyArticleWarning from '@/components/EmptyArticleWarning';
 import DataTablePanel from '@/components/DataTablePanel';
 import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/SearchInput';
-import {
-  useArticleStore,
-} from '@/stores/articleStore';
 import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
-import { queryCreatorWorks, searchCreators } from '@/api/erogamescape';
-import type { CreatorWorksResult, GameRecord, GameConnection, GameConnectionKind } from '@/api/erogamescape';
-import TemplateLinkModal from './TemplateLinkModal';
+import {
+  queryCreatorWorks,
+  searchCreators,
+  type CreatorWorksResult,
+  type GameRecord,
+  type GameConnection,
+  type GameConnectionKind,
+} from '@/api/erogamescape';
 import { shokushuDetailLabels, gameConnectionKindLabels } from '@/lib/erogamescapeDict';
 import { resolveInputId } from '@/utils/text';
 import { buildGameArticleMap } from '@/utils/articleMap';
 import { toTableData } from '@/utils/table';
 import { generateCVWikitext } from './generateWikitext';
+import TemplateLinkModal from './TemplateLinkModal';
 
 type TableGameRecord = GameRecord & { key: string };
 type TableGameConnection = GameConnection & { key: string };
