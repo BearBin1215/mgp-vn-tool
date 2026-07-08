@@ -1,5 +1,4 @@
-import { useImperativeHandle, useRef, useState, useEffect } from 'react';
-import type { Ref } from 'react';
+import { useImperativeHandle, useRef, useState, useEffect, type Ref } from 'react';
 import { App, AutoComplete, Input } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { isNumeric } from '@/utils/text';

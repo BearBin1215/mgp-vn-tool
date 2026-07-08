@@ -1,6 +1,11 @@
 import { useNavigate, useLocation } from 'react-router';
-import { Layout as AntLayout, Menu as AntMenu, Divider, BorderBeam } from 'antd';
-import type { MenuProps } from 'antd';
+import {
+  Layout as AntLayout,
+  Menu as AntMenu,
+  Divider,
+  BorderBeam,
+  type MenuProps,
+} from 'antd';
 import { routes, type RouteConfig } from '@/routes';
 
 const topRoutes = routes.filter((r) => r.path !== '/' && (r.position ?? 'top') === 'top');

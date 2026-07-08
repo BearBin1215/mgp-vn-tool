@@ -1,6 +1,14 @@
 import { useMemo, useRef, useState } from 'react';
-import { App, Button, Descriptions, Splitter, Spin, Table, Typography } from 'antd';
-import type { TableColumnsType } from 'antd';
+import {
+  App,
+  Button,
+  Descriptions,
+  Splitter,
+  Spin,
+  Table,
+  Typography,
+  type TableColumnsType,
+} from 'antd';
 import { CheckOutlined } from '@ant-design/icons';
 import Page from '@/components/page';
 import CodePanel from '@/components/CodePanel';

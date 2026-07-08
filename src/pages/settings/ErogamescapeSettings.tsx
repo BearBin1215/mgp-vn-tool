@@ -1,7 +1,18 @@
-import { Card, Input, InputNumber, Select, Button, Typography, Space, Modal, Tooltip, App } from 'antd';
-import type { ButtonProps } from 'antd';
-import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { useState } from 'react';
+import {
+  Card,
+  Input,
+  InputNumber,
+  Select,
+  Button,
+  Typography,
+  Space,
+  Modal,
+  Tooltip,
+  App,
+  type ButtonProps,
+} from 'antd';
+import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '@/stores/settingsStore';
 import SettingItem from './SettingItem';

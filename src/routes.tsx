@@ -1,4 +1,3 @@
-import { flatMapDeep } from 'lodash-es';
 import {
   AppstoreOutlined,
   AudioOutlined,
@@ -7,12 +6,13 @@ import {
   SettingOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
+import { flatMapDeep } from 'lodash-es';
 import { GameIcon } from '@/icons';
+import About from '@/pages/about';
+import ArticleStats from '@/pages/article-stats';
 import CvGenerator from '@/pages/cv-generator';
 import CompanyGenerator from '@/pages/company-generator';
 import WorkGenerator from '@/pages/work-generator';
-import ArticleStats from '@/pages/article-stats';
-import About from '@/pages/about';
 import Settings from '@/pages/settings';
 
 /** 菜单/路由配置，可包含子菜单实现二级菜单 */

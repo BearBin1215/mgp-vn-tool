@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
-import { App, Button, Input, Table, Modal } from 'antd';
-import type { TableColumnsType } from 'antd';
+import { App, Button, Input, Table, Modal, type TableColumnsType } from 'antd';
 import { CheckOutlined, SearchOutlined } from '@ant-design/icons';
 import moegirl from '@/api/moegirl';
 import MoegirlLink from '@/components/MoegirlLink';
