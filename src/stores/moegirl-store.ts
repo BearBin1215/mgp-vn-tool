@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import moegirl from '@/api/moegirl';
-import { loadConfigStore } from '@/lib/configStore';
+import { loadConfigStore } from '@/lib/config-store';
 
 interface MoegirlStore {
   /** 用户组 */

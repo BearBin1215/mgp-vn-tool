@@ -50,24 +50,25 @@ mgp-vn-tool/
 │   ├── icons/                  # 图标组件目录
 │   ├── components/             # 共享组件
 │   │   ├── layout/             # 布局组件（Layout + Menu）
-│   │   ├── page/               # 页面外壳组件
-│   │   ├── CodePanel.tsx       # 代码展示面板
-│   │   ├── CopyButton.tsx      # 复制按钮
-│   │   ├── DataTablePanel.tsx  # 原始数据表面板
-│   │   ├── EmptyArticleWarning.tsx # 本地条目数据为空提醒
-│   │   ├── EmptyPlaceholder.tsx    # 空状态占位组件
-│   │   ├── ExternalLink.tsx    # 外部链接
-│   │   ├── HelpButton.tsx      # 打开帮助弹窗按钮
-│   │   ├── KeepAlive.tsx       # 页面状态缓存组件
-│   │   ├── MoegirlLink.tsx     # 萌百链接组件
-│   │   └── SearchInput.tsx     # 带防抖的名称/id 搜索输入框
+│   │   ├── background.tsx           # 应用背景
+│   │   ├── code-panel.tsx           # 代码展示面板
+│   │   ├── copy-button.tsx          # 复制按钮
+│   │   ├── data-table-panel.tsx     # 原始数据表面板
+│   │   ├── empty-article-warning.tsx # 本地条目数据为空提醒
+│   │   ├── empty-placeholder.tsx    # 空状态占位组件
+│   │   ├── external-link.tsx        # 外部链接
+│   │   ├── help-button.tsx          # 打开帮助弹窗按钮
+│   │   ├── keep-alive.tsx           # 页面状态缓存组件
+│   │   ├── moegirl-link.tsx         # 萌百链接组件
+│   │   ├── page.tsx                 # 页面外壳组件
+│   │   └── search-input.tsx         # 带防抖的名称/id 搜索输入框
 │   ├── lib/                    # 工具库
-│   │   ├── types.ts            # 共享类型定义
-│   │   ├── configStore.ts      # 配置存储
-│   │   ├── moegirlDict.ts      # 萌百中文映射（用户组等）
-│   │   └── erogamescapeDict.ts # 批评空间中文映射（职种等）
+│   │   ├── types.ts             # 共享类型定义
+│   │   ├── config-store.ts      # 配置存储
+│   │   ├── moegirl-dict.ts      # 萌百中文映射（用户组等）
+│   │   └── erogamescape-dict.ts # 批评空间中文映射（职种等）
 │   ├── utils/                  # 纯工具函数
-│   │   ├── articleMap.ts       # 批评空间数据映射等
+│   │   ├── article-map.ts      # 批评空间数据映射等
 │   │   ├── constants.ts        # 常量定义
 │   │   ├── table.ts            # 表格工具函数
 │   │   └── text.ts             # 文本处理工具
@@ -79,9 +80,9 @@ mgp-vn-tool/
 │   │   ├── company-generator/  # 会社条目生成
 │   │   └── settings/           # 设置页面
 │   ├── stores/                 # Zustand 状态管理及对应持久化存储
-│   │   ├── settingsStore.ts    # 应用设置
-│   │   ├── moegirlStore.ts     # 萌百数据（用户组等）
-│   │   └── articleStore.ts     # 条目统计数据
+│   │   ├── settings-store.ts   # 应用设置
+│   │   ├── moegirl-store.ts    # 萌百数据（用户组等）
+│   │   └── article-store.ts    # 条目统计数据
 │   ├── App.tsx                 # 根组件
 │   ├── App.css                 # 全局样式
 │   ├── routes.tsx              # 路由、菜单配置
@@ -170,7 +171,7 @@ function Component() {
 使用 Zustand 进行状态管理，设置持久化存储在 Tauri Store：
 
 ```typescript
-// stores/settingsStore.ts
+// stores/settings-store.ts
 export const useSettingsStore = create<SettingsStore>((set) => ({
   // 状态和更新方法
 }));
@@ -282,7 +283,7 @@ Props：
 
 ## 添加新设置项
 
-1. 在 `src/stores/settingsStore.ts` 中：
+1. 在 `src/stores/settings-store.ts` 中：
   - 定义类型
   - 添加到 `SettingsStore` 接口
   - 添加 getter 和 setter 方法

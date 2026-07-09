@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card, Input } from 'antd';
 import { useLocation } from 'react-router';
-import { useSettingsStore } from '@/stores/settingsStore';
-import SettingItem from './SettingItem';
+import { useSettingsStore } from '@/stores/settings-store';
+import SettingItem from './setting-item';
 
 /** 飞书设置 */
 export default function FeishuSettings() {

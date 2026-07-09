@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { useMoegirlStore } from '@/stores/moegirlStore';
+import { useSettingsStore } from '@/stores/settings-store';
+import { useMoegirlStore } from '@/stores/moegirl-store';
 import type { ApiParams } from '@/lib/types';
 
 interface TokenQueryResponse {

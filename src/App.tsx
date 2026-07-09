@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route } from 'react-router';
 import { ConfigProvider, App as AntApp, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import Background from '@/components/Background';
+import Background from '@/components/background';
 import Layout from '@/components/layout';
-import KeepAlive from '@/components/KeepAlive';
+import KeepAlive from '@/components/keep-alive';
 import { flatRoutes } from '@/routes';
-import { useSettingsStore } from '@/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settings-store';
 import './App.css';
 
 const keepAliveRoutes = flatRoutes.map((r) => ({ path: r.path, element: <r.component />, keepAlive: r.keepAlive }));

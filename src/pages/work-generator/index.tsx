@@ -3,12 +3,12 @@ import { App, Button, Input, Modal, Splitter, type InputRef, type TableColumnsTy
 import { CheckOutlined } from '@ant-design/icons';
 import { uniq } from 'lodash-es';
 import Page from '@/components/page';
-import CodePanel from '@/components/CodePanel';
-import EmptyPlaceholder from '@/components/EmptyPlaceholder';
-import HelpButton from '@/components/HelpButton';
-import DataTablePanel from '@/components/DataTablePanel';
-import MoegirlLink from '@/components/MoegirlLink';
-import SearchInput, { type SearchInputOption } from '@/components/SearchInput';
+import CodePanel from '@/components/code-panel';
+import EmptyPlaceholder from '@/components/empty-placeholder';
+import HelpButton from '@/components/help-button';
+import DataTablePanel from '@/components/data-table-panel';
+import MoegirlLink from '@/components/moegirl-link';
+import SearchInput, { type SearchInputOption } from '@/components/search-input';
 import {
   searchGames,
   queryWorkDetail,
@@ -17,12 +17,12 @@ import {
   type StaffRecord,
   type WorkTransplant,
 } from '@/api/erogamescape';
-import { shokushuLabels, shokushuDetailLabels, platforms } from '@/lib/erogamescapeDict';
+import { shokushuLabels, shokushuDetailLabels, platforms } from '@/lib/erogamescape-dict';
 import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
 import { resolveInputId, normalizePunctuation } from '@/utils/text';
 import { toTableData } from '@/utils/table';
 import { PENDING_SELL_DATE } from '@/utils/constants';
-import { generateWorkWikitext, parseStaffName, parseMusicStaffName } from './generateWikitext';
+import { generateWorkWikitext, parseStaffName, parseMusicStaffName } from './generate-wikitext';
 
 type TableStaffRecord = StaffRecord & { key: string };
 type TableTransplant = WorkTransplant & { key: string };

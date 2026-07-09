@@ -1,7 +1,7 @@
 import { groupBy, uniq } from 'lodash-es';
 import type { WorkDetail, MusicCreatorDetail, StaffRecord } from '@/api/erogamescape';
 import type { PageInfo } from '@/api/moegirl';
-import { platformLink, platformCategory } from '@/lib/erogamescapeDict';
+import { platformLink, platformCategory } from '@/lib/erogamescape-dict';
 import { PENDING_SELL_DATE } from '@/utils/constants';
 import {
   normalizePunctuation,

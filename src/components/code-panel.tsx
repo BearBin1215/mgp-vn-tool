@@ -1,5 +1,5 @@
 import { Spin, Typography } from 'antd';
-import CopyButton from '@/components/CopyButton';
+import CopyButton from '@/components/copy-button';
 
 interface CodePanelProps {
   /** 生成的 wikitext */

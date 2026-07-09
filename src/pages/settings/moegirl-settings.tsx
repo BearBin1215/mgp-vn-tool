@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Card, Button, Typography, Space, Select, Popover, Input, InputNumber } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { useMoegirlStore } from '@/stores/moegirlStore';
-import { groupLabels } from '@/lib/moegirlDict';
+import { useSettingsStore } from '@/stores/settings-store';
+import { useMoegirlStore } from '@/stores/moegirl-store';
+import { groupLabels } from '@/lib/moegirl-dict';
 import type { MoegirlHost } from '@/lib/types';
-import MoegirlLoginDialog from './MoegirlLoginDialog';
-import SettingItem from './SettingItem';
+import MoegirlLoginDialog from './moegirl-login-dialog';
+import SettingItem from './setting-item';
 
 /** 萌娘百科设置 */
 export default function MoegirlSettings() {

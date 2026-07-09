@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { App, Modal, Form, Input, Alert } from 'antd';
-import { useSettingsStore } from '@/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settings-store';
 
 interface MoegirlLoginDialogProps {
   open: boolean;

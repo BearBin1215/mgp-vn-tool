@@ -2,9 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
-import { initSettings, useSettingsStore } from '@/stores/settingsStore';
-import { initArticles } from '@/stores/articleStore';
-import { initMoegirlData } from '@/stores/moegirlStore';
+import { initSettings, useSettingsStore } from '@/stores/settings-store';
+import { initArticles } from '@/stores/article-store';
+import { initMoegirlData } from '@/stores/moegirl-store';
 import App from './App';
 
 dayjs.locale('zh-cn');

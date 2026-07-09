@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router';
 import { Layout as AntLayout } from 'antd';
-import { useSettingsStore } from '@/stores/settingsStore';
-import Menu from './Menu';
+import { useSettingsStore } from '@/stores/settings-store';
+import Menu from './menu';
 import './index.css';
 
 const siderWidth = 240;

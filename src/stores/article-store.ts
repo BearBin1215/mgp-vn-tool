@@ -3,8 +3,8 @@ import dayjs from 'dayjs';
 import feishu from '@/api/feishu';
 import moegirl from '@/api/moegirl';
 import { ApiParams } from '@/lib/types';
-import { loadConfigStore } from '@/lib/configStore';
-import { useMoegirlStore } from './moegirlStore';
+import { loadConfigStore } from '@/lib/config-store';
+import { useMoegirlStore } from './moegirl-store';
 
 
 /** 条目数据 */
