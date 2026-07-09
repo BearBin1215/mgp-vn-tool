@@ -12,7 +12,7 @@ import {
   App,
   type ButtonProps,
 } from 'antd';
-import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '@/stores/settingsStore';
 import SettingItem from './SettingItem';
@@ -82,20 +82,13 @@ export default function ErogamescapeSettings() {
       <Card title='批评空间'>
         <div className='flex flex-col gap-4'>
           <SettingItem
-            label={
-              <span className='inline-flex items-center gap-1'>
-                访问地址
-                <Tooltip
-                  title={<span>批评空间<b>通常</b>需要日本IP或家宽；镜像站仅限国内访问</span>}
-                >
-                  <QuestionCircleOutlined className='text-(--ant-color-text-tertiary) cursor-help' />
-                </Tooltip>
-              </span>
-            }
-            description='批评空间（erogamescape）访问地址'
+            label='访问地址'
+            description='从批评空间（erogamescape）读取数据时的访问地址'
+            help={<>原站<b>通常</b>需要日本IP或家宽；镜像站仅限国内访问</>}
           >
             <div className='flex gap-1 w-60'>
               <Select
+                className='grow'
                 value={erogamescapeUrl}
                 onChange={setErogamescapeHost}
                 options={[
@@ -116,20 +109,15 @@ export default function ErogamescapeSettings() {
             </div>
           </SettingItem>
           <SettingItem
-            label={
-              <span className='inline-flex items-center gap-1'>
-                请求超时
-                <Tooltip title='通常批评空间请求超过30s就会报502'>
-                  <QuestionCircleOutlined className='text-(--ant-color-text-tertiary) cursor-help' />
-                </Tooltip>
-              </span>
-            }
+            label='请求超时'
             description='判定连接超时的时长'
+            help='通常批评空间请求超过30s就会报502'
           >
             <InputNumber
               className='w-60!'
-              min={0.1}
+              min={1}
               max={120}
+              precision={0}
               value={erogamescapeTimeout}
               onChange={(v) => v !== null && setErogamescapeTimeout(v)}
               suffix='s'
