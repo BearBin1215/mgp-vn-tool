@@ -71,7 +71,7 @@ body,
       --ant-menu-item-bg: rgb(20 20 20 / 0.4);
 
       --ant-select-selector-bg: rgb(20 20 20 / 0.4);
-      --ant-btn-bg-color-disabled: rgb(0 0 0 / 0.4);
+      --ant-btn-bg-color-disabled: rgb(0 0 0 / 0.6);
       --ant-table-header-bg: rgb(29 29 29 / 0.6);
     }
   }
@@ -90,7 +90,7 @@ body,
       --ant-menu-item-bg: rgb(255 255 255 / 0.4);
 
       --ant-select-selector-bg: rgb(255 255 255 / 0.4);
-      --ant-btn-bg-color-disabled: rgb(255 255 255 / 0.4);
+      --ant-btn-bg-color-disabled: rgb(255 255 255 / 0.6);
       --ant-table-header-bg: rgb(250 250 250 / 0.6);
     }
   }
