@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { App, Button, Card, Input, Radio } from 'antd';
+import { App, Button, Card, Input, Radio, Slider } from 'antd';
 import { FolderOpenOutlined, DeleteOutlined } from '@ant-design/icons';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -18,6 +18,9 @@ export default function InterfaceSettings() {
   const setCodeFont = useSettingsStore((s) => s.setCodeFont);
   const backgroundImage = useSettingsStore((s) => s.backgroundImage);
   const setBackgroundImage = useSettingsStore((s) => s.setBackgroundImage);
+  const backgroundImageTransparency = useSettingsStore((s) => s.backgroundImageTransparency);
+  const setBackgroundImageTransparency = useSettingsStore((s) => s.setBackgroundImageTransparency);
+  const previewBackgroundImageTransparency = useSettingsStore((s) => s.previewBackgroundImageTransparency);
 
   const [uiFontDraft, setUiFontDraft] = useState(uiFont);
   const [codeFontDraft, setCodeFontDraft] = useState(codeFont);
@@ -88,6 +91,18 @@ export default function InterfaceSettings() {
               <Button icon={<DeleteOutlined />} onClick={handleClearImage} />
             )}
           </div>
+        </SettingItem>
+        <SettingItem label='背景图片透明度'>
+          <Slider
+            className='w-57! mx-1.5!'
+            min={0}
+            max={100}
+            value={backgroundImageTransparency}
+            onChange={(value) => previewBackgroundImageTransparency(value)}
+            onChangeComplete={(value) => setBackgroundImageTransparency(value)}
+            disabled={!backgroundImage}
+            tooltip={{ formatter: (value) => `${value}%` }}
+          />
         </SettingItem>
       </div>
     </Card>
