@@ -18,6 +18,9 @@ const KEYRING_SERVICE: &str = "com.bearbin.mgp-vn-tool";
 /// 萌百 cookies 在凭据存储中的条目名
 const COOKIE_ENTRY: &str = "moegirl-cookies";
 
+/// 允许请求的萌百 API 域名白名单，防止域名设置被篡改后请求外发到非萌百站点
+const ALLOWED_MOEGIRL_HOSTS: &[&str] = &["mzh.moegirl.org.cn", "zh.moegirl.org.cn"];
+
 /// Cookie 数据结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Cookie {
@@ -74,12 +77,17 @@ fn persist_cookies() {
     }
 }
 
+/// 判断 host 是否属于 moegirl.org.cn 域（本身或其任意子域）
+fn is_moegirl_domain(host: &str) -> bool {
+    host == "moegirl.org.cn" || host.ends_with(".moegirl.org.cn")
+}
+
 /// 根据域名从存储中筛选 cookie，拼成 "n1=v1; n2=v2" 格式
 fn cookie_header_for(host: &str) -> Option<String> {
     let data = cookies().lock().expect("cookie 锁中毒，数据可能不一致");
     let parts: Vec<String> = data
         .iter()
-        .filter(|c| c.domain == host || c.domain == "moegirl.org.cn")
+        .filter(|c| c.domain == host || (is_moegirl_domain(host) && c.domain == "moegirl.org.cn"))
         .map(|c| format!("{}={}", c.name, c.value))
         .collect();
     if parts.is_empty() {
@@ -150,6 +158,11 @@ pub async fn moegirl_request(
     let retry_delay = settings::get_f64(&app, "moegirlRetryDelay")
         .map(|v| v as u64)
         .unwrap_or(1000);
+
+    // 校验请求域名是否在白名单内，避免域名设置被篡改后请求外发到非萌百站点
+    if !ALLOWED_MOEGIRL_HOSTS.contains(&host.as_str()) {
+        return Err(format!("非法的萌百域名: {host}"));
+    }
 
     let url = format!("https://{host}/api.php");
 
