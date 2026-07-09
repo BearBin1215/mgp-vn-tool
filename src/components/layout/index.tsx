@@ -11,7 +11,10 @@ export default function Layout() {
   const colorMode = useSettingsStore((state) => state.colorMode);
 
   return (
-    <AntLayout className='h-screen'>
+    <AntLayout
+      className='relative h-screen z-10'
+      style={{ background: colorMode === 'dark' ? 'rgb(0 0 0 / 0.8)' : 'rgb(245 245 245 / 0.8)' }}
+    >
       <AntLayout.Sider
         width={siderWidth}
         theme={colorMode === 'dark' ? 'dark' : 'light'}

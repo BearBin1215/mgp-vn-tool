@@ -70,6 +70,9 @@ interface SettingsStore {
   /** 条目统计页每页条数 */
   articlePageSize: number;
   setArticlePageSize: (size: number) => void;
+  /** 背景图片文件路径（空字符串表示未设置） */
+  backgroundImage: string;
+  setBackgroundImage: (path: string) => void;
 }
 
 /** Tauri store 实例（路径由后端统一解析到用户配置目录） */
@@ -182,6 +185,12 @@ const getInitialArticlePageSize = async (): Promise<number> => {
   return typeof saved === 'number' && Number.isFinite(saved) ? saved : 100;
 };
 
+/** 从 Tauri store 读取保存的背景图片路径 */
+const getInitialBackgroundImage = async (): Promise<string> => {
+  const store = await storePromise;
+  return (await store.get<string>('backgroundImage')) || '';
+};
+
 /** 应用设置 store，持久化到 Tauri store */
 export const useSettingsStore = create<SettingsStore>((set) => ({
   colorMode: 'light',
@@ -189,6 +198,13 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   feishuStatsTableAppId: DEFAULT_FEISHU_APP_ID,
   feishuStatsTableAppSecret: '',
   articlePageSize: 100,
+  backgroundImage: '',
+  setBackgroundImage: async (path) => {
+    const store = await storePromise;
+    await store.set('backgroundImage', path);
+    await store.save();
+    set({ backgroundImage: path });
+  },
   setColorMode: async (mode) => {
     const store = await storePromise;
     await store.set('colorMode', mode);
@@ -375,6 +391,7 @@ export const initSettings = async () => {
     moegirlUserAgent,
     moegirlRetries,
     moegirlRetryDelay,
+    backgroundImage,
   ] = await Promise.all([
     getInitialColorMode(),
     getInitialUiFont(),
@@ -392,6 +409,7 @@ export const initSettings = async () => {
     getInitialMoegirlUserAgent(),
     getInitialMoegirlRetries(),
     getInitialMoegirlRetryDelay(),
+    getInitialBackgroundImage(),
   ]);
   const [erogamescapeUsername, erogamescapePassword, moegirlUsername] = await Promise.all([
     store.get<string>('erogamescapeUsername').then((v) => v || ''),
@@ -418,5 +436,6 @@ export const initSettings = async () => {
     moegirlUserAgent,
     moegirlRetries,
     moegirlRetryDelay,
+    backgroundImage,
   });
 };
