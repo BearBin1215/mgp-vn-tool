@@ -1,6 +1,6 @@
 import { Card, InputNumber } from 'antd';
-import { useSettingsStore } from '@/stores/settingsStore';
-import SettingItem from './SettingItem';
+import { useSettingsStore } from '@/stores/settings-store';
+import SettingItem from './setting-item';
 
 /** Bangumi 设置 */
 export default function BangumiSettings() {

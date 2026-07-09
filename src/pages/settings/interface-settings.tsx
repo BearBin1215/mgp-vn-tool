@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { App, Button, Card, Input, Radio, Slider } from 'antd';
 import { FolderOpenOutlined, DeleteOutlined } from '@ant-design/icons';
 import { open } from '@tauri-apps/plugin-dialog';
-import { useSettingsStore } from '@/stores/settingsStore';
-import SettingItem from './SettingItem';
+import { useSettingsStore } from '@/stores/settings-store';
+import SettingItem from './setting-item';
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
 

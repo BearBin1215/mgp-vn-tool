@@ -3,8 +3,8 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import moegirl from '@/api/moegirl';
 import { DEFAULT_USER_AGENT, DEFAULT_FEISHU_APP_ID } from '@/utils/constants';
 import { type ErogamescapeUrl, type MoegirlHost } from '@/lib/types';
-import { loadConfigStore } from '@/lib/configStore';
-import { useMoegirlStore } from './moegirlStore';
+import { loadConfigStore } from '@/lib/config-store';
+import { useMoegirlStore } from './moegirl-store';
 
 export type ColorMode = 'light' | 'dark';
 

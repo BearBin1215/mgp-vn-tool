@@ -30,9 +30,9 @@ import {
 import dayjs, { type Dayjs } from 'dayjs';
 import { uniq } from 'lodash-es';
 import Page from '@/components/page';
-import MoegirlLink from '@/components/MoegirlLink';
-import { useArticleStore, initArticles, type Article } from '@/stores/articleStore';
-import { useSettingsStore } from '@/stores/settingsStore';
+import MoegirlLink from '@/components/moegirl-link';
+import { useArticleStore, initArticles, type Article } from '@/stores/article-store';
+import { useSettingsStore } from '@/stores/settings-store';
 import './index.css';
 
 const { RangePicker } = DatePicker;

@@ -1,6 +1,6 @@
 import { Typography } from 'antd';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { useSettingsStore } from '@/stores/settingsStore';
+import { useSettingsStore } from '@/stores/settings-store';
 
 interface MoegirlLinkProps {
   /** 页面标题（必填） */

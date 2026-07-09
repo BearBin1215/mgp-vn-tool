@@ -14,8 +14,8 @@ import {
 } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
-import { useSettingsStore } from '@/stores/settingsStore';
-import SettingItem from './SettingItem';
+import { useSettingsStore } from '@/stores/settings-store';
+import SettingItem from './setting-item';
 
 /** 批评空间设置 */
 export default function ErogamescapeSettings() {

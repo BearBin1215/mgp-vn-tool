@@ -4,11 +4,11 @@ import { GithubOutlined, UserOutlined, InfoCircleOutlined, ToolOutlined, FolderO
 import { openUrl, openPath } from '@tauri-apps/plugin-opener';
 import { appConfigDir, appLocalDataDir } from '@tauri-apps/api/path';
 import Page from '@/components/page';
-import MoegirlLink from '@/components/MoegirlLink';
-import ExternalLink from '@/components/ExternalLink';
+import MoegirlLink from '@/components/moegirl-link';
+import ExternalLink from '@/components/external-link';
 import avatar from '@/assets/BearBin.jpg';
 import { version } from '../../../package.json';
-import AboutItem from './AboutItem';
+import AboutItem from './about-item';
 
 export default function About() {
   const { message, modal } = App.useApp();

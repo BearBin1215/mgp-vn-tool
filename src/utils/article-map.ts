@@ -1,4 +1,4 @@
-import type { Article } from '@/stores/articleStore';
+import type { Article } from '@/stores/article-store';
 import { normalizePunctuation } from '@/utils/text';
 
 /**

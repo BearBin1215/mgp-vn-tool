@@ -11,11 +11,11 @@ import {
 } from 'antd';
 import { CheckOutlined } from '@ant-design/icons';
 import Page from '@/components/page';
-import CodePanel from '@/components/CodePanel';
-import EmptyPlaceholder from '@/components/EmptyPlaceholder';
-import HelpButton from '@/components/HelpButton';
-import EmptyArticleWarning from '@/components/EmptyArticleWarning';
-import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/SearchInput';
+import CodePanel from '@/components/code-panel';
+import EmptyPlaceholder from '@/components/empty-placeholder';
+import HelpButton from '@/components/help-button';
+import EmptyArticleWarning from '@/components/empty-article-warning';
+import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/search-input';
 import { queryVndbProducer, searchVndbProducers, type VndbProducerData, type VndbWork } from '@/api/vndb';
 import {
   queryBangumiCompany,
@@ -25,11 +25,11 @@ import {
   type BangumiWork,
 } from '@/api/bangumi';
 import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
-import { useArticleStore } from '@/stores/articleStore';
-import { buildGameArticleMap } from '@/utils/articleMap';
+import { useArticleStore } from '@/stores/article-store';
+import { buildGameArticleMap } from '@/utils/article-map';
 import { resolveInputId, formatError } from '@/utils/text';
 import { toTableData } from '@/utils/table';
-import { generateCompanyWikitext, ensureSameCompany, type CompanyData } from './generateWikitext';
+import { generateCompanyWikitext, ensureSameCompany, type CompanyData } from './generate-wikitext';
 
 /** queryCompanyData 的返回：聚合数据 + 可选 Bangumi 数据源的失败原因（降级时非 null） */
 interface CompanyDataResult {

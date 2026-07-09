@@ -1,14 +1,14 @@
 import { useState, useRef, useMemo } from 'react';
 import { Button, App, Splitter, type TableColumnsType } from 'antd';
 import { CheckOutlined, ImportOutlined } from '@ant-design/icons';
-import { useArticleStore } from '@/stores/articleStore';
+import { useArticleStore } from '@/stores/article-store';
 import Page from '@/components/page';
-import CodePanel from '@/components/CodePanel';
-import EmptyPlaceholder from '@/components/EmptyPlaceholder';
-import HelpButton from '@/components/HelpButton';
-import EmptyArticleWarning from '@/components/EmptyArticleWarning';
-import DataTablePanel from '@/components/DataTablePanel';
-import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/SearchInput';
+import CodePanel from '@/components/code-panel';
+import EmptyPlaceholder from '@/components/empty-placeholder';
+import HelpButton from '@/components/help-button';
+import EmptyArticleWarning from '@/components/empty-article-warning';
+import DataTablePanel from '@/components/data-table-panel';
+import SearchInput, { type SearchInputHandle, type SearchInputOption } from '@/components/search-input';
 import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
 import {
   queryCreatorWorks,
@@ -18,12 +18,12 @@ import {
   type GameConnection,
   type GameConnectionKind,
 } from '@/api/erogamescape';
-import { shokushuDetailLabels, gameConnectionKindLabels } from '@/lib/erogamescapeDict';
+import { shokushuDetailLabels, gameConnectionKindLabels } from '@/lib/erogamescape-dict';
 import { resolveInputId } from '@/utils/text';
-import { buildGameArticleMap } from '@/utils/articleMap';
+import { buildGameArticleMap } from '@/utils/article-map';
 import { toTableData } from '@/utils/table';
-import { generateCVWikitext } from './generateWikitext';
-import TemplateLinkModal from './TemplateLinkModal';
+import { generateCVWikitext } from './generate-wikitext';
+import TemplateLinkModal from './template-link-modal';
 
 type TableGameRecord = GameRecord & { key: string };
 type TableGameConnection = GameConnection & { key: string };
