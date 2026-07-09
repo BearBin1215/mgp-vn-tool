@@ -19,6 +19,14 @@ interface SettingsStore {
   /** 代码块字体（CSS font-family 值） */
   codeFont: string;
   setCodeFont: (font: string) => void;
+  /** 背景图片文件路径，空字符串表示未设置 */
+  backgroundImage: string;
+  setBackgroundImage: (path: string) => void;
+  /** 背景图片透明度（0-100，数值越大背景图片越透明） */
+  backgroundImageTransparency: number;
+  setBackgroundImageTransparency: (value: number) => void;
+  /** 实时预览背景图片透明度（仅更新内存状态，不写入持久化存储） */
+  previewBackgroundImageTransparency: (value: number) => void;
   /** 萌娘百科 API 域名前缀 */
   moegirlApiHost: MoegirlHost;
   setMoegirlApiHost: (host: MoegirlHost) => void;
@@ -182,6 +190,19 @@ const getInitialArticlePageSize = async (): Promise<number> => {
   return typeof saved === 'number' && Number.isFinite(saved) ? saved : 100;
 };
 
+/** 从 Tauri store 读取保存的背景图片路径 */
+const getInitialBackgroundImage = async (): Promise<string> => {
+  const store = await storePromise;
+  return (await store.get<string>('backgroundImage')) || '';
+};
+
+/** 从 Tauri store 读取保存的背景图片透明度 */
+const getInitialBackgroundImageTransparency = async (): Promise<number> => {
+  const store = await storePromise;
+  const saved = await store.get<number>('backgroundImageTransparency');
+  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 90;
+};
+
 /** 应用设置 store，持久化到 Tauri store */
 export const useSettingsStore = create<SettingsStore>((set) => ({
   colorMode: 'light',
@@ -189,6 +210,21 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   feishuStatsTableAppId: DEFAULT_FEISHU_APP_ID,
   feishuStatsTableAppSecret: '',
   articlePageSize: 100,
+  backgroundImage: '',
+  setBackgroundImage: async (path) => {
+    const store = await storePromise;
+    await store.set('backgroundImage', path);
+    await store.save();
+    set({ backgroundImage: path });
+  },
+  backgroundImageTransparency: 90,
+  setBackgroundImageTransparency: async (value) => {
+    const store = await storePromise;
+    await store.set('backgroundImageTransparency', value);
+    await store.save();
+    set({ backgroundImageTransparency: value });
+  },
+  previewBackgroundImageTransparency: (value) => set({ backgroundImageTransparency: value }),
   setColorMode: async (mode) => {
     const store = await storePromise;
     await store.set('colorMode', mode);
@@ -362,6 +398,8 @@ export const initSettings = async () => {
     colorMode,
     uiFont,
     codeFont,
+    backgroundImage,
+    backgroundImageTransparency,
     erogamescapeUrl,
     erogamescapeTimeout,
     bangumiTimeout,
@@ -379,6 +417,8 @@ export const initSettings = async () => {
     getInitialColorMode(),
     getInitialUiFont(),
     getInitialCodeFont(),
+    getInitialBackgroundImage(),
+    getInitialBackgroundImageTransparency(),
     getInitialErogamescapeHost(),
     getInitialErogamescapeTimeout(),
     getInitialBangumiTimeout(),
@@ -402,6 +442,8 @@ export const initSettings = async () => {
     colorMode,
     uiFont,
     codeFont,
+    backgroundImage,
+    backgroundImageTransparency,
     erogamescapeUrl,
     erogamescapeTimeout,
     bangumiTimeout,

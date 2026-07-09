@@ -23,14 +23,14 @@ export default function Page({ actions, subtitle, padding = true, className, chi
   return (
     <>
       <AntLayout.Header
-        className='flex items-center px-6! flex-none gap-4 border-b border-(--ant-color-border-secondary) bg-(--ant-color-bg-container)!'
+        className='flex items-center px-6! flex-none gap-4 border-b border-(--ant-color-border-secondary)'
       >
         <span className='text-base font-semibold'>{label}</span>
         {subtitle && <Typography.Text type='secondary' className='text-xs'>{subtitle}</Typography.Text>}
         <span className='flex-1' />
         <div className='flex items-center gap-2'>{actions}</div>
       </AntLayout.Header>
-      <AntLayout.Content className={`overflow-auto flex-1 min-h-0 ${padding ? 'p-3' : ''} ${className || ''}`}>
+      <AntLayout.Content className={`overflow-auto flex-1 min-h-0 bg-(--ant-layout-body-bg) ${padding ? 'p-3' : ''} ${className || ''}`}>
         {children}
       </AntLayout.Content>
     </>

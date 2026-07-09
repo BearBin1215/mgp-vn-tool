@@ -55,3 +55,44 @@ body,
 .ant-splitter-panel {
   scrollbar-color: var(--ant-color-text-tertiary) var(--ant-color-bg-container);
 }
+
+/* 调整元素透明度以适配背景图片显示 */
+.ant-app {
+  &.dark-mode {
+    background-color: #000;
+
+    .css-var-mgp_vn_tool {
+      --ant-color-bg-container: rgb(20 20 20 / 0.62);
+      --ant-color-bg-elevated: rgb(31 31 31 / 0.7);
+
+      --ant-layout-sider-bg: rgb(0 21 41 / 0.2);
+      --ant-layout-header-bg: rgb(0 0 0 / 0.67);
+      --ant-layout-body-bg: rgb(0 0 0 / 0.12);
+
+      --ant-menu-item-bg: rgb(20 20 20 / 0.4);
+
+      --ant-select-selector-bg: rgb(20 20 20 / 0.4);
+      --ant-btn-bg-color-disabled: rgb(0 0 0 / 0.6);
+      --ant-table-header-bg: rgb(29 29 29 / 0.6);
+    }
+  }
+
+  &.light-mode {
+    background-color: #fff;
+
+    .css-var-mgp_vn_tool {
+      --ant-color-bg-container: rgb(255 255 255 / 0.62);
+      --ant-color-bg-elevated: rgb(255 255 255 / 0.7);
+
+      --ant-layout-light-sider-bg: rgb(255 255 255 / 0.2);
+      --ant-layout-header-bg: rgb(255 255 255 / 0.67);
+      --ant-layout-body-bg: rgb(245 245 245 / 0.12);
+
+      --ant-menu-item-bg: rgb(255 255 255 / 0.4);
+
+      --ant-select-selector-bg: rgb(255 255 255 / 0.4);
+      --ant-btn-bg-color-disabled: rgb(255 255 255 / 0.6);
+      --ant-table-header-bg: rgb(250 250 250 / 0.6);
+    }
+  }
+}
