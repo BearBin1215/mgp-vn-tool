@@ -38,7 +38,7 @@ fn read_settings(app: &tauri::AppHandle) -> Result<ErogamescapeSettings, String>
     let timeout = store
         .get("erogamescapeTimeout")
         .and_then(|v| v.as_f64())
-        .map(|v| v as u64)
+        .map(|v| v.max(1.0) as u64)
         .unwrap_or(30);
 
     Ok(ErogamescapeSettings {
