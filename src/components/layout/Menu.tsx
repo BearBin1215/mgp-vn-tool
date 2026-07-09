@@ -68,7 +68,6 @@ export default function LayoutMenu() {
             relative text-center p-0!
             cursor-pointer font-bold text-base
             border-b border-(--ant-color-border-secondary)
-            bg-(--ant-color-bg-container)!
           `}
           onClick={() => navigate('/')}
         >

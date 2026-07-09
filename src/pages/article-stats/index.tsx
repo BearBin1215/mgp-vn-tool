@@ -410,7 +410,13 @@ export default function ArticleStats() {
       )}
 
       {activePanel === 'category' && (
-        <div className='filter-bar p-4 pb-3 sticky top-0 z-10'>
+        <div
+          className={`
+            filter-bar p-4 pb-3 sticky top-0 z-10
+            bg-(--ant-color-bg-container)
+            border-b border-(--ant-color-border-secondary)
+          `}
+        >
           <div className='flex items-start gap-6'>
             <div className='flex-1'>
               <div className='mb-2 flex items-center gap-2'>
