@@ -3,6 +3,8 @@
 //! cookie 经系统凭据存储（keyring）持久化，跨请求共享于全局 `OnceLock` 中；
 //! 响应失败时按设置的重试次数与间隔重试。cookie 变更标记为 dirty，在下次成功
 //! 响应后批量写回磁盘，避免每次请求都触发 I/O。
+//!
+//! 萌百各子站点（mzh./zh.）共用同一套 cookie 作为登录凭据
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -83,11 +85,18 @@ fn is_moegirl_domain(host: &str) -> bool {
 }
 
 /// 根据域名从存储中筛选 cookie，拼成 "n1=v1; n2=v2" 格式
+///
+/// 萌百各子站点共用登录凭据：MediaWiki 下发的登录 cookie 通常带 `Domain=moegirl.org.cn`，
+/// 按 cookie 规范对该域及其所有子域生效。因此除精确匹配当前 host 的 cookie 外，请求萌百
+/// 子域时还需携带 `domain == "moegirl.org.cn"` 的 cookie，使一处登录即可在各子站点保持登录态。
 fn cookie_header_for(host: &str) -> Option<String> {
     let data = cookies().lock().expect("cookie 锁中毒，数据可能不一致");
     let parts: Vec<String> = data
         .iter()
-        .filter(|c| c.domain == host || (is_moegirl_domain(host) && c.domain == "moegirl.org.cn"))
+        .filter(|c| {
+            // 精确匹配当前 host；或当前 host 属萌百域时，带上 Domain=moegirl.org.cn 的共享登录凭据
+            c.domain == host || (is_moegirl_domain(host) && c.domain == "moegirl.org.cn")
+        })
         .map(|c| format!("{}={}", c.name, c.value))
         .collect();
     if parts.is_empty() {
