@@ -31,7 +31,11 @@ export default function MoegirlSettings() {
     <>
       <Card title='萌娘百科' id='network-section'>
         <div className='flex flex-col gap-4'>
-          <SettingItem label='登录账号' description='用于请求萌娘百科API，建议使用机器人账号登录（如果有）'>
+          <SettingItem
+            label='登录账号'
+            description='用于请求萌娘百科API，建议使用机器人账号登录（如果有）'
+            help='目前而言，仅机器人等拥有API高限制的账号、或维护姬等拥有特定页面查看权限的账号有用，普通账号登录无影响'
+          >
             {moegirlUsername ? (
               <Space>
                 <Typography.Text type='secondary'>{moegirlUsername}</Typography.Text>

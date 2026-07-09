@@ -30,7 +30,7 @@ export default function BangumiSettings() {
         </SettingItem>
         <SettingItem
           label='请求重试'
-          description='请求失败或 5xx 时自动重试的次数和间隔'
+          description='请求失败时自动重试的次数和间隔'
         >
           <div className='flex gap-1'>
             <InputNumber
