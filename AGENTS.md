@@ -292,9 +292,18 @@ Props：
 
 ## 故障排查
 
-- **类型错误**: 运行 `pnpm tsc --noEmit`
+- **类型错误**: 运行 `pnpm tsc --noEmit`（`tsc` 为 TypeScript 7 原生版本）
 - **ESLint 错误**: 执行 eslint 指令，能自动修复的用 `--fix` 参数自动修复，不能自动修复的进行提示
 - **Tauri 启动失败**: 检查 Rust 环境和依赖
+
+### TypeScript 版本说明
+
+项目采用 TypeScript 7（原生 Go 实现）与 TypeScript 6 并存的侧载（side-by-side）方案：
+
+- `@typescript/native`（别名 `npm:typescript@^7.0.2`）：提供 `tsc` 可执行文件，用于类型检查与构建（`tsc && vite build`）
+- `typescript`（别名 `npm:@typescript/typescript6@^6.0.2`）：提供 TS 6 编程 API，供 `typescript-eslint`、`vite-plugin-checker` 等依赖 `typescript` 模块的工程工具使用
+
+原因是 TypeScript 7 尚未提供稳定的编程 API，而 `typescript-eslint` 等工具仍需通过 `import 'typescript'` 调用编译器 API。待 `typescript-eslint` 支持 TS 7 后可移除该别名方案。
 
 ## 萌娘百科相关用户
 
