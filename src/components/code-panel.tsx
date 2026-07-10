@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Spin, Typography } from 'antd';
 import CopyButton from '@/components/copy-button';
 
@@ -18,7 +19,7 @@ interface CodePanelProps {
  * 统一三个条目生成页的代码区结构：标题（生成结果 + 复制按钮）+ 代码区。
  * 加载时用半透明遮罩 + 居中 Spin 覆盖代码区，代码始终保持可见（而非被替换）。
  */
-export default function CodePanel({ text, loading, loadingDescription, variant = 'inset' }: CodePanelProps) {
+const CodePanel = memo(({ text, loading, loadingDescription, variant = 'inset' }: CodePanelProps) => {
   const standalone = variant === 'standalone';
   return (
     <>
@@ -51,4 +52,6 @@ export default function CodePanel({ text, loading, loadingDescription, variant =
       </div>
     </>
   );
-}
+});
+
+export default CodePanel;

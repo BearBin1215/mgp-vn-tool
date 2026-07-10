@@ -120,6 +120,15 @@ export default function WorkGenerator() {
     transplantTableData.length > 0 ||
     sequelTableData.length > 0;
 
+  // 右侧原始数据表格分段，memoize 以配合 DataTablePanel 的 memo 优化
+  const tableSections = useMemo(() => [
+    { title: 'CAST', columns: staffColumns, dataSource: castTableData },
+    { title: 'STAFF', columns: staffColumns, dataSource: staffTableData },
+    { title: '关联音乐', columns: staffColumns, dataSource: musicStaffTableData },
+    { title: '移植版', columns: transplantColumns, dataSource: transplantTableData },
+    { title: '续作', columns: sequelColumns, dataSource: sequelTableData },
+  ], [castTableData, staffTableData, musicStaffTableData, transplantTableData, sequelTableData]);
+
   // 生成结果
   const [wikitext, setWikitext] = useState('');
 
@@ -289,13 +298,7 @@ export default function WorkGenerator() {
           >
             <DataTablePanel
               header='批评空间原始数据'
-              sections={[
-                { title: 'CAST', columns: staffColumns, dataSource: castTableData },
-                { title: 'STAFF', columns: staffColumns, dataSource: staffTableData },
-                { title: '关联音乐', columns: staffColumns, dataSource: musicStaffTableData },
-                { title: '移植版', columns: transplantColumns, dataSource: transplantTableData },
-                { title: '续作', columns: sequelColumns, dataSource: sequelTableData },
-              ]}
+              sections={tableSections}
             />
           </Splitter.Panel>
         </Splitter>
