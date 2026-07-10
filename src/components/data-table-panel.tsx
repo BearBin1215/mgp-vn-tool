@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { Table, Typography, type TableColumnsType } from 'antd';
 
 interface TableSection {
@@ -16,8 +16,11 @@ interface DataTablePanelProps {
   sections: TableSection[];
 }
 
-/** 右侧原始数据面板，统一三页面的 Splitter 右侧面板结构 */
-export default function DataTablePanel({ header, sections }: DataTablePanelProps) {
+/**
+ * 右侧原始数据面板，统一各页面的 Splitter 右侧面板结构。
+ * 使用memo包裹，因此传入的`sections`需要注意使用`useMemo`
+ */
+const DataTablePanel = memo(({ header, sections }: DataTablePanelProps) => {
   return (
     <>
       {header !== undefined && (
@@ -40,4 +43,6 @@ export default function DataTablePanel({ header, sections }: DataTablePanelProps
       </div>
     </>
   );
-}
+});
+
+export default DataTablePanel;

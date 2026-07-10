@@ -87,6 +87,13 @@ export default function CvGenerator() {
   }, [creatorWorks]);
   const hasSourceData = actingTableData.length > 0 || musicTableData.length > 0;
 
+  // 右侧原始数据表格分段，memoize 以配合 DataTablePanel 的 memo 优化
+  const tableSections = useMemo(() => [
+    { title: '出演作品', columns: gameColumns, dataSource: actingTableData },
+    { title: '音乐作品', columns: musicColumns, dataSource: musicTableData },
+    { title: '作品关联', columns: connectionColumns, dataSource: connectionsTableData },
+  ], [actingTableData, musicTableData, connectionsTableData]);
+
   // 生成的代码
   const [wikitext, setWikitext] = useState('');
   const [regenerating, setRegenerating] = useState(false);
@@ -251,11 +258,7 @@ export default function CvGenerator() {
           >
             <DataTablePanel
               header='批评空间原始数据'
-              sections={[
-                { title: '出演作品', columns: gameColumns, dataSource: actingTableData },
-                { title: '音乐作品', columns: musicColumns, dataSource: musicTableData },
-                { title: '作品关联', columns: connectionColumns, dataSource: connectionsTableData },
-              ]}
+              sections={tableSections}
             />
           </Splitter.Panel>
         </Splitter>
