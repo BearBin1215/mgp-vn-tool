@@ -15,7 +15,8 @@
         "title": "萌百视研会条目工具",
         "width": 1440,
         "height": 810,
-        "minWidth": 720
+        "minWidth": 720,
+        "visible": false
       }
     ],
     "security": {
