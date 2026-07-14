@@ -4,6 +4,8 @@
 
 萌百视觉小说研究会条目工具（mgp-vn-tool），基于Tauri v2构建的桌面应用，供萌百视觉小说研究会成员使用，用于生成条目代码、获取条目信息等。
 
+面向中文用户，若无另外要求，对话、注释及输出文档都使用中文。
+
 ## 技术栈
 
 - **后端**: Rust 2021 (Tauri v2)
@@ -181,7 +183,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
 
 路由配置同时驱动路由和侧边栏菜单：
 
-```typescript
+```tsx
 // routes.tsx
 export const routes: RouteConfig[] = [
   {
@@ -308,4 +310,5 @@ Props：
 
 ## 代码审查
 
-- 审查安全性时，批评空间镜像站账号密码、飞书统计表 App Secret 仅涉及读取且半公开，因此是明文存储，无需视为安全风险
+- 审查安全性时，批评空间镜像站账号密码、飞书统计表 App Secret 仅涉及读取且半公开，因此使用明文存储，无需视为安全风险
+- 批评空间 SQL 执行页只能用于读取，且本身有防注入，无需考虑安全风险

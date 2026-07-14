@@ -7,12 +7,12 @@ import path from 'path';
 
 const host = process.env.TAURI_DEV_HOST;
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     tailwindcss(),
-    checker({ typescript: true }),
     svgr(),
+    command === 'serve' && checker({ typescript: true }),
   ],
   resolve: {
     alias: {
@@ -45,4 +45,4 @@ export default defineConfig({
       ignored: ['**/src-tauri/**'],
     },
   },
-});
+}));
