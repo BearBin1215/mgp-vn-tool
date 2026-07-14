@@ -172,7 +172,7 @@ const res = await moegirl.post({
 
 1. **只要有 `continue` 就要继续请求**，直到响应中不再出现 `continue` 为止
 2. **`continue` 中所有字段都要原样作为请求参数传入**，缺一不可
-3. 多个 continue 字段可以同时出现，例如同时请求 `prop: ["redirects", "categories"]` 时，可能同时返回 `rdcontinue`、`clcontinue` 和 `continue`
+3. 多个 `continue` 字段可以同时出现，例如同时请求 `prop: ["redirects", "categories"]` 时，可能同时返回 `rdcontinue`、`clcontinue` 和 `continue`
 4. 一般通过 `do {...} while (rules)` 来实现，先发起请求，以请求中有无 `continue` 判定是否继续循环执行;
 
 ### 示例

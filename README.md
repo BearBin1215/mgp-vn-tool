@@ -11,7 +11,7 @@
   - [作品条目生成](#作品条目生成)
   - [里界声优条目生成](#里界声优条目生成)
   - [会社条目生成](#会社条目生成)
-- [License](#license)
+- [开源许可](#开源许可)
 
 ## 下载
 
@@ -72,6 +72,6 @@
 | ---- | ---- |
 | ![会社搜索](docs/images/会社条目生成-搜索.jpg) | ![代码生成结果](docs/images/会社条目生成-结果.jpg) |
 
-## License
+## 开源许可
 
-[MIT License](LICENSE)
+本项目基于 [MIT License](./LICENSE) 开源，Copyright (c) 2026 BearBin。
