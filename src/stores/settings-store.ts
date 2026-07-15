@@ -348,6 +348,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       loginreturnurl: 'https://mzh.moegirl.org.cn/api.php',
       username,
       password,
+      rememberMe: '1',
     });
 
     const res = loginRes as Record<string, unknown>;
