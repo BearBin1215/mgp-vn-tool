@@ -1,12 +1,8 @@
 import { create } from 'zustand';
-import moegirl from '@/api/moegirl';
+import moegirl, { type UserInfo } from '@/api/moegirl';
 import { loadConfigStore } from '@/lib/config-store';
 
-interface MoegirlStore {
-  /** 用户组 */
-  groups: string[];
-  /** 用户权限 */
-  rights: string[];
+interface MoegirlStore extends UserInfo {
   /** 登录后获取用户信息 */
   fetchUserInfo: () => Promise<void>;
   /** 清空用户信息 */
@@ -18,24 +14,30 @@ const storePromise = loadConfigStore('moegirl.json');
 export const useMoegirlStore = create<MoegirlStore>((set) => ({
   groups: [],
   rights: [],
+  displayname: null,
+  displaytag: null,
 
   fetchUserInfo: async () => {
-    const { groups, rights } = await moegirl.getUserRights();
+    const { groups, rights, displayname, displaytag } = await moegirl.getUserRights();
 
     const store = await storePromise;
     await store.set('groups', groups);
     await store.set('rights', rights);
+    await store.set('displayname', displayname);
+    await store.set('displaytag', displaytag);
     await store.save();
 
-    set({ groups, rights });
+    set({ groups, rights, displayname, displaytag });
   },
 
   clearUserInfo: async () => {
     const store = await storePromise;
     await store.set('groups', []);
     await store.set('rights', []);
+    await store.set('displayname', null);
+    await store.set('displaytag', null);
     await store.save();
-    set({ groups: [], rights: [] });
+    set({ groups: [], rights: [], displayname: null, displaytag: null });
   },
 }));
 
@@ -51,5 +53,7 @@ export const initMoegirlData = async (isLoggedIn: boolean) => {
   const store = await storePromise;
   const groups = (await store.get<string[]>('groups')) || [];
   const rights = (await store.get<string[]>('rights')) || [];
-  useMoegirlStore.setState({ groups, rights });
+  const displayname = (await store.get<string | null>('displayname')) ?? null;
+  const displaytag = (await store.get<string | null>('displaytag')) ?? null;
+  useMoegirlStore.setState({ groups, rights, displayname, displaytag });
 };

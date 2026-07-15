@@ -23,9 +23,16 @@ export default function MoegirlSettings() {
   const moegirlUsername = useSettingsStore((s) => s.moegirlUsername);
   const moegirlGroups = useMoegirlStore((s) => s.groups);
   const moegirlRights = useMoegirlStore((s) => s.rights);
+  const moegirlDisplayname = useMoegirlStore((s) => s.displayname);
+  const moegirlDisplaytag = useMoegirlStore((s) => s.displaytag);
   const logoutMoegirl = useSettingsStore((s) => s.logoutMoegirl);
 
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+
+  /** 显示昵称，格式为 displayname#displaytag，未设置时为 null */
+  const nickname = moegirlDisplayname
+    ? `${moegirlDisplayname}${moegirlDisplaytag ? `#${moegirlDisplaytag}` : ''}`
+    : null;
 
   return (
     <>
@@ -38,10 +45,11 @@ export default function MoegirlSettings() {
           >
             {moegirlUsername ? (
               <Space>
-                <Typography.Text type='secondary'>{moegirlUsername}</Typography.Text>
+                <Typography.Text type='secondary'>{nickname || moegirlUsername}</Typography.Text>
                 <Popover
                   content={
                     <div className='max-w-175'>
+                      {nickname && <div><b>用户名：</b>{moegirlUsername}</div>}
                       <div><b>用户组：</b>{moegirlGroups.filter((g) => g !== '*').map((g) => groupLabels[g] || g).join('，') || '无'}</div>
                       <div><b>权限：</b>{moegirlRights.join(', ') || '无'}</div>
                     </div>

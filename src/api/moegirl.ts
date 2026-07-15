@@ -9,6 +9,30 @@ interface TokenQueryResponse {
   };
 }
 
+/** getUserRights 返回的当前用户信息 */
+export interface UserInfo {
+  /** 用户组 */
+  groups: string[];
+  /** 用户权限 */
+  rights: string[];
+  /** 显示昵称（未设置时为 null） */
+  displayname: string | null;
+  /** 昵称标签（未设置时为 null） */
+  displaytag: string | null;
+}
+
+/** list=users 接口的响应结构 */
+interface UsersQueryResponse {
+  query?: {
+    users?: Array<{
+      groups?: string[];
+      rights?: string[];
+      displayname?: string | null;
+      displaytag?: string | null;
+    }>;
+  };
+}
+
 /** 本次会话中使用过的 token，减少重复获取 */
 const tokenCache = new Map<string, string>();
 
@@ -71,15 +95,22 @@ const moegirl = {
     return invoke<string | null>('moegirl_check_login');
   },
 
-  /** 获取当前用户的 groups 和 rights */
-  async getUserRights(): Promise<{ groups: string[]; rights: string[] }> {
+  /** 获取当前用户的 groups、rights 以及显示昵称 */
+  async getUserRights(): Promise<UserInfo> {
+    const username = useSettingsStore.getState().moegirlUsername;
     const res = await moegirl.post({
       action: 'query',
-      meta: 'userinfo',
-      uiprop: ['groups', 'rights'],
+      list: 'users',
+      ususers: username,
+      usprop: ['groups', 'rights'],
     });
-    const userinfo = (res as { query?: { userinfo?: { groups?: string[]; rights?: string[] } } }).query?.userinfo;
-    return { groups: userinfo?.groups || [], rights: userinfo?.rights || [] };
+    const user = (res as UsersQueryResponse).query?.users?.[0];
+    return {
+      groups: user?.groups || [],
+      rights: user?.rights || [],
+      displayname: user?.displayname ?? null,
+      displaytag: user?.displaytag ?? null,
+    };
   },
 
   /** 退出登录，清空 token 缓存 */
