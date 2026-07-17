@@ -9,6 +9,10 @@ updates:
       cargo:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   # 前端依赖
   - package-ecosystem: "npm"
@@ -19,3 +23,7 @@ updates:
       npm:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
