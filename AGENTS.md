@@ -12,7 +12,7 @@
 - **前端包管理器**: pnpm
 - **前端**: TypeScript + React 19 + Tailwind CSS v4
 - **状态管理**: Zustand
-- **路由**: React Router v7
+- **路由**: React Router v8（无需react-router-dom）
 - **UI 组件库**: Ant Design (antd) v6
 
 ## 常用命令
@@ -39,48 +39,30 @@ pnpm lint:fix
 
 ## 项目结构
 
+仅列出总体结构和代表性文件
+
 ```
 mgp-vn-tool/
 ├── src/                        # 前端源码
 │   ├── api/                    # API 封装
 │   │   ├── erogamescape.ts     # 批评空间 API 封装
-│   │   ├── feishu.ts           # 飞书 API 封装
-│   │   ├── moegirl.ts          # 萌娘百科 API 封装
-│   │   ├── vndb.ts             # VNDB API 封装（含 VndbWork 类型）
-│   │   └── bangumi.ts          # Bangumi API 封装（含 BangumiWork 类型）
+│   │   └── ...
 │   ├── assets/                 # 静态资源
 │   ├── icons/                  # 图标组件目录
 │   ├── components/             # 共享组件
 │   │   ├── layout/             # 布局组件（Layout + Menu）
-│   │   ├── background.tsx           # 应用背景
-│   │   ├── code-panel.tsx           # 代码展示面板
-│   │   ├── copy-button.tsx          # 复制按钮
-│   │   ├── data-table-panel.tsx     # 原始数据表面板
-│   │   ├── empty-article-warning.tsx # 本地条目数据为空提醒
-│   │   ├── empty-placeholder.tsx    # 空状态占位组件
-│   │   ├── external-link.tsx        # 外部链接
-│   │   ├── help-button.tsx          # 打开帮助弹窗按钮
-│   │   ├── keep-alive.tsx           # 页面状态缓存组件
-│   │   ├── moegirl-link.tsx         # 萌百链接组件
-│   │   ├── page.tsx                 # 页面外壳组件
-│   │   └── search-input.tsx         # 带防抖的名称/id 搜索输入框
+│   │   ├── page.tsx            # 页面外壳组件
+│   │   └── ...
 │   ├── lib/                    # 工具库
-│   │   ├── types.ts             # 共享类型定义
-│   │   ├── config-store.ts      # 配置存储
-│   │   ├── moegirl-dict.ts      # 萌百中文映射（用户组等）
-│   │   └── erogamescape-dict.ts # 批评空间中文映射（职种等）
+│   │   ├── types.ts            # 共享类型定义
+│   │   ├── config-store.ts     # 配置存储
+│   │   └── ...
 │   ├── utils/                  # 纯工具函数
-│   │   ├── article-map.ts      # 批评空间数据映射等
-│   │   ├── constants.ts        # 常量定义
-│   │   ├── table.ts            # 表格工具函数
-│   │   └── text.ts             # 文本处理工具
 │   ├── pages/                  # 页面组件
 │   │   ├── about/              # 关于页面（首页）
+│   │   ├── settings/           # 设置页面
 │   │   ├── article-stats/      # 条目统计
-│   │   ├── cv-generator/       # 声优条目生成
-│   │   ├── work-generator/     # 作品条目生成
-│   │   ├── company-generator/  # 会社条目生成
-│   │   └── settings/           # 设置页面
+│   │   └── ...
 │   ├── stores/                 # Zustand 状态管理及对应持久化存储
 │   │   ├── settings-store.ts   # 应用设置
 │   │   ├── moegirl-store.ts    # 萌百数据（用户组等）
@@ -94,12 +76,8 @@ mgp-vn-tool/
 │   │   ├── lib.rs              # Tauri 配置和 Rust API 命令
 │   │   ├── http.rs             # 网络请求模块
 │   │   ├── settings.rs         # 统一从 Tauri Store 读取 settings.json
-│   │   ├── erogamescape.rs     # 批评空间 API
-│   │   ├── feishu.rs           # 飞书 API
-│   │   ├── moegirl.rs          # 萌娘百科 API
-│   │   ├── vndb.rs             # VNDB API
-│   │   ├── bangumi.rs          # Bangumi API
-│   │   └── main.rs             # 入口
+│   │   ├── main.rs             # 入口
+│   │   └── ...
 │   ├── capabilities/           # Tauri 权限配置
 │   ├── tauri.conf.json         # Tauri 核心配置
 │   └── Cargo.toml              # Rust 依赖
@@ -116,7 +94,7 @@ mgp-vn-tool/
 └── vite.config.ts              # Vite 配置
 ```
 
-页面/组件/工具函数等结构变动后，将对应内容写入这里。
+等结构变动后，将对应内容回血到此处。
 
 ## 编码规范
 
@@ -298,17 +276,20 @@ Props：
 - **ESLint 错误**: 执行 eslint 指令，能自动修复的用 `--fix` 参数自动修复，不能自动修复的进行提示
 - **Tauri 启动失败**: 检查 Rust 环境和依赖
 
-## 萌娘百科相关用户
+## 萌娘百科相关
 
 萌娘百科基于 MediaWiki 系统，涉及部分用语如下：
 
 - 内链：内部链接，可以在萌娘百科的页面之间跳转，格式为`[[页面名]]`，如`[[Galgame]]`
+- 外链：外部链接，用于跳转到外部网站，格式为`[网站地址 显示文本]`，如`[https://www.google.com/ Google]`
 - 分类：页面所属分类，给页面添加形如`[[分类:分类名]]`/`[[Category:分类名]]`/`[[Cat:分类名]]`的代码即可使其归入该分类
 - 模板：可以嵌入的复用页面代码，格式为`{{模板名|命名参数1=值1|匿名参数1|匿名参数2|...}}`
 - 大家族：嵌入在页面末尾的大家族模板，通常为该页面所属的上一级，比如作品/角色条目所属的会社大家族，会社条目所属的`{{Galgame公司}}`大家族等
 - 信息栏：嵌入在页面顶部的信息栏模板，每种类型的页面通常有对应的信息栏
 
+由于萌娘百科在API、权限等方面有较多定制化内容，未说明的内容不要直接照搬MediaWiki文档，应与用户确认。
+
 ## 代码审查
 
-- 审查安全性时，批评空间镜像站账号密码、飞书统计表 App Secret 仅涉及读取且半公开，因此使用明文存储，无需视为安全风险
+- 审查安全性时，批评空间镜像站账号密码、飞书统计表 App Secret 仅涉及读取且半公开，因此使用明文存储，无需视为安全风险。现阶段不涉及提交内容到萌娘百科的功能，因此唯一的通信安全审查点是Cookie泄露
 - 批评空间 SQL 执行页只能用于读取，且本身有防注入，无需考虑安全风险

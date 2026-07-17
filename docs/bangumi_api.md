@@ -1,9 +1,31 @@
 # Bangumi API 使用文档
 
+- [相关链接](#相关链接)
+- [持久化设置项](#持久化设置项)
+- [请求规范](#请求规范)
+- [错误响应](#错误响应)
+- [使用接口](#使用接口)
+  - [1. 人物/组织信息](#1-人物组织信息)
+  - [2. 人物/组织的作品列表](#2-人物组织的作品列表)
+  - [3. 作品信息](#3-作品信息)
+  - [4. 人物/组织搜索](#4-人物组织搜索)
+
 ## 相关链接
 
 - **API文档**：https://bangumi.github.io/api/
 - **GitHub仓库**：https://github.com/bangumi/api/
+
+## 持久化设置项
+
+设置项存储在 Tauri Store 的 `settings.json` 中，由前端 `useSettingsStore` 写入、后端 `read_bangumi_settings` 读取。
+
+| Store Key | 类型 | 默认值（前端 / 后端） | 取值范围 | 说明 |
+|-----------|------|--------|---------|------|
+| `bangumiTimeout` | number | `30` / `30` | 1-120 | 请求超时时长（秒） |
+| `bangumiRetries` | number | `1` / `2` | 0-10 | 请求失败重试次数 |
+| `bangumiRetryDelay` | number | `1000` / `1000` | 100-30000 | 请求失败重试间隔（毫秒） |
+
+> 注意：`bangumiRetries` 前端默认值为 1（[settings-store.ts:289](file:///d:/Repositories/mgp-vn-tool/src/stores/settings-store.ts#L289)），后端默认值为 2（[bangumi.rs:127](file:///d:/Repositories/mgp-vn-tool/src-tauri/src/bangumi.rs#L127)）。后端读取时会 clamp 到 0-10 范围。
 
 ## 请求规范
 
@@ -30,15 +52,17 @@ HTTP 404
 }
 ```
 
+后端 `format_bangumi_error` 处理错误响应：优先取 JSON 的 `title`/`description` 用 `：` 拼接（如 `Not Found：resource can't be found...`）；JSON 解析失败或为空时回退到截断 200 字符的裸响应体；最终格式化为 `Bangumi API HTTP {status}: {detail}`。
+
 ## 使用接口
 
-本工具用以下三个端点（以下示例均以 sprite / person `13541` 为例，长字段已截断，列表仅保留代表性项）：
+本工具用以下四个端点（以下示例均以 sprite / person `13541` 为例，长字段已截断，列表仅保留代表性项）：
 
 ### 1. 人物/组织信息
 
 `GET /v0/persons/{person_id}`
 
-返回该 person 的信息。本工具仅使用 `name` 与 `infobox` 中的别名、官网。
+返回该 person 的信息。本工具仅反序列化 `name` 与 `infobox` 字段，其他字段被 serde 忽略。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -46,8 +70,8 @@ HTTP 404
 | `name` | string | 名称 |
 | `type` | number | 1=个人，2=组织/会社 |
 | `infobox` | array | 信息框项，见下 |
-| `summary` | string | 简介（本工具未使用） |
-| `images`/`img`/`career`/`stat` 等 | - | 其余字段，本工具未使用 |
+| `summary` | string | 简介 |
+| `images`/`img`/`career`/`stat` 等 | - | 其余字段 |
 
 `infobox` 每项为 `{ "key": string, "value": string | array }`。`value` 形态不固定：
 - **字符串**：如 `"官网"`、`"Twitter"`；
@@ -85,7 +109,7 @@ HTTP 404
 | `name_cn` | string | 中文名，无则空串 |
 | `type` | number | 条目类型，见下 |
 | `staff` | string | 该 person 在本条目的职务（如「开发」「原作」「厂牌」） |
-| `image`/`eps` | - | 本工具未使用 |
+| `image`/`eps` 等 | - | 其余字段 |
 
 `type` 含义（与网站显示一致）：
 
@@ -96,7 +120,7 @@ HTTP 404
 | 3 | 音乐 | 纳入「游戏衍生音乐」 |
 | 4 | 游戏 | **排除**（Galgame 由 VNDB 提供） |
 
-> 注意：同一 `id` 可能因多个 `staff` 职务重复出现（见下例 `id: 308808` 出现两次）。本工具按 `id` 去重，只保留一次。
+> 注意：同一 `id` 可能因多个 `staff` 职务重复出现。本工具按 `id` 去重，只保留首次出现的记录（实现用 `HashSet`）。
 
 ```json
 [
@@ -112,7 +136,7 @@ HTTP 404
 
 `GET /v0/subjects/{subject_id}`
 
-返回单个条目详情。列表端点不含发行日期，本工具对列表中每个条目**逐条**调用本端点获取 `date`。
+返回单个条目详情。列表端点不含发行日期，本工具对列表中每个条目**逐条串行**调用本端点获取 `date`。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -120,7 +144,7 @@ HTTP 404
 | `name`/`name_cn` | string | 原名 / 中文名 |
 | `date` | string \| null | 发售/放送日期，`YYYY-MM-DD`，可能为空或缺失 |
 | `type` | number | 条目类型（同上） |
-| `platform`/`summary`/`infobox`/`tags`/`rating` 等 | - | 其余字段，本工具未使用 |
+| `platform`/`summary`/`infobox`/`tags`/`rating` 等 | - | 其余字段 |
 
 ```json
 {
@@ -139,3 +163,34 @@ HTTP 404
   "tags": [ { "name": "漫画", "count": 12 }, { "name": "恋爱", "count": 10 } ]
 }
 ```
+
+### 4. 人物/组织搜索
+
+`POST /v0/search/persons`
+
+按名称搜索 person，`filter.career` 固定为 `["producer"]`（与 VNDB producer 概念对齐，避免误搜到非制作人员）。
+
+请求体：
+
+```json
+{
+  "keyword": "sprite",
+  "filter": { "career": ["producer"] }
+}
+```
+
+响应体（本工具仅反序列化 `data` 数组中每项的 `id` 与 `name`）：
+
+```json
+{
+  "data": [
+    { "id": 13541, "name": "sprite" }
+  ]
+}
+```
+
+前端 `BangumiPersonSearchResult` 类型：
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | number | person id |
+| `name` | string | person 名称 |

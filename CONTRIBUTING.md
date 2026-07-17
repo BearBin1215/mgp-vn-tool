@@ -25,7 +25,7 @@
 2. 安装 [node.js](https://nodejs.org/zh-cn) 20.19+/22.12+。
 3. 安装 [pnpm](https://pnpm.io/zh-CN/docs/installation) 作为包管理器。
 
-推荐使用 [VS Code](https://code.visualstudio.com/) 作为编辑器，打开本工程后会提示安装 rust-analyzer、Tauri 等扩展。RustOver等其他编辑器/IDE请自行翻阅官方文档。
+推荐使用 [VS Code](https://code.visualstudio.com/) 作为编辑器，打开本工程后会提示安装 rust-analyzer、Tauri 等扩展。RustRover等其他编辑器/IDE请自行翻阅官方文档。
 
 ### 开发命令
 
@@ -45,7 +45,7 @@ pnpm tauri dev
 - **框架**: [React 19](https://react.docschina.org/) + [TypeScript](https://www.typescriptlang.org/zh/)
 - **样式**: [Tailwind CSS v4](https://tailwindcss.com/) + [Ant Design v6](https://ant.design/index-cn/)
 - **状态管理**: [Zustand](https://zustand.docs.pmnd.rs/)
-- **路由**: [React Router v7](https://reactrouter.com/)
+- **路由**: [React Router v8](https://reactrouter.com/)（无需react-router-dom）
 - **构建**: [Vite 8](https://cn.vitejs.dev/) + [Tauri v2](https://tauri.app/zh-cn/)
 
 ## 构建并发布
@@ -57,7 +57,7 @@ pnpm tauri dev
 1. 用脚本统一修改版本号（会同步修改 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`）。支持显式版本号或自增关键字：
    ```bash
    pnpm bump <version>   # 显式指定，如 pnpm bump 1.2.3
-   pnpm bump <keyword>   # 基于当前版本自增：major / minor / patch 等
+   pnpm bump <keyword>   # 基于当前版本自增：major / minor / patch
    ```
 2. 提交改动并打 tag（tag 名须为 `v` + 版本号，含预发布后缀）：
    ```bash

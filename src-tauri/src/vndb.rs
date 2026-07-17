@@ -16,8 +16,6 @@ pub struct VndbWork {
     pub id: String,
     /// 与其他 VN 的关联（relation 类型 + 目标 VN id）
     pub relations: Vec<VndbApiRelation>,
-    /// 行尾编辑注释，当前 VNDB 模块始终为 None
-    pub note: Option<String>,
 }
 
 /// VNDB producer（制作组织）信息（前端渲染 wikitext 所需）
@@ -344,7 +342,6 @@ async fn fetch_vndb_galgames(
                 date: vn.released,
                 id: vn.id,
                 relations: vn.relations,
-                note: None,
             });
         }
         if !data.more {

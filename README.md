@@ -1,17 +1,18 @@
-# 萌百视觉小说研究会条目工具
+<h1 align="center">萌百视觉小说研究会条目工具</h1>
+
+
+<p align="center">
+  <a href="https://github.com/BearBin1215/mgp-vn-tool/releases"><img src="https://img.shields.io/github/v/release/BearBin1215/mgp-vn-tool?logo=github&color=blue&style=flat-square" alt="Latest Release" /></a>
+  <img src="https://img.shields.io/badge/Windows-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows Support" /><img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux Support" /><img src="https://img.shields.io/badge/macOS-black?style=flat-square&logo=apple&logoColor=white" alt="macOS Support" />
+  <a href="https://github.com/BearBin1215/mgp-vn-tool/blob/main/LICENSE" target="_blank"><img src="https://img.shields.io/github/license/BearBin1215/mgp-vn-tool?style=flat-square" alt="License"></a>
+  <br />
+  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-v2.0-24c8db?logo=tauri&style=flat-square" alt="tauri version"></a>
+  <a href="https://react.dev" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/React-v19-20232a?style=flat-square&logo=react&logoColor=61dafb" alt="React Website" /></a>
+</p>
 
 萌百视觉小说研究会条目工具，供[萌百视觉小说研究会](https://zh.moegirl.org.cn/Template:萌百视觉小说研究会)成员使用，用于生成条目代码、获取条目信息等。
 
 由于本人技术能力有限，尤其 Rust 方面完全是个新手，后端部分代码高度依赖 AI 的编程及交叉验证，可能会有许多低质量代码，欢迎各路萌百人[参与完善](CONTRIBUTING.md)及提出建议。
-
-- [下载](#下载)
-- [使用须知](#使用须知)
-- [功能](#功能)
-  - [条目统计](#条目统计)
-  - [作品条目生成](#作品条目生成)
-  - [里界声优条目生成](#里界声优条目生成)
-  - [会社条目生成](#会社条目生成)
-- [开源许可](#开源许可)
 
 ## 下载
 
@@ -23,9 +24,7 @@
 | macOS | `.dmg` / `.app` |
 | Linux | `.deb` / `.rpm` / `.AppImage` |
 
-## 使用须知
-
-- 本工程使用 [Tauri v2](https://tauri.app/zh-cn/) 构建，理论上支持 Windows、macOS 和 Linux。但由于本人仅在 Windows 上开发，其他环境的表现可能不一致，出现其他系统专属 BUG 不保证修复。
+> 本工程使用 [Tauri v2](https://tauri.app/zh-cn/) 构建，理论上支持 Windows、macOS 和 Linux。但由于本人仅在 Windows 上开发，其他环境的表现可能不一致，出现其他系统专属 BUG 不保证修复。
 
 ## 功能
 

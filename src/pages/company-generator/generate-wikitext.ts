@@ -27,7 +27,7 @@ const fromVndb = (w: VndbWork): WorkLineInput => ({
   originalTitle: w.original_title,
   chineseTitle: w.chinese_title,
   date: w.date,
-  note: w.note,
+  note: null,
 });
 
 /** 将 BangumiWork 归一化为 WorkLineInput */

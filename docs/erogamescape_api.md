@@ -9,12 +9,17 @@
 - [常用函数](#常用函数)
   - [`read_settings`](#read_settings)
   - [`post_sql`](#post_sql)
+  - [`fetch_page`](#fetch_page)
   - [`parse_result_table`](#parse_result_table)
   - [`check_status`](#check_status)
   - [`wrap_response`](#wrap_response)
 - [请求方式](#请求方式)
 - [SQL示例](#sql示例)
+- [读取详情](#读取详情)
+  - [作品详情](#作品详情)
+  - [作品音乐详情](#作品音乐详情)
 - [数据表](#数据表)
+  - [brandlist - 厂牌信息](#brandlist---厂牌信息)
   - [gamelist - 游戏信息](#gamelist---游戏信息)
   - [createrlist - 创作者信息](#createrlist---创作者信息)
   - [shokushu - 职种（游戏与创作者的关联信息）](#shokushu---职种游戏与创作者的关联信息)
@@ -69,7 +74,7 @@ flowchart TD
 从 Tauri Store 中读取批评空间的连接配置，包含：
 - `url`：批评空间地址（默认 `http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki`）
 - `username` / `password`：镜像站 HTTP Basic Auth 认证信息
-- `timeout`：请求超时时长（秒，默认 20）
+- `timeout`：请求超时时长（秒，默认 30）
 
 ### `post_sql`
 
@@ -79,13 +84,21 @@ flowchart TD
 - 镜像站自动附加 Basic Auth 认证
 - 返回 `(HTTP 状态码, 原始 HTML 响应体)`
 
+### `fetch_page`
+
+获取批评空间普通页面 HTML（非 SQL 接口）：
+- 与 `post_sql` 共用 `read_settings` 的 URL/认证/超时配置，但走 GET 请求直接获取页面
+- 用于 `query_work_music_detail` 抓取 `game.php` 与 `music.php` 详情页
+- 状态非 2xx 时返回 `Err("HTTP {status}: {url}")`
+
 ### `parse_result_table`
 
 从批评空间返回的 HTML 页面中提取查询结果表格：
 - 使用 `scraper` 库解析 HTML
-- 定位 `#query_result_main` 选择器下的所有 `<table>`
-- 跳过表头为"列名/型/内容"的数据表定义表格
-- 返回 `(列名列表, 数据行列表)`
+- 定位 `#query_result_main` 容器，其内仅有一个结果表格
+- 返回 `(列名列表, 数据行列表)`；未找到数据表格时返回 `(vec![], vec![])`
+
+错误提示分支：批评空间查询失败（如 SQL 执行成本超限、语法错误）时会返回 `<div id="query_result_main"><p>错误信息</p></div>`。此时若容器内存在非空 `<p>` 文本，将其作为 `Err` 返回，便于上层透传给前端。
 
 ### `check_status`
 
@@ -101,7 +114,7 @@ flowchart TD
   "response": { ... }
 }
 ```
-失败时 `result` 为 `"fail"`，`response` 为错误信息字符串。
+失败时 `result` 为 `"fail"`，`response` 为错误信息字符串；`statusCode` 从错误信息前缀 `HTTP {code}` 中提取，无前缀时为 `"0"`。
 
 ## 请求方式
 
@@ -113,30 +126,125 @@ SQL查询地址：`http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/sql_fo
 ## SQL示例
 
 ```sql
--- 根据创作者ID查询其参与的作品（声优出演+音乐作品）
+-- 根据创作者ID查询其参与的作品（声优出演+音乐作品），并取创作者基本信息
 SELECT
-  s.shubetu,            -- 职业类型（1:原画 2:编剧 3:音乐 4:角色设计 5:声优 6:歌手 7:其他）
-  s.shubetu_detail,     -- 1:主要 2:次要 3:其他
-  s.shubetu_detail_name, -- 声优为角色名，音乐为歌曲名
-  g.gamename,           -- 游戏名称
-  g.sellday,            -- 发售日（未定则为2050-01-01）
-  g.model               -- 平台（如 Windows）
+  c.name,                    -- 创作者名字
+  c.furigana,                -- 创作者名字的假名
+  c.url,                     -- 创作者官方主页URL
+  c.twitter_username,        -- 创作者的twitter ID
+  c.blog,                    -- 创作者的博客URL
+  c.blog_title,              -- 创作者的博客标题
+  c.pixiv,                   -- 创作者的pixiv ID
+  s.shubetu,                 -- 职种（5:声优 6:音乐，见 shokushu 表）
+  s.shubetu_detail,          -- 1:主要 2:次要 3:其他
+  s.shubetu_detail_name,     -- 声优为角色名，音乐为歌曲名
+  g.id AS game_id,           -- 游戏ID（后端内部用于追加 Fan Disk/追加篇/重制版关联查询）
+  g.gamename,                -- 游戏名称
+  g.sellday,                 -- 发售日（未定则为2050-01-01）
+  g.model                    -- 平台（如 Windows）
 FROM
   createrlist c
-JOIN
+LEFT JOIN
   shokushu s ON c.id = s.creater
-JOIN
+LEFT JOIN
   gamelist g ON s.game = g.id
 WHERE
   c.id = 26545; -- 夏和小对应的id
 ```
 
+## 读取详情
+
+`query_work_detail` 与 `query_work_music_detail` 用于作品条目生成，分别提供作品基本信息（含 STAFF/CAST/移植/续作）与音乐详情。
+
+### 作品详情
+
+`#[tauri::command] query_work_detail(app, work_id: u64)`
+
+按作品 ID 查询作品详情，单次请求拿到作品自身信息，再分别请求关联作品与 STAFF/CAST（关联查询失败不阻断主流程）。
+
+**请求流程**：
+1. 自身信息：`gamelist g LEFT JOIN brandlist b ON g.brandname = b.id WHERE g.id = {work_id}`
+   - 取 `gamename`/`sellday`/`model`/`shoukai`(官网)/`dlsite_id`/`dlsite_domain`/`twitter`/`brand`
+2. 关联作品（`transplant`/`sequel`）：`connection_between_lists_of_games c JOIN gamelist g ON c.game_subject = g.id LEFT JOIN brandlist b ON g.brandname = b.id WHERE c.kind IN ('transplant','sequel') AND c.game_object = {work_id}`
+   - transplant 取 `model`/`sellday`/`brand`（补充平台与发行商）
+   - sequel 取 `gamename`（续作游戏名列表）
+3. STAFF/CAST/歌手：`shokushu s JOIN createrlist c ON s.creater = c.id WHERE s.game = {work_id} AND s.shubetu IN (1,2,3,5,6,7)`
+   - 前端按 shubetu 分流：5→CAST，1/2/3/6/7→STAFF/音乐
+   - 注意未取 shubetu=4（角色设计）
+
+**响应结构**：
+
+```json
+{
+  "gamename": "GalExample",
+  "sellday": "2017-11-24",
+  "model": "Windows",
+  "shoukai": "https://...",
+  "dlsiteId": "RJxxxxx",
+  "dlsiteDomain": "maniax/home",
+  "twitter": "...",
+  "brand": "BrandExample",
+  "transplants": [{ "model": "...", "sellday": "...", "brand": "..." }],
+  "sequels": ["..."],
+  "staff": [
+    { "shubetu": "5", "shubetuDetail": "1", "shubetuDetailName": "...", "name": "..." }
+  ]
+}
+```
+
+字段含义详见 `src/api/erogamescape.ts` 的 `WorkDetail`/`WorkTransplant`/`StaffRecord` 类型定义。
+
+### 作品音乐详情
+
+`#[tauri::command] query_work_music_detail(app, work_id: u64)`
+
+抓取作品的音乐详情，用于作品条目生成的「相关音乐」章节。分类信息由 SQL（shokushu.shubetu=6 的 shubetu_detail_name）提供，本命令负责获取 per-song 的曲名与创作者。
+
+**请求流程**：
+1. 爬 `game.php?game={work_id}`，解析 `#music_summary_main` 表格拿到 `(music_id, song_name, summary_singer)`
+   - 表格每行：第1列曲名含 `music.php?music=xxx` 链接，第3列为歌手
+2. 并发爬取每个 `music.php?music={music_id}`（最大 3 并发，单曲失败跳过），解析 `#creaters_information_table` 拿作词/作曲/编曲/歌手
+   - 按 `<a>` 标签拆分多个创作者，无 `<a>` 时按 `<br>` 拆分
+   - 详情页歌手为空时回退用作品页的歌手名
+
+**响应结构**（数组，每项一首曲子）：
+
+```json
+[
+  {
+    "musicId": "8659",
+    "songName": "OP主题歌",
+    "singer": ["歌手A", "歌手B"],
+    "lyricist": ["作词人"],
+    "composer": ["作曲人"],
+    "arranger": ["编曲人"]
+  }
+]
+```
+
+字段含义详见 `src/api/erogamescape.ts` 的 `MusicCreatorDetail` 类型定义。
 
 ## 数据表
 
-### gamelist - 游戏信息
+### brandlist - 厂牌信息
 
-brandlist（品牌信息）在本项目中未使用，故省略。brandname列是brandlist的id外键。
+`gamelist.brandname` 是本表的 `id` 外键；`search_games` 与 `query_work_detail` 均会 JOIN 本表取 `brandname` 作为制作组织名。
+
+| 列名 | 型 | 内容 |
+|------|-----|------|
+| id | integer | 主键 |
+| brandname | text | 厂牌名 |
+| brandfurigana | text | 厂牌名的假名 |
+| url | text | 厂牌官方主页URL |
+| kind | text | CORPORATION（企业）或 CIRCLE（同人） |
+| lost | boolean | t 表示已解散 |
+| directlink | boolean | t 表示禁止链接到首页以外 |
+| median | integer | 该厂牌开发游戏评分中位数，每日计算 |
+| twitter | text | 厂牌官方 twitter ID |
+
+---
+
+### gamelist - 游戏信息
 
 | 列名 | 型 | 内容 |
 |------|-----|------|

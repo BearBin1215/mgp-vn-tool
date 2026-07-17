@@ -12,8 +12,6 @@ export interface VndbWork {
   id: string;
   /** 与其他 VN 的关联（relation 类型 + 目标 VN id） */
   relations: { relation: string; id: string }[];
-  /** 行尾编辑注释，无则为 null */
-  note: string | null;
 }
 
 /** VNDB producer（制作组织）原始数据 */

@@ -93,69 +93,55 @@ async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), St
     Ok((status, text))
 }
 
-/// 从 HTML 中解析 `#query_result_main` 表格，返回 (列名列表, 数据行列表)
+/// 从 HTML 中解析 `#query_result_main` 内的结果表格，返回 (列名列表, 数据行列表)
 ///
-/// 页面中可能存在多个表格，需要跳过数据表定义表格（表头为"列名/型/内容"），
-/// 只提取实际查询结果的数据表格。若未找到数据表格但容器内存在错误提示（如 SQL 执行
-/// 成本超限），返回该提示文本作为错误，以便上层透传给前端。
+/// `#query_result_main` 容器内仅有一个结果表格。若未找到数据表格但容器内存在错误
+/// 提示（如 SQL 执行成本超限、语法错误），返回该提示文本作为错误，以便上层透传给前端。
 fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
     let document = scraper::Html::parse_document(html);
-    let table_selector =
+    let container_selector =
         scraper::Selector::parse("#query_result_main").map_err(|e| format!("{e:?}"))?;
     let tr_selector = scraper::Selector::parse("tr").unwrap();
     let th_selector = scraper::Selector::parse("th").unwrap();
     let td_selector = scraper::Selector::parse("td").unwrap();
     let p_selector = scraper::Selector::parse("p").unwrap();
-    let tables: Vec<_> = document.select(&table_selector).collect();
 
-    for table in &tables {
-        let rows: Vec<_> = table.select(&tr_selector).collect();
-        if rows.len() < 2 {
-            continue;
-        }
+    let Some(container) = document.select(&container_selector).next() else {
+        return Ok((vec![], vec![]));
+    };
 
-        let headers: Vec<String> = rows[0]
-            .select(&th_selector)
-            .map(|th| th.text().collect::<String>())
-            .collect();
+    let rows: Vec<_> = container.select(&tr_selector).collect();
+    let headers: Vec<String> = rows
+        .first()
+        .map(|row| {
+            row.select(&th_selector)
+                .map(|th| th.text().collect::<String>())
+                .collect()
+        })
+        .unwrap_or_default();
 
-        if headers.len() == 3
-            && headers
-                .iter()
-                .any(|h| h == "列名" || h == "型" || h == "内容")
-        {
-            continue;
-        }
-
-        if headers.is_empty() {
-            continue;
-        }
-
-        // 提取数据行，跳过表头行。统一 trim 单元格文本，保证返回数据无首尾空白
-        let mut data_rows: Vec<Vec<String>> = Vec::new();
-        for row in &rows[1..] {
-            let cells: Vec<String> = row
-                .select(&td_selector)
+    // 提取数据行，跳过表头行。统一 trim 单元格文本，保证返回数据无首尾空白
+    let data_rows: Vec<Vec<String>> = rows
+        .iter()
+        .skip(1)
+        .map(|row| {
+            row.select(&td_selector)
                 .map(|td| td.text().collect::<String>().trim().to_string())
-                .collect();
-            if cells.len() == headers.len() {
-                data_rows.push(cells);
-            }
-        }
+                .collect::<Vec<String>>()
+        })
+        .filter(|cells| !headers.is_empty() && cells.len() == headers.len())
+        .collect();
 
-        if !data_rows.is_empty() {
-            return Ok((headers, data_rows));
-        }
+    if !headers.is_empty() && !data_rows.is_empty() {
+        return Ok((headers, data_rows));
     }
 
-    // 未找到数据表格时，检查容器内是否有错误提示。批评空间查询失败（如 SQL 执行成本
-    // 超限、语法错误）时会返回 <div id="query_result_main"><p>错误信息</p></div>
-    for table in &tables {
-        if let Some(p) = table.select(&p_selector).next() {
-            let msg = p.text().collect::<String>().trim().to_string();
-            if !msg.is_empty() {
-                return Err(msg);
-            }
+    // 未找到有效数据表格时，检查容器内是否有错误提示。批评空间查询失败（如 SQL 执行
+    // 成本超限、语法错误）时会返回 <div id="query_result_main"><p>错误信息</p></div>
+    if let Some(p) = container.select(&p_selector).next() {
+        let msg = p.text().collect::<String>().trim().to_string();
+        if !msg.is_empty() {
+            return Err(msg);
         }
     }
 

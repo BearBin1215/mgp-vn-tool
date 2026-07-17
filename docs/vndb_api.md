@@ -2,6 +2,17 @@
 
 本文档记录项目中用到的 VNDB API v2（Kana）接口。部分参数说明译自 [VNDB API 文档](https://api.vndb.org/kana)。
 
+- [请求规范](#请求规范)
+- [请求参数](#请求参数)
+  - [filters 格式](#filters-格式)
+  - [fields 格式](#fields-格式)
+  - [响应结构](#响应结构)
+  - [失败响应](#失败响应)
+- [使用接口](#使用接口)
+  - [制作组织信息](#制作组织信息)
+  - [制作组织名称搜索](#制作组织名称搜索)
+  - [会社作品列表](#会社作品列表)
+
 ## 请求规范
 
 - 请求地址：`https://api.vndb.org/kana`
@@ -40,6 +51,7 @@
 `more=true` 时递增 `page` 继续请求即可获取后续数据。
 
 ### 失败响应
+
 HTTP 400
 ```
 Invalid 'id' filter: Invalid value.
@@ -65,7 +77,7 @@ Invalid 'id' filter: Invalid value.
 | `extlinks` | array | 扩展链接，见下 | 提取官网/X/YouTube |
 | `lang`/`type` 等 | - | 其余字段 | 本工具未使用 |
 
-`extlinks` 每项为 `{ "label": string, "url": string }`。本工具按 `label`（大小写不敏感）提取：
+`extlinks` 每项为 `{ "label": string \| null, "url": string }`，`label` 可能为 null（项目用 `eq_ignore_ascii_case` 比较时 None 自动跳过）。本工具按 `label`（大小写不敏感）提取：
 - `Official website` → 官网；
 - `Xitter` → X（Twitter）；
 - `Youtube` → YouTube。
@@ -75,7 +87,8 @@ Invalid 'id' filter: Invalid value.
 ```json
 {
   "filters": ["id", "=", "p7001"],
-  "fields": "name,original,aliases,description,extlinks{url,label}"
+  "fields": "name,original,aliases,description,extlinks{url,label}",
+  "results": 10
 }
 ```
 
@@ -127,7 +140,7 @@ Invalid 'id' filter: Invalid value.
 }
 ```
 
-响应体结构同制作组织信息（`{ results, more }`），`results` 为匹配项数组。
+响应体结构同制作组织信息（`{ results, more }`），`results` 为匹配项数组。后端会过滤掉 `id` 或 `name` 为空的结果。
 
 ### 会社作品列表
 
@@ -147,7 +160,7 @@ Invalid 'id' filter: Invalid value.
 - 原名：`lang` 等于 `olang` 且 `main=true` 的标题（回退到 `olang` 首个，再回退 VN id）；
 - 中文名：`zh-Hans` 或 `zh-Hant` 首个，且与原名不同。
 
-`relations` 每项为 `{ "relation": string, "id": string }`。本工具仅用 `orig`（原作）触发衍生作品缩进；`preq`/`seq`/`set`/`fan` 等为平级或反向关系，不触发缩进。
+`relations` 每项为 `{ "relation": string, "id": string }`。后端原样透传所有 relations，前端仅用 `orig`（原作）触发衍生作品缩进；`preq`/`seq`/`set`/`fan` 等为平级或反向关系，不触发缩进。
 
 > 注意：同一 VN 可能有多个 release（初回版、体验版等），直接查询 VN 可避免重复。
 
@@ -157,7 +170,8 @@ Invalid 'id' filter: Invalid value.
 {
   "filters": ["developer", "=", ["id", "=", "p7001"]],
   "fields": "id,released,olang,titles.lang,titles.title,titles.main,relations.relation,relations.id",
-  "results": 100
+  "results": 100,
+  "page": 1
 }
 ```
 
