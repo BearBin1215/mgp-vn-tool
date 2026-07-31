@@ -28,7 +28,7 @@ import {
   EnterOutlined,
 } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
-import { uniq } from 'lodash-es';
+import { uniq } from 'es-toolkit';
 import Page from '@/components/page';
 import MoegirlLink from '@/components/moegirl-link';
 import { useArticleStore, initArticles, type Article } from '@/stores/article-store';

@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
 import { App, Button, Input, Modal, Splitter, type InputRef, type TableColumnsType } from 'antd';
 import { CheckOutlined } from '@ant-design/icons';
-import { uniq } from 'lodash-es';
+import { uniq } from 'es-toolkit';
 import Page from '@/components/page';
 import CodePanel from '@/components/code-panel';
 import EmptyPlaceholder from '@/components/empty-placeholder';

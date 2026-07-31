@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { groupBy, uniq } from 'lodash-es';
+import { groupBy, uniq } from 'es-toolkit';
 import type { CreatorWorksResult, GameConnection, GameRecord } from '@/api/erogamescape';
 import type { PageInfo } from '@/api/moegirl';
 import { PENDING_SELL_DATE } from '@/utils/constants';

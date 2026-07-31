@@ -6,7 +6,7 @@ import {
   SettingOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import { flatMapDeep } from 'lodash-es';
+import { flatMapDeep } from 'es-toolkit';
 import { GameIcon } from '@/icons';
 import About from '@/pages/about';
 import ArticleStats from '@/pages/article-stats';

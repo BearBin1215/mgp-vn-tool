@@ -1,4 +1,4 @@
-import { groupBy, uniq } from 'lodash-es';
+import { groupBy, uniq } from 'es-toolkit';
 import type { VndbProducer, VndbWork } from '@/api/vndb';
 import type { BangumiCompany, BangumiWork } from '@/api/bangumi';
 import type { PageInfo } from '@/api/moegirl';

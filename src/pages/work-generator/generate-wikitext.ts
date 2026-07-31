@@ -1,4 +1,4 @@
-import { groupBy, uniq } from 'lodash-es';
+import { groupBy, uniq } from 'es-toolkit';
 import type { WorkDetail, MusicCreatorDetail, StaffRecord } from '@/api/erogamescape';
 import type { PageInfo } from '@/api/moegirl';
 import { platformLink, platformCategory } from '@/lib/erogamescape-dict';
