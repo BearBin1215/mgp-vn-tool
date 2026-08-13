@@ -84,7 +84,7 @@ export default function ErogamescapeSettings() {
           <SettingItem
             label='访问地址'
             description='从批评空间（erogamescape）读取数据时的访问地址'
-            help={<>原站<b>通常</b>需要日本IP或家宽；镜像站仅限国内访问</>}
+            help={<>原站<b>通常</b>需要日本IP或家宽；镜像站仅限国内访问，且暂不支持sql查询（影响目前绝大多数功能）</>}
           >
             <div className='flex gap-1 w-60'>
               <Select
