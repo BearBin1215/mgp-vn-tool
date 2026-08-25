@@ -199,14 +199,15 @@ export const formatError = (e: unknown): string =>
  * 从条目 wikitext 源代码中提取游戏发行时间
  *
  * 优先取信息框中的 `|发行时间 = ...` 参数（页面存在多个 Infobox 时取首个，即本篇），
- * 未命中时兜底匹配正文的「于XXXX年X月X日发行/发售」句式。
+ * 未命中时兜底匹配正文的「于XXXX年X月X日发行/发售」句式。关键字兼容繁简
+ * （发行/發行、发售/發售、于/於），「年/月/日」繁简同形无需区分。
  * @param wikitext 页面源代码
  * @returns YYYY-MM-DD 格式日期，无法提取时返回空串
  */
 export const extractReleaseDate = (wikitext: string): string => {
   const patterns = [
     /^\s*\|\s*发行时间\s*=\s*(\d{4})年(\d{1,2})月(\d{1,2})日/m,
-    /于(\d{4})年(\d{1,2})月(\d{1,2})日(?:发行|发售)/,
+    /[于於](\d{4})年(\d{1,2})月(\d{1,2})日(?:发行|發行|发售|發售)/,
   ];
   for (const pattern of patterns) {
     const match = pattern.exec(wikitext);
@@ -218,16 +219,73 @@ export const extractReleaseDate = (wikitext: string): string => {
 };
 
 /**
- * 将 YYYY-MM-DD 字符串转为 Excel 序列号
+ * 将 YYYY-MM-DD 字符串转为 Excel 序列号（数值）
  *
- * 与 {@link excelDateToString} 互逆，用于向飞书日期类型单元格写入时保持原格式显示
- * （直接写 `YYYY-MM-DD` 文本会被当字符串而显示异常）。采用与读取端一致的
- * dayjs 本地时区基准，避免时区偏移导致跨天误差。
- * @param date YYYY-MM-DD 格式日期，空值原样返回
+ * 与 {@link excelDateToString} 互逆，用于向飞书日期类型单元格写入时保持原格式显示。
+ * 直接写 `YYYY-MM-DD` 文本会被当字符串而显示异常，必须写入**数值型**序列号，
+ * 且由 Rust 端 append 后对 D、E 列设置日期格式，才会渲染为日期而非裸数字。
+ * 采用与读取端一致的 dayjs 本地时区基准，避免时区偏移导致跨天误差。
+ * @param date YYYY-MM-DD 格式日期，空值或非法值原样返回
  */
-export const toExcelSerial = (date: string): string => {
+export const toExcelSerial = (date: string): number | string => {
   if (!date) { return date; }
   const d = dayjs(date, 'YYYY-MM-DD', true);
   if (!d.isValid()) { return date; }
-  return String(Math.round(d.valueOf() / 86400000) + 25569);
+  return Math.round(d.valueOf() / 86400000) + 25569;
+};
+
+/**
+ * 从条目 wikitext 源代码中提取日文原名
+ *
+ * 优先取信息框的 `|原名 = ` 参数值（可能直接是原名文本，也可能包裹
+ * `{{lj|...}}` / `{{lang-ja|'''...'''}}` 等模板或加粗标记）；兜底匹配
+ * 正文 `{{lang-ja|...}}` / `{{lj|...}}` 模板。取到原始片段后剥离模板与
+ * 加粗标记，保留内部日文原名。
+ * @param wikitext 页面源代码
+ * @returns 日文原名，无法提取时返回空串
+ */
+export const extractJa = (wikitext: string): string => {
+  const patterns = [
+    // 信息框参数：|原名 = （值可能带模板包裹，也可能直接是原名）
+    /^\s*\|\s*原名\s*=\s*(.+)/m,
+    // 正文 lang-ja / lj 模板
+    /\{\{\s*(?:lang-ja|lj)\s*\|\s*'*(.+?)'*\s*\}\}/,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(wikitext);
+    if (!match) { continue; }
+    // 若片段本身还包着模板，先取内部；否则取整段（去首尾空白与加粗引号）
+    const inner = /\{\{\s*(?:lang-ja|lj)\s*\|\s*'*(.+?)'*\s*\}\}/.exec(match[1]);
+    const raw = (inner ? inner[1] : match[1]).replace(/^'+|'+$/g, '').trim();
+    if (raw) { return raw; }
+  }
+  return '';
+};
+
+/**
+ * 从条目 wikitext 源代码中提取制作组织
+ *
+ * 两类写法：
+ * 1) 信息框参数：`|开发 = xxx` / `|制作 = xxx` / `|发行 = xxx`，值可能带
+ *    `[[...]]` 内链（取真实条目名，去掉 `|别名`），也可能直接是文本。
+ * 2) 描述语句：「由 xxx 制作/开发/创作」，繁简皆可（制作/製作、开发/開發、
+ *    创作/創作），xxx 同样可能带或不带内链。
+ * 取首个匹配作为主导会社（统计表单制作组织列仅记主导会社）。
+ * @param wikitext 页面源代码
+ * @returns 制作组织名，无法提取时返回空串
+ */
+export const extractBrand = (wikitext: string): string => {
+  const patterns = [
+    // 信息框参数：|开发/制作/发行 = （可能 [[xxx]] 或直接文本）
+    /^\s*\|\s*(?:开发|制作|发行)\s*=\s*(?:\[\[)?([^\]|}]+?)(?:\|[^\]]+)?\]\]/m,
+    // 描述语句：由 xxx 制作/製作/开发/開發/创作/創作
+    /由\s*(?:\[\[)?([^\]|}]+?)(?:\|[^\]]+)?\]\]\s*(?:制作|製作|开发|開發|创作|創作)/,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(wikitext);
+    if (!match) { continue; }
+    const brand = match[1].trim();
+    if (brand) { return brand; }
+  }
+  return '';
 };

@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import feishu from '@/api/feishu';
 import moegirl, { fetchPageInfo } from '@/api/moegirl';
 import { ApiParams } from '@/lib/types';
-import { extractReleaseDate } from '@/utils/text';
+import { extractBrand, extractJa, extractReleaseDate } from '@/utils/text';
 import { loadConfigStore } from '@/lib/config-store';
 import { useMoegirlStore } from './moegirl-store';
 
@@ -30,11 +30,11 @@ export interface Article {
 
 /** 检查更新筛出的待入库候选条目 */
 export interface UpdateCandidate {
-  /** 日文原名（默认留空，由用户补充） */
+  /** 日文原名（优先从条目源代码提取，提取不到时留空由用户补充） */
   ja: string;
   /** 条目名（当前规范标题） */
   title: string;
-  /** 制作组织（默认留空，由用户补充） */
+  /** 制作组织（优先从条目源代码提取，提取不到时留空由用户补充） */
   brand: string;
   /** 游戏发行时间（优先从条目源代码提取，格式 YYYY-MM-DD） */
   releaseDate: string;
@@ -470,11 +470,14 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
         });
       }
 
-      // 从条目源代码中预填发行时间
+      // 从条目源代码中预填发行时间、原名与制作组织
       if (candidates.length > 0) {
         const wikitexts = await fetchPageWikitexts(candidates.map((c) => c.title));
         for (const candidate of candidates) {
-          candidate.releaseDate = extractReleaseDate(wikitexts.get(candidate.title) ?? '');
+          const wikitext = wikitexts.get(candidate.title) ?? '';
+          candidate.releaseDate = extractReleaseDate(wikitext);
+          candidate.ja = extractJa(wikitext);
+          candidate.brand = extractBrand(wikitext);
         }
       }
 

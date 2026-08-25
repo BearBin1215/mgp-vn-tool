@@ -103,7 +103,9 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
           row.brand.trim(),
           toExcelSerial(row.releaseDate),
           toExcelSerial(row.creationDate),
-          `=COUNTIF(C$2:C${rowNum},C${rowNum})`,
+          // F 列序号用公式对象写入，飞书才会识别为公式并自动计算；
+          // 直接传 "=COUNTIF(...)" 字符串会被当作普通文本显示。
+          { type: 'formula', text: `=COUNTIF(C$2:C${rowNum},C${rowNum})` },
         ];
       });
       await feishu.appendRows(
