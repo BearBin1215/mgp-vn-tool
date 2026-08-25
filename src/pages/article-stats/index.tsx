@@ -20,6 +20,7 @@ import {
   type TableColumnsType,
 } from 'antd';
 import {
+  CloudDownloadOutlined,
   FilterOutlined,
   ReloadOutlined,
   TagsOutlined,
@@ -33,6 +34,7 @@ import Page from '@/components/page';
 import MoegirlLink from '@/components/moegirl-link';
 import { useArticleStore, initArticles, type Article } from '@/stores/article-store';
 import { useSettingsStore } from '@/stores/settings-store';
+import UpdateCheckModal from './update-check-modal';
 import './index.css';
 
 const { RangePicker } = DatePicker;
@@ -182,6 +184,9 @@ export default function ArticleStats() {
   // ─── 更新提醒 ───
   const [updateModalOpen, setUpdateModalOpen] = useState<boolean | number>(false);
 
+  // ─── 检查更新弹窗 ───
+  const [updateCheckOpen, setUpdateCheckOpen] = useState(false);
+
   // ─── 初始化 ───
   useEffect(() => {
     initArticles().then(() => {
@@ -269,20 +274,53 @@ export default function ArticleStats() {
     });
   }, [articles, filterValues, selectedCategories, categoryMode]);
 
+  /** 校验飞书配置，缺失时弹窗引导前往设置 */
+  const ensureFeishuConfig = () => {
+    if (feishuStatsTableAppId && feishuStatsTableAppSecret) { return true; }
+    modal.confirm({
+      title: '缺少配置',
+      content: '请先在设置页面填写飞书 App ID 和 App Secret',
+      okText: '前往设置',
+      cancelText: '取消',
+      onOk: () => {
+        navigate('/settings#feishu');
+      },
+    });
+    return false;
+  };
+
+  /** 打开检查更新弹窗并开始增量检测 */
+  const handleCheckUpdates = () => {
+    if (!ensureFeishuConfig()) { return; }
+    setUpdateCheckOpen(true);
+    useArticleStore.getState().checkUpdates(feishuStatsTableAppId, feishuStatsTableAppSecret)
+      .then((count) => {
+        if (count > 0) {
+          message.success(`检测到 ${count} 个候选条目，请完善后提交`);
+        } else {
+          message.info('没有检测到新条目');
+          setUpdateCheckOpen(false);
+        }
+      })
+      .catch((err) => {
+        setUpdateCheckOpen(false);
+        message.error(err instanceof Error ? err.message : String(err), 5);
+      });
+  };
+
+  /** 候选提交成功后刷新统计数据 */
+  const handleUpdateSubmitted = async () => {
+    try {
+      await useArticleStore.getState().fetchFeishuTable(feishuStatsTableAppId, feishuStatsTableAppSecret);
+      await useArticleStore.getState().fetchPageData();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : String(err), 5);
+    }
+  };
+
   /** 更新数据 */
   const handleRefresh = async () => {
-    if (!feishuStatsTableAppId || !feishuStatsTableAppSecret) {
-      modal.confirm({
-        title: '缺少配置',
-        content: '请先在设置页面填写飞书 App ID 和 App Secret',
-        okText: '前往设置',
-        cancelText: '取消',
-        onOk: () => {
-          navigate('/settings#feishu');
-        },
-      });
-      return;
-    }
+    if (!ensureFeishuConfig()) { return; }
     try {
       await useArticleStore.getState().fetchFeishuTable(feishuStatsTableAppId, feishuStatsTableAppSecret);
       message.success('获取条目列表成功，正在获取分类和重定向信息…');
@@ -328,6 +366,13 @@ export default function ArticleStats() {
               color={activePanel === 'category' ? 'primary' : undefined}
               icon={<TagsOutlined />}
               onClick={() => togglePanel('category')}
+            />
+          </Tooltip>
+          <Tooltip title='检查更新'>
+            <Button
+              variant='outlined'
+              icon={<CloudDownloadOutlined />}
+              onClick={handleCheckUpdates}
             />
           </Tooltip>
           <Tooltip title='更新'>
@@ -539,6 +584,12 @@ export default function ArticleStats() {
             ))}
         </div>
       </Modal>
+
+      <UpdateCheckModal
+        open={updateCheckOpen}
+        onClose={() => setUpdateCheckOpen(false)}
+        onSubmitted={handleUpdateSubmitted}
+      />
     </Page>
   );
 }

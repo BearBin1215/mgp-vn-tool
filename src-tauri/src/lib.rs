@@ -29,6 +29,7 @@ pub fn run() {
             moegirl::moegirl_check_login,
             moegirl::moegirl_logout,
             feishu::feishu_fetch_sheet,
+            feishu::feishu_append_rows,
             erogamescape::check_connectivity,
             erogamescape::query_creator_works,
             erogamescape::search_creators,

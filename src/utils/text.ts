@@ -194,3 +194,40 @@ export const formatDateCN = (date: string | null): string => {
 /** 将任意值格式化为可读的错误信息字符串 */
 export const formatError = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
+
+/**
+ * 从条目 wikitext 源代码中提取游戏发行时间
+ *
+ * 优先取信息框中的 `|发行时间 = ...` 参数（页面存在多个 Infobox 时取首个，即本篇），
+ * 未命中时兜底匹配正文的「于XXXX年X月X日发行/发售」句式。
+ * @param wikitext 页面源代码
+ * @returns YYYY-MM-DD 格式日期，无法提取时返回空串
+ */
+export const extractReleaseDate = (wikitext: string): string => {
+  const patterns = [
+    /^\s*\|\s*发行时间\s*=\s*(\d{4})年(\d{1,2})月(\d{1,2})日/m,
+    /于(\d{4})年(\d{1,2})月(\d{1,2})日(?:发行|发售)/,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(wikitext);
+    if (!match) { continue; }
+    const [, y, m, d] = match;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return '';
+};
+
+/**
+ * 将 YYYY-MM-DD 字符串转为 Excel 序列号
+ *
+ * 与 {@link excelDateToString} 互逆，用于向飞书日期类型单元格写入时保持原格式显示
+ * （直接写 `YYYY-MM-DD` 文本会被当字符串而显示异常）。采用与读取端一致的
+ * dayjs 本地时区基准，避免时区偏移导致跨天误差。
+ * @param date YYYY-MM-DD 格式日期，空值原样返回
+ */
+export const toExcelSerial = (date: string): string => {
+  if (!date) { return date; }
+  const d = dayjs(date, 'YYYY-MM-DD', true);
+  if (!d.isValid()) { return date; }
+  return String(Math.round(d.valueOf() / 86400000) + 25569);
+};
