@@ -11,6 +11,35 @@ const SPREADSHEET_TOKEN: &str = "VUppstQ8OhgmQItNt6tc0LudnMf";
 /// Galgame 条目统计表的工作表 ID
 const SHEET_ID: &str = "0rCQAp";
 
+/// 按 HTTP 状态分类飞书请求错误，保留服务端返回的业务错误信息。
+fn format_feishu_error(
+    operation: &str,
+    status: reqwest::StatusCode,
+    code: Option<i64>,
+    msg: &str,
+    permission_hint: &str,
+) -> String {
+    let detail = format!("{msg}（HTTP {status}，错误码 {code:?}）");
+    match status {
+        reqwest::StatusCode::UNAUTHORIZED => {
+            format!("{operation}失败：飞书访问凭证无效或已过期。{detail}")
+        }
+        reqwest::StatusCode::FORBIDDEN => {
+            format!("{operation}失败：{permission_hint}。{detail}")
+        }
+        reqwest::StatusCode::NOT_FOUND => {
+            format!("{operation}失败：目标飞书表格或工作表不存在，请检查配置。{detail}")
+        }
+        reqwest::StatusCode::TOO_MANY_REQUESTS => {
+            format!("{operation}失败：飞书接口请求过于频繁，请稍后重试。{detail}")
+        }
+        status if status.is_server_error() => {
+            format!("{operation}失败：飞书服务暂时异常，请稍后重试。{detail}")
+        }
+        _ => format!("{operation}失败：{detail}"),
+    }
+}
+
 /// 飞书追加结果；数据写入成功后，样式失败通过警告返回给前端。
 #[derive(serde::Serialize)]
 pub struct FeishuAppendResult {
@@ -65,7 +94,7 @@ pub async fn feishu_append_rows(
 /// 追加行数据到统计表工作表末尾
 ///
 /// 使用 sheets v2 追加接口并以 INSERT_ROWS 方式插入新行，不会覆盖已有数据；
-/// 应用无编辑权限时接口返回 HTTP 403/400，转为可操作的中文提示。
+/// 应用无编辑权限时接口返回 HTTP 403，转换为可操作的中文提示。
 /// 写入成功后解析响应里的实际写入范围，并批量设置新增行样式。
 async fn feishu_append_rows_inner(
     token: &str,
@@ -122,14 +151,13 @@ async fn feishu_append_rows_inner(
     if !status.is_success() || code != Some(0) {
         let msg = data["msg"].as_str().unwrap_or("未知错误");
         log::error!("飞书追加行失败\n  URL: {url}\n  状态码: {status}\n  错误码: {code:?}\n  响应: {msg}");
-        if status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::BAD_REQUEST {
-            return Err(format!(
-                "追加失败：应用可能没有该表格的编辑权限（{msg}）。\
-                 请在飞书开放平台为应用开通电子表格编辑权限（sheets:spreadsheet），\
-                 并联系表主将应用添加为表格协作者"
-            ));
-        }
-        return Err(format!("追加失败: {msg}"));
+        return Err(format_feishu_error(
+            "追加统计表数据",
+            status,
+            code,
+            msg,
+            "应用没有该表格的编辑权限，请开通 sheets:spreadsheet 权限并将应用添加为表格协作者",
+        ));
     }
 
     // 数据已写入；样式失败不回滚数据，但通过返回值通知前端。
@@ -276,7 +304,13 @@ async fn set_styles_batch_request(
             "飞书设置单元格样式失败\n  URL: {style_url}\n  Body: {}\n  状态码: {status}\n  响应: {raw}\n  错误: {msg}",
             serde_json::to_string(body).unwrap_or_default()
         );
-        return Err(format!("飞书设置单元格样式失败: {msg}（响应: {raw}）"));
+        return Err(format_feishu_error(
+            "设置单元格样式",
+            status,
+            code,
+            msg,
+            "应用没有该表格的编辑权限，请开通 sheets:spreadsheet 权限并将应用添加为表格协作者",
+        ));
     }
 
     Ok(())
@@ -309,6 +343,13 @@ async fn feishu_get_token_inner(app_id: &str, app_secret: &str) -> Result<String
     if !status.is_success() || data["code"].as_i64() != Some(0) {
         let msg = data["msg"].as_str().unwrap_or("未知错误");
         log::error!("飞书获取 token 失败\n  URL: {url}\n  状态码: {status}\n  响应: {msg}");
+        return Err(format_feishu_error(
+            "获取飞书访问凭证",
+            status,
+            data["code"].as_i64(),
+            msg,
+            "应用凭证或租户授权无效，请检查 App ID 和 App Secret",
+        ));
     }
 
     data["tenant_access_token"]
@@ -348,14 +389,27 @@ async fn feishu_get_sheet_inner(
 
     if !status.is_success() || data["code"].as_i64() != Some(0) {
         let msg = data["msg"].as_str().unwrap_or("未知错误");
-        log::error!("飞书读取表格失败\n  URL: {url}\n  状态码: {status}\n  响应: {msg}");
+        log::error!("飞书读取表格失败\n  URL: {url}\n  状态码: {status}\n  错误码: {:?}\n  响应: {msg}", data["code"].as_i64());
+        return Err(format_feishu_error(
+            "读取统计表",
+            status,
+            data["code"].as_i64(),
+            msg,
+            "应用没有该表格的查看权限，请检查表格协作者授权",
+        ));
     }
 
     let values = data["data"]["valueRange"]["values"]
         .as_array()
         .ok_or_else(|| {
             let msg = data["msg"].as_str().unwrap_or("未知错误");
-            format!("读取表格失败: {msg}")
+            format_feishu_error(
+                "读取统计表",
+                status,
+                data["code"].as_i64(),
+                msg,
+                "应用没有该表格的查看权限，请检查表格协作者授权",
+            )
         })?;
 
     let result: Vec<Vec<String>> = values
