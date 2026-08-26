@@ -114,8 +114,8 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
       }
       clearCandidates();
       resetLocalState();
-      await onSubmitted();
       onClose();
+      await onSubmitted();
     } catch (err) {
       message.error(formatError(err), 6);
     } finally {
