@@ -86,7 +86,7 @@ async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), St
     })?;
     let status = resp.status().as_u16();
     let text = resp.text().await.map_err(|e| e.to_string())?;
-    if status < 200 || status >= 300 {
+    if !(200..300).contains(&status) {
         let snippet = log_snippet(&text);
         log::error!("批评空间请求失败\n  URL: {sql_url}\n  SQL: {sql}\n  状态码: {status}\n  响应: {snippet}");
     }
@@ -186,7 +186,7 @@ where
 
 /// 检查 HTTP 状态码，非 2xx 时返回带状态码的错误信息
 fn check_status(status: u16) -> Result<(), String> {
-    if status >= 200 && status < 300 {
+    if (200..300).contains(&status) {
         Ok(())
     } else {
         Err(format!("HTTP {status}"))

@@ -360,7 +360,7 @@ async fn fetch_bangumi_subjects(
     let mut seen = HashSet::new();
     Ok(subjects
         .into_iter()
-        .filter(|s| matches!(s.ty, 1 | 2 | 3) && seen.insert(s.id))
+        .filter(|s| matches!(s.ty, 1..=3) && seen.insert(s.id))
         .collect())
 }
 

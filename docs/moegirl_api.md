@@ -23,7 +23,7 @@
 | `moegirlRetryDelay` | number | `1000` | 请求失败重试间隔（毫秒） |
 | `moegirlUsername` | string | `''` | 当前登录用户名（未登录为空，由 `moegirl_check_login` 初始化） |
 
-> Cookie 通过系统凭据存储（keyring）持久化，service 名 `com.bearbin.mgp-vn-tool`，entry 名 `moegirl-cookies`。萌百各子站点（mzh./zh.）共用同一套 cookie，`Domain=moegirl.org.cn` 的 cookie 会自动携带到所有子域。
+> Cookie 通过系统凭据存储（keyring）持久化，service 名 `com.bearbin.mgp-vn-tool`，entry 名 `moegirl-cookies`。萌百各子站点（mzh./zh.）共用同一套 cookie，`Domain=moegirl.org.cn` 的 cookie 会自动携带到所有子域。keyring 仅以紧凑格式持久化具有有效 `Max-Age` 或 `Expires` 的 SSO 登录 Cookie；会话 Cookie 和短期路由 Cookie 只在当前应用进程中保留。登录状态通过本地关键 SSO Cookie 的有效期判断；既有 API 请求明确返回 `notloggedin` 时会清除本地登录态，不会为检查登录状态额外发起请求。
 
 ## 请求方式
 
@@ -33,7 +33,7 @@
 - `post(params)`：POST 请求，host 自动从设置读取
 - `getToken(tokenType)`：获取指定类型 token，优先使用会话内缓存
 - `postWithToken(tokenType, params)`：先获取指定类型 token，再携带 token 发起 POST 请求，token 会在会话内缓存
-- `checkLogin()`：检查登录状态
+- `checkLogin()`：检查本地关键 SSO Cookie 是否齐全且未过期
 - `getUserRights()`：获取当前用户的 groups、rights 与显示昵称
 - `logout()`：退出登录，清空 token 缓存与 cookie
 

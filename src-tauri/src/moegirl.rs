@@ -6,12 +6,14 @@
 //!
 //! 萌百各子站点（mzh./zh.）共用同一套 cookie 作为登录凭据
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
+use cookie_store::{CookieError, CookieStore};
 use keyring::Entry;
 use reqwest::header::{HeaderMap, HeaderValue, COOKIE, SET_COOKIE, USER_AGENT};
-use serde::{Deserialize, Serialize};
+use reqwest::Url;
 
 use crate::settings;
 
@@ -19,49 +21,78 @@ use crate::settings;
 const KEYRING_SERVICE: &str = "com.bearbin.mgp-vn-tool";
 /// 萌百 cookies 在凭据存储中的条目名
 const COOKIE_ENTRY: &str = "moegirl-cookies";
+/// 萌百 API 路径，用于 Cookie 的 Path 匹配
+const API_PATH: &str = "/api.php";
+/// 本地登录态检查使用的固定 URL
+const LOGIN_CHECK_URL: &str = "https://mzh.moegirl.org.cn/api.php";
+/// 需要跨应用启动持久化的登录凭据 Cookie
+const PERSISTENT_COOKIE_NAMES: &[&str] =
+    &["moegirlSSOUserID", "moegirlSSOUserName", "moegirlSSOToken"];
 
 /// 允许请求的萌百 API 域名白名单，防止域名设置被篡改后请求外发到非萌百站点
 const ALLOWED_MOEGIRL_HOSTS: &[&str] = &["mzh.moegirl.org.cn", "zh.moegirl.org.cn"];
 
-/// Cookie 数据结构
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Cookie {
-    name: String,
-    value: String,
-    domain: String,
-}
-
-/// 从系统凭据存储加载已保存的 cookies
-fn load_cookies() -> Vec<Cookie> {
+/// 从系统凭据存储加载 CookieStore
+fn load_cookie_store() -> CookieStore {
     match Entry::new(KEYRING_SERVICE, COOKIE_ENTRY).and_then(|entry| entry.get_password()) {
-        Ok(text) => match serde_json::from_str(&text) {
-            Ok(cookies) => cookies,
-            Err(e) => {
-                log::warn!("凭据存储中的 cookies 数据损坏，已忽略: {e}");
-                Vec::new()
-            }
-        },
-        Err(keyring::Error::NoEntry) => Vec::new(),
+        Ok(text) => load_cookie_store_json(&text),
+        Err(keyring::Error::NoEntry) => CookieStore::default(),
         Err(e) => {
-            log::warn!("从凭据存储读取 cookies 失败: {e}");
-            Vec::new()
+            log::warn!("从凭据存储读取 Cookie 失败: {e}");
+            CookieStore::default()
         }
     }
 }
 
-/// 持久化的 cookie 列表，跨请求、跨应用生命周期共享
-static COOKIES: OnceLock<Arc<Mutex<Vec<Cookie>>>> = OnceLock::new();
+/// 从 keyring 中的紧凑 JSON 恢复持久化 Cookie
+fn load_cookie_store_json(text: &str) -> CookieStore {
+    let url = Url::parse(LOGIN_CHECK_URL).expect("固定的萌百登录检查 URL 必须合法");
+    let mut store = CookieStore::default();
+    if let Ok(headers) = serde_json::from_str::<Vec<String>>(text) {
+        for header in headers {
+            if let Err(e) = store.parse(&header, &url) {
+                log::warn!("忽略无法恢复的萌百 Cookie: {e}");
+            }
+        }
+        return store;
+    }
+    // 兼容本次引入 cookie_store 后产生的完整 JSON；下一次写入时会自动压缩为关键 Cookie。
+    if let Ok(store) = cookie_store::serde::json::load(Cursor::new(text.as_bytes())) {
+        COOKIES_DIRTY.store(true, Ordering::SeqCst);
+        return store;
+    }
+    // 旧版自定义对象数组缺少完整过期信息，无法安全迁移。
+    log::warn!("凭据存储中的 Cookie 数据格式过旧或已损坏，已忽略");
+    COOKIES_DIRTY.store(true, Ordering::SeqCst);
+    store
+}
+
+/// CookieStore 跨请求共享，会话 Cookie 仅保留在内存中
+static COOKIE_STORE: OnceLock<Arc<Mutex<CookieStore>>> = OnceLock::new();
 
 /// 标记 cookie 列表是否有未持久化的变更，避免每次请求成功都写磁盘
 static COOKIES_DIRTY: AtomicBool = AtomicBool::new(false);
 
-fn cookies() -> &'static Arc<Mutex<Vec<Cookie>>> {
-    COOKIES.get_or_init(|| Arc::new(Mutex::new(load_cookies())))
+fn cookie_store() -> &'static Arc<Mutex<CookieStore>> {
+    COOKIE_STORE.get_or_init(|| Arc::new(Mutex::new(load_cookie_store())))
 }
 
-/// 将 cookie 列表持久化到系统凭据存储
+/// 将关键登录 Cookie 序列化为适合 keyring 限制的紧凑 JSON
+fn serialize_persistent_cookies(store: &CookieStore) -> Result<String, serde_json::Error> {
+    let headers: Vec<String> = store
+        .iter_unexpired()
+        .filter(|cookie| cookie.is_persistent() && PERSISTENT_COOKIE_NAMES.contains(&cookie.name()))
+        .map(|cookie| {
+            let raw: cookie_store::RawCookie<'static> = cookie.clone().into();
+            raw.to_string()
+        })
+        .collect();
+    serde_json::to_string(&headers)
+}
+
+/// 将未过期的持久化 Cookie 写入系统凭据存储
 fn persist_cookies() {
-    if !COOKIES_DIRTY.swap(false, Ordering::SeqCst) {
+    if !COOKIES_DIRTY.load(Ordering::SeqCst) {
         return;
     }
     let entry = match Entry::new(KEYRING_SERVICE, COOKIE_ENTRY) {
@@ -71,33 +102,37 @@ fn persist_cookies() {
             return;
         }
     };
-    let data = cookies().lock().expect("cookie 锁中毒，数据可能不一致");
-    if let Ok(json) = serde_json::to_string(&*data) {
-        if let Err(e) = entry.set_password(&json) {
-            log::warn!("cookies 持久化失败: {e}");
+    let store = cookie_store()
+        .lock()
+        .expect("Cookie 锁中毒，数据可能不一致");
+    let json = match serialize_persistent_cookies(&store) {
+        Ok(json) => json,
+        Err(e) => {
+            log::warn!("Cookie 序列化失败: {e}");
+            return;
         }
+    };
+    match entry.set_password(&json) {
+        Ok(()) => {
+            // 持有 Cookie 锁时写入，避免成功写入后又错误清除并发更新的 dirty 标记。
+            COOKIES_DIRTY.store(false, Ordering::SeqCst);
+        }
+        Err(e) => log::warn!("Cookie 持久化失败: {e}"),
     }
 }
 
-/// 判断 host 是否属于 moegirl.org.cn 域（本身或其任意子域）
-fn is_moegirl_domain(host: &str) -> bool {
-    host == "moegirl.org.cn" || host.ends_with(".moegirl.org.cn")
-}
-
-/// 根据域名从存储中筛选 cookie，拼成 "n1=v1; n2=v2" 格式
-///
-/// 萌百各子站点共用登录凭据：MediaWiki 下发的登录 cookie 通常带 `Domain=moegirl.org.cn`，
-/// 按 cookie 规范对该域及其所有子域生效。因此除精确匹配当前 host 的 cookie 外，请求萌百
-/// 子域时还需携带 `domain == "moegirl.org.cn"` 的 cookie，使一处登录即可在各子站点保持登录态。
-fn cookie_header_for(host: &str) -> Option<String> {
-    let data = cookies().lock().expect("cookie 锁中毒，数据可能不一致");
-    let parts: Vec<String> = data
-        .iter()
-        .filter(|c| {
-            // 精确匹配当前 host；或当前 host 属萌百域时，带上 Domain=moegirl.org.cn 的共享登录凭据
-            c.domain == host || (is_moegirl_domain(host) && c.domain == "moegirl.org.cn")
-        })
-        .map(|c| format!("{}={}", c.name, c.value))
+/// 获取指定 URL 应携带的 Cookie 请求头
+fn cookie_header_for(url: &Url) -> Option<String> {
+    let host = url.host_str()?;
+    if url.scheme() != "https" || !ALLOWED_MOEGIRL_HOSTS.contains(&host) {
+        return None;
+    }
+    let store = cookie_store()
+        .lock()
+        .expect("Cookie 锁中毒，数据可能不一致");
+    let parts: Vec<String> = store
+        .get_request_values(url)
+        .map(|(name, value)| format!("{name}={value}"))
         .collect();
     if parts.is_empty() {
         None
@@ -106,49 +141,48 @@ fn cookie_header_for(host: &str) -> Option<String> {
     }
 }
 
-/// 从 Set-Cookie 响应头解析并存入存储，同名同域 cookie 会被覆盖
-fn store_set_cookie(header: &str, host: &str) {
-    if let Some((pair, _)) = header.split_once(';') {
-        if let Some((name, value)) = pair.trim().split_once('=') {
-            let name = name.trim().to_string();
-            let value = value.trim().to_string();
-            // 提取 Set-Cookie 中的 Domain 属性，否则使用 host
-            let domain = extract_domain(header).unwrap_or_else(|| host.to_string());
-            let mut data = cookies().lock().expect("cookie 锁中毒，数据可能不一致");
-            data.retain(|c| !(c.name == name && c.domain == domain));
-            data.push(Cookie {
-                name,
-                value,
-                domain,
-            });
-            COOKIES_DIRTY.store(true, Ordering::SeqCst);
-        }
+/// 将响应中的 Set-Cookie 交给 CookieStore 按 RFC 规则处理
+fn store_set_cookie(header: &str, url: &Url) {
+    let mut store = cookie_store()
+        .lock()
+        .expect("Cookie 锁中毒，数据可能不一致");
+    match store.parse(header, url) {
+        Ok(_) => COOKIES_DIRTY.store(true, Ordering::SeqCst),
+        // 删除不存在的过期 Cookie 是合法的无状态变更，无需记录警告。
+        Err(CookieError::Expired) => {}
+        Err(e) => log::warn!("无法存储萌百 Cookie: {e}"),
     }
 }
 
-/// 从 Set-Cookie 头中提取 Domain 属性值，去除前导点
-fn extract_domain(header: &str) -> Option<String> {
-    header.split(';').find_map(|part| {
-        let part = part.trim();
-        part.strip_prefix("Domain=")
-            .or_else(|| part.strip_prefix("domain="))
-            .map(|d| d.trim().trim_start_matches('.').to_string())
-    })
+/// 从适用于萌百 API 的未过期 Cookie 中读取登录用户名
+fn login_username(store: &CookieStore) -> Option<String> {
+    let url = Url::parse(LOGIN_CHECK_URL).expect("固定的萌百登录检查 URL 必须合法");
+    let mut username = None;
+    let mut has_token = false;
+    for (name, value) in store.get_request_values(&url) {
+        match name {
+            "moegirlSSOUserName" if !value.is_empty() => username = Some(value),
+            "moegirlSSOToken" if !value.is_empty() => has_token = true,
+            _ => {}
+        }
+    }
+    if !has_token {
+        return None;
+    }
+    Some(
+        urlencoding::decode(username?)
+            .unwrap_or_default()
+            .into_owned(),
+    )
 }
 
 /// 检查当前是否已登录，返回用户名或 null
 #[tauri::command]
 pub fn moegirl_check_login() -> Option<String> {
-    cookies()
+    let store = cookie_store()
         .lock()
-        .unwrap()
-        .iter()
-        .find(|c| c.name == "moegirlSSOUserName")
-        .map(|c| {
-            urlencoding::decode(&c.value)
-                .unwrap_or_default()
-                .into_owned()
-        })
+        .expect("Cookie 锁中毒，数据可能不一致");
+    login_username(&store)
 }
 
 /// 向萌娘百科 API 发送请求，自动携带 cookie、Referer 和默认参数，支持失败重试
@@ -173,7 +207,8 @@ pub async fn moegirl_request(
         return Err(format!("非法的萌百域名: {host}"));
     }
 
-    let url = format!("https://{host}/api.php");
+    let url = Url::parse(&format!("https://{host}{API_PATH}"))
+        .map_err(|e| format!("萌百 API URL 构建失败: {e}"))?;
 
     // 构建请求头
     let mut headers = HeaderMap::new();
@@ -182,12 +217,6 @@ pub async fn moegirl_request(
             headers.insert(USER_AGENT, hv);
         }
     }
-    if let Some(cookie_str) = cookie_header_for(&host) {
-        if let Ok(hv) = HeaderValue::from_str(&cookie_str) {
-            headers.insert(COOKIE, hv);
-        }
-    }
-
     let client = reqwest::Client::builder()
         .default_headers(headers)
         .build()
@@ -235,11 +264,17 @@ pub async fn moegirl_request(
             tokio::time::sleep(std::time::Duration::from_millis(retry_delay)).await;
         }
 
-        let resp = match method.to_uppercase().as_str() {
-            "GET" => client.get(&url).query(&string_params).send().await,
-            "POST" => client.post(&url).form(&string_params).send().await,
+        let mut request = match method.to_uppercase().as_str() {
+            "GET" => client.get(url.clone()).query(&string_params),
+            "POST" => client.post(url.clone()).form(&string_params),
             _ => return Err(format!("Unsupported method: {method}")),
         };
+        if let Some(cookie_str) = cookie_header_for(&url) {
+            if let Ok(value) = HeaderValue::from_str(&cookie_str) {
+                request = request.header(COOKIE, value);
+            }
+        }
+        let resp = request.send().await;
 
         let resp = match resp {
             Ok(r) => r,
@@ -256,7 +291,7 @@ pub async fn moegirl_request(
         // 处理响应中的 Set-Cookie
         for value in resp.headers().get_all(SET_COOKIE).iter() {
             if let Ok(set_cookie) = value.to_str() {
-                store_set_cookie(set_cookie, &host);
+                store_set_cookie(set_cookie, &url);
             }
         }
 
@@ -306,11 +341,110 @@ pub async fn moegirl_request(
 /// 清除内存和凭据存储中的 cookie，实现登出
 #[tauri::command]
 pub fn moegirl_logout() {
-    cookies()
+    cookie_store()
         .lock()
-        .expect("cookie 锁中毒，数据可能不一致")
+        .expect("Cookie 锁中毒，数据可能不一致")
         .clear();
     // 标记变更并立即持久化空 cookie 列表，覆盖凭据存储中的旧数据
     COOKIES_DIRTY.store(true, Ordering::SeqCst);
     persist_cookies();
+}
+
+#[cfg(test)]
+mod tests {
+    use cookie_store::CookieStore;
+    use reqwest::Url;
+
+    use super::{load_cookie_store_json, login_username, serialize_persistent_cookies};
+
+    /// 构造测试使用的萌百 API URL
+    fn test_url() -> Url {
+        Url::parse("https://mzh.moegirl.org.cn/api.php").unwrap()
+    }
+
+    /// 验证 keyring 格式仅保存长期 SSO Cookie，且大小低于 Windows 凭据限制
+    #[test]
+    fn persists_only_persistent_cookies() {
+        let url = test_url();
+        let mut store = CookieStore::default();
+        store
+            .parse(
+                "moegirlSSO_session=session; Path=/; Domain=.moegirl.org.cn; HttpOnly",
+                &url,
+            )
+            .unwrap();
+        store
+            .parse(
+                "moegirlSSOUserID=882152; Max-Age=15552000; Path=/; Domain=.moegirl.org.cn; HttpOnly",
+                &url,
+            )
+            .unwrap();
+        store
+            .parse(
+                "moegirlSSOUserName=BearBot; Max-Age=15552000; Path=/; Domain=.moegirl.org.cn; HttpOnly",
+                &url,
+            )
+            .unwrap();
+        store
+            .parse(
+                "moegirlSSOToken=token; Max-Age=15552000; Path=/; Domain=.moegirl.org.cn; HttpOnly",
+                &url,
+            )
+            .unwrap();
+        store
+            .parse(
+                "cpPosIndex=route; Max-Age=10; Path=/; Domain=.moegirl.org.cn; HttpOnly",
+                &url,
+            )
+            .unwrap();
+
+        let data = serialize_persistent_cookies(&store).unwrap();
+        assert!(data.encode_utf16().count() < 2_560);
+        let headers: Vec<String> = serde_json::from_str(&data).unwrap();
+        assert_eq!(headers.len(), 3);
+
+        let restored = load_cookie_store_json(&data);
+        let values: Vec<_> = restored.get_request_values(&url).collect();
+        assert!(values.contains(&("moegirlSSOToken", "token")));
+        assert!(!values.iter().any(|(name, _)| *name == "moegirlSSO_session"));
+        assert!(!values.iter().any(|(name, _)| *name == "cpPosIndex"));
+    }
+
+    /// 验证服务端通过 Max-Age=0 删除已有 Cookie
+    #[test]
+    fn removes_cookie_with_zero_max_age() {
+        let url = test_url();
+        let mut store = CookieStore::default();
+        store
+            .parse("moegirlSSOToken=token; Max-Age=60; Path=/", &url)
+            .unwrap();
+        store
+            .parse("moegirlSSOToken=; Max-Age=0; Path=/", &url)
+            .unwrap();
+        assert!(!store
+            .get_request_values(&url)
+            .any(|(name, _)| name == "moegirlSSOToken"));
+    }
+
+    /// 验证只有用户名和令牌 Cookie 同时有效时才判定为已登录
+    #[test]
+    fn requires_username_and_token_for_login() {
+        let url = test_url();
+        let mut store = CookieStore::default();
+        store
+            .parse(
+                "moegirlSSOUserName=BearBot; Max-Age=60; Path=/; Domain=.moegirl.org.cn",
+                &url,
+            )
+            .unwrap();
+        assert_eq!(login_username(&store), None);
+
+        store
+            .parse(
+                "moegirlSSOToken=token; Max-Age=60; Path=/; Domain=.moegirl.org.cn",
+                &url,
+            )
+            .unwrap();
+        assert_eq!(login_username(&store), Some("BearBot".to_string()));
+    }
 }
