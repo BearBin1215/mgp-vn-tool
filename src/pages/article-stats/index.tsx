@@ -158,6 +158,7 @@ export default function ArticleStats() {
   const articles = useArticleStore((s) => s.articles);
   const updatedAt = useArticleStore((s) => s.updatedAt);
   const loading = useArticleStore((s) => s.loading);
+  const checking = useArticleStore((s) => s.checking);
   const feishuStatsTableAppId = useSettingsStore((s) => s.feishuStatsTableAppId);
   const feishuStatsTableAppSecret = useSettingsStore((s) => s.feishuStatsTableAppSecret);
   const articlePageSize = useSettingsStore((s) => s.articlePageSize);
@@ -372,6 +373,8 @@ export default function ArticleStats() {
             <Button
               variant='outlined'
               icon={<CloudDownloadOutlined />}
+              loading={checking}
+              disabled={checking || updateCheckOpen || loading}
               onClick={handleCheckUpdates}
             />
           </Tooltip>
@@ -380,6 +383,7 @@ export default function ArticleStats() {
               variant='outlined'
               icon={<ReloadOutlined />}
               loading={loading}
+              disabled={checking || updateCheckOpen}
               onClick={handleRefresh}
             />
           </Tooltip>

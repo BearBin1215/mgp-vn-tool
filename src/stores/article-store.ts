@@ -203,6 +203,8 @@ const fetchPageData = async (titles: string[]): Promise<FetchPageDataResult> => 
 
 /** logevents 接口的单条日志 */
 interface LogEvent {
+  /** 日志 ID，用于同一秒内事件排序 */
+  logid?: number;
   /** 页面标题 */
   title: string;
   /** 日志类型 */
@@ -262,7 +264,7 @@ const fetchLogEvents = async (
       lenamespace: 0,
       lestart: endISO,
       leend: startISO,
-      leprop: ['title', 'timestamp', 'details'],
+      leprop: ['ids', 'title', 'timestamp', 'details'],
       lelimit: 'max',
       ...continueParams,
     };
@@ -284,16 +286,33 @@ const fetchLogEvents = async (
 };
 
 /**
- * 沿移动映射把创建时标题收敛为当前标题（支持链式移动，带防环保护）
+ * 将创建事件的标题沿其发生之后的移动事件收敛为当前标题。
+ * 只应用创建时间之后的移动，避免旧标题被重建后误套用历史移动映射。
  * @param title 创建时的标题
- * @param renameMap 移动映射（源标题 -> 目标标题）
+ * @param createdEvent 创建事件
+ * @param moveEvents 按时间升序排列的移动事件
  */
-const resolveMovedTitle = (title: string, renameMap: Map<string, string>): string => {
+const resolveMovedTitle = (
+  title: string,
+  createdEvent: LogEvent,
+  moveEvents: LogEvent[],
+): string => {
   const seen = new Set<string>();
   let current = title;
-  while (!seen.has(current) && renameMap.has(current)) {
+  for (const event of moveEvents) {
+    const isAfterCreation = event.timestamp > createdEvent.timestamp
+      || (event.timestamp === createdEvent.timestamp
+        && event.logid !== undefined
+        && createdEvent.logid !== undefined
+        && event.logid > createdEvent.logid);
+    if (!isAfterCreation || event.title !== current || !event.params?.target_title) {
+      continue;
+    }
+    if (seen.has(current)) {
+      break;
+    }
     seen.add(current);
-    current = renameMap.get(current)!;
+    current = event.params.target_title;
   }
   return current;
 };
@@ -415,18 +434,16 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       const createdEvents = await fetchLogEvents('create', startISO, endISO);
       const moveEvents = await fetchLogEvents('move', startISO, endISO);
 
-      /** 改名映射：源标题 -> 目标标题 */
-      const renameMap = new Map<string, string>();
-      for (const event of moveEvents) {
-        if (event.params?.target_title) {
-          renameMap.set(event.title, event.params.target_title);
-        }
-      }
+      // 按时间升序处理移动，解析创建事件时只应用其后的移动。
+      const sortedMoveEvents = moveEvents
+        .filter((event) => Boolean(event.params?.target_title) && event.params?.target_ns === 0)
+        .sort((a, b) => a.timestamp.localeCompare(b.timestamp)
+          || (a.logid ?? 0) - (b.logid ?? 0));
 
       /** 当前标题到最早创建时间的映射（多个旧标题可能收敛到同一标题） */
       const currentToCreatedAt = new Map<string, string>();
       for (const event of createdEvents) {
-        const currentTitle = resolveMovedTitle(event.title, renameMap);
+        const currentTitle = resolveMovedTitle(event.title, event, sortedMoveEvents);
         const existing = currentToCreatedAt.get(currentTitle);
         if (!existing || event.timestamp < existing) {
           currentToCreatedAt.set(currentTitle, event.timestamp);

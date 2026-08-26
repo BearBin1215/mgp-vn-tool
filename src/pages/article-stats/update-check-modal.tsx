@@ -12,11 +12,11 @@ import {
 } from 'antd';
 import { CloudUploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import feishu from '@/api/feishu';
+import feishu, { type FeishuAppendRow } from '@/api/feishu';
 import MoegirlLink from '@/components/moegirl-link';
 import { useArticleStore, type UpdateCandidate } from '@/stores/article-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { formatError, toExcelSerial } from '@/utils/text';
+import { formatError } from '@/utils/text';
 
 interface UpdateCheckModalProps {
   /** 弹窗是否可见 */
@@ -90,30 +90,28 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
     setSubmitting(true);
     try {
       const { articles } = useArticleStore.getState();
-      // 飞书按第一个空行追加：数据从 A2 起、表头占第 1 行，故第 i 行（0 起）实际行号为「数据行数 + 2 + i」。
-      // 依赖表格连续无空洞（统计表为程序化维护，满足此假设）
-      const startRow = articles.length + 2;
       const sorted = [...chosen].sort((a, b) => a.creationDate.localeCompare(b.creationDate));
-      // 日期转 Excel 序列号以匹配表格日期列格式；F 列写入 COUNTIF 公式统计该制作组织第几部作品
-      const values = sorted.map((row, i) => {
-        const rowNum = startRow + i;
-        return [
-          row.ja.trim(),
-          row.title.trim(),
-          row.brand.trim(),
-          toExcelSerial(row.releaseDate),
-          toExcelSerial(row.creationDate),
-          // F 列序号用公式对象写入，飞书才会识别为公式并自动计算；
-          // 直接传 "=COUNTIF(...)" 字符串会被当作普通文本显示。
-          { type: 'formula', text: `=COUNTIF(C$2:C${rowNum},C${rowNum})` },
-        ];
-      });
-      await feishu.appendRows(
+      const appendRows: FeishuAppendRow[] = sorted.map((row) => ({
+        original_name: row.ja.trim(),
+        title: row.title.trim(),
+        brand: row.brand.trim(),
+        release_date: row.releaseDate,
+        creation_date: row.creationDate,
+      }));
+      const appendResult = await feishu.appendRows(
         feishuStatsTableAppId,
         feishuStatsTableAppSecret,
-        values,
+        articles.length,
+        appendRows,
       );
-      message.success(`已向统计表追加 ${chosen.length} 条数据，正在刷新本地缓存…`);
+      if (appendResult.style_warnings.length > 0) {
+        message.warning(
+          `已追加 ${chosen.length} 条数据，但样式设置失败，请检查线上表格。${appendResult.style_warnings[0]}`,
+          8,
+        );
+      } else {
+        message.success(`已向统计表追加 ${chosen.length} 条数据，正在刷新本地缓存…`);
+      }
       clearCandidates();
       resetLocalState();
       await onSubmitted();

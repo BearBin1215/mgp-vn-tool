@@ -219,22 +219,6 @@ export const extractReleaseDate = (wikitext: string): string => {
 };
 
 /**
- * 将 YYYY-MM-DD 字符串转为 Excel 序列号（数值）
- *
- * 与 {@link excelDateToString} 互逆，用于向飞书日期类型单元格写入时保持原格式显示。
- * 直接写 `YYYY-MM-DD` 文本会被当字符串而显示异常，必须写入**数值型**序列号，
- * 且由 Rust 端 append 后对 D、E 列设置日期格式，才会渲染为日期而非裸数字。
- * 采用与读取端一致的 dayjs 本地时区基准，避免时区偏移导致跨天误差。
- * @param date YYYY-MM-DD 格式日期，空值或非法值原样返回
- */
-export const toExcelSerial = (date: string): number | string => {
-  if (!date) { return date; }
-  const d = dayjs(date, 'YYYY-MM-DD', true);
-  if (!d.isValid()) { return date; }
-  return Math.round(d.valueOf() / 86400000) + 25569;
-};
-
-/**
  * 从条目 wikitext 源代码中提取日文原名
  *
  * 优先取信息框的 `|原名 = ` 参数值（可能直接是原名文本，也可能包裹
@@ -263,28 +247,39 @@ export const extractJa = (wikitext: string): string => {
 };
 
 /**
- * 从条目 wikitext 源代码中提取制作组织
+ * 将 wikitext 内链统一转换为目标页面标题。
+ * @param text 原始 wikitext 片段
+ * @returns 去除内链标记后的文本
+ */
+const normalizeBrandText = (text: string): string => text
+  .replace(/\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g, '$1')
+  .replace(/<br\s*\/?>(.*)$/i, '')
+  .trim();
+
+/**
+ * 从条目 wikitext 源代码中提取制作组织。
  *
- * 两类写法：
- * 1) 信息框参数：`|开发 = xxx` / `|制作 = xxx` / `|发行 = xxx`，值可能带
- *    `[[...]]` 内链（取真实条目名，去掉 `|别名`），也可能直接是文本。
- * 2) 描述语句：「由 xxx 制作/开发/创作」，繁简皆可（制作/製作、开发/開發、
- *    创作/創作），xxx 同样可能带或不带内链。
- * 取首个匹配作为主导会社（统计表单制作组织列仅记主导会社）。
+ * 仅识别顶部信息框的 `开发/開發` 参数，以及序言中的「由…制作/製作、
+ * 开发/開發、创作/創作」句式。两种句式均支持普通文本和 `[[内链]]`。
  * @param wikitext 页面源代码
  * @returns 制作组织名，无法提取时返回空串
  */
 export const extractBrand = (wikitext: string): string => {
-  const patterns = [
-    // 信息框参数：|开发/制作/发行 = （可能 [[xxx]] 或直接文本）
-    /^\s*\|\s*(?:开发|制作|发行)\s*=\s*(?:\[\[)?([^\]|}]+?)(?:\|[^\]]+)?\]\]/m,
-    // 描述语句：由 xxx 制作/製作/开发/開發/创作/創作
-    /由\s*(?:\[\[)?([^\]|}]+?)(?:\|[^\]]+)?\]\]\s*(?:制作|製作|开发|開發|创作|創作)/,
-  ];
-  for (const pattern of patterns) {
-    const match = pattern.exec(wikitext);
-    if (!match) { continue; }
-    const brand = match[1].trim();
+  // 序言和顶部信息框位于首个二级标题之前，后续章节不参与会社提取。
+  const preface = wikitext.split(/\n\s*==/u, 1)[0];
+
+  // 信息框通常位于页面开头；取首个参数，避免误读正文或其他模板中的同名字段。
+  const infoboxMatch = /^\s*\|\s*(?:开发|開發)\s*=\s*(.*?)\s*$/m.exec(preface);
+  if (infoboxMatch) {
+    const brand = normalizeBrandText(infoboxMatch[1]);
+    if (brand) { return brand; }
+  }
+
+  // 序言位于首个二级标题之前，避免把正文后续章节中的其他公司描述当作主导会社。
+  const normalizedPreface = normalizeBrandText(preface);
+  const proseMatch = /由\s*([^\n，。；、]{1,80}?)\s*(?:制作|製作|开发|開發|创作|創作)/u.exec(normalizedPreface);
+  if (proseMatch) {
+    const brand = normalizeBrandText(proseMatch[1]);
     if (brand) { return brand; }
   }
   return '';

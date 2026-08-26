@@ -1,5 +1,27 @@
 import { invoke } from '@tauri-apps/api/core';
 
+/** 飞书追加结果；样式失败不会回滚已写入的数据。 */
+export interface FeishuAppendResult {
+  /** 飞书返回的实际写入范围 */
+  updated_range: string | null;
+  /** 数据已写入但样式设置失败时的警告 */
+  style_warnings: string[];
+}
+
+/** 统计表追加行的业务字段；物理列顺序由 Rust 端统一处理。 */
+export interface FeishuAppendRow {
+  /** 日文原名 */
+  original_name: string;
+  /** 条目名 */
+  title: string;
+  /** 制作组织 */
+  brand: string;
+  /** 发行时间，格式 YYYY-MM-DD */
+  release_date: string;
+  /** 创建时间，格式 YYYY-MM-DD */
+  creation_date: string;
+}
+
 const feishu = {
   /** 获取飞书表格内容（自动获取 token 并请求表格） */
   fetchSheet(appId: string, appSecret: string) {
@@ -10,13 +32,16 @@ const feishu = {
    * 向统计表末尾追加行（自动获取 token 并写入）
    * @param appId 飞书开放平台应用 App ID
    * @param appSecret 飞书开放平台应用 App Secret
-   * @param rows 行数据，每行为 A~F 六列的值，须按创建时间升序排列。
-   *   单元格支持混合类型：日期列须传数值型 Excel 序列号；
-   *   公式列须传飞书公式对象 `{ type: 'formula', text: '=A1' }`，
-   *   直接传字符串公式会被当作文本显示而不计算；其余列为普通字符串
+   * @param existingRowCount 当前表格的数据行数，用于生成新增行的序号公式
+   * @param rows 行数据，须按创建时间升序排列
    */
-  appendRows(appId: string, appSecret: string, rows: unknown[][]) {
-    return invoke<void>('feishu_append_rows', { appId, appSecret, rows });
+  appendRows(appId: string, appSecret: string, existingRowCount: number, rows: FeishuAppendRow[]) {
+    return invoke<FeishuAppendResult>('feishu_append_rows', {
+      appId,
+      appSecret,
+      existingRowCount,
+      rows,
+    });
   },
 };
 
