@@ -117,6 +117,7 @@ async fn feishu_append_rows_inner(
 /// 根据追加接口返回的实际写入范围（形如 `0rCQAp!A869:F870`），
 /// 对新增行设置样式使其与界面手输单元格观感一致：
 ///   - D:E 设日期格式（yyyy/MM/dd 左对齐）
+///   - A:F 设置右边框，补齐 A~F 列之间及 F 列右侧的竖向边框
 ///   - F 列设常规格式（按线上旧行，居中），与旧行观感一致（公式由前端以公式对象写入）
 ///
 /// 使用单条「设置单元格样式」接口（PUT /style，请求体顶层为 `appendStyle`）。
@@ -164,6 +165,24 @@ async fn set_new_row_style_inner(token: &str, updated_range: &str) -> Result<(),
         }
     });
     set_style_request(token, &date_body, "日期格式").await?;
+
+    // 线上统计表在 A~F 列之间有竖向分隔线。values_append 不会继承已有行的边框。
+    // 逐列设置右边框：对单列范围设置 RIGHT_BORDER，可稳定形成 A|B、B|C、C|D、
+    // D|E、E|F 五条列间分隔线，以及 F 列右侧的外边框；不使用 INNER_BORDER，
+    // 避免额外生成行间横线。
+    for column in ['A', 'B', 'C', 'D', 'E', 'F'] {
+        let border_range = format!("{SHEET_ID}!{column}{start_row}:{column}{end_row}");
+        let border_body = serde_json::json!({
+            "appendStyle": {
+                "range": border_range,
+                "style": {
+                    "borderType": "RIGHT_BORDER",
+                    "borderColor": "#000000",
+                },
+            }
+        });
+        set_style_request(token, &border_body, "竖向边框").await?;
+    }
 
     // F 列为序号公式（=COUNTIF），线上其他行均为「常规」格式并居中。此处将其
     // 显式设为常规（不带 formatter）+ 居中（hAlign:1），既与旧行观感一致，
