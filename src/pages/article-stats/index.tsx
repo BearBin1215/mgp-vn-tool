@@ -34,6 +34,7 @@ import Page from '@/components/page';
 import MoegirlLink from '@/components/moegirl-link';
 import { useArticleStore, initArticles, type Article } from '@/stores/article-store';
 import { useSettingsStore } from '@/stores/settings-store';
+import { formatError } from '@/utils/text';
 import UpdateCheckModal from './update-check-modal';
 import './index.css';
 
@@ -305,7 +306,7 @@ export default function ArticleStats() {
       })
       .catch((err) => {
         setUpdateCheckOpen(false);
-        message.error(err instanceof Error ? err.message : String(err), 5);
+        message.error(formatError(err), 5);
       });
   };
 
@@ -315,7 +316,7 @@ export default function ArticleStats() {
       await useArticleStore.getState().fetchFeishuTable(feishuStatsTableAppId, feishuStatsTableAppSecret);
       await useArticleStore.getState().fetchPageData();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : String(err), 5);
+      message.error(formatError(err), 5);
     }
   };
 
@@ -328,7 +329,7 @@ export default function ArticleStats() {
       await useArticleStore.getState().fetchPageData();
       message.success('数据更新成功');
     } catch (err) {
-      message.error(err instanceof Error ? err.message : String(err), 5);
+      message.error(formatError(err), 5);
     }
   };
 

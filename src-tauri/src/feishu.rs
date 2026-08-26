@@ -3,13 +3,18 @@
 //! 通过飞书开放平台 API 读取 Galgame 条目统计表内容并向其追加行，
 //! 自动获取并使用 tenant_access_token 鉴权
 
+use std::time::Duration;
+
 use chrono::NaiveDate;
 
 /// Galgame 条目统计表的 spreadsheet_token
-const SPREADSHEET_TOKEN: &str = "VUppstQ8OhgmQItNt6tc0LudnMf";
+const SPREADSHEET_TOKEN: &str = "shtcnTQQ5n5HkdGwiiYEtE1FHZ9";
 
 /// Galgame 条目统计表的工作表 ID
 const SHEET_ID: &str = "0rCQAp";
+
+/// 飞书请求超时时间（秒）
+const REQUEST_TIMEOUT_SECS: u64 = 30;
 
 /// 按 HTTP 状态分类飞书请求错误，保留服务端返回的业务错误信息。
 fn format_feishu_error(
@@ -65,9 +70,17 @@ pub async fn feishu_fetch_sheet(
     app_id: String,
     app_secret: String,
 ) -> Result<Vec<Vec<String>>, String> {
-    let token = feishu_get_token_inner(&app_id, &app_secret).await?;
+    let client = crate::http::build_client(Duration::from_secs(REQUEST_TIMEOUT_SECS))?;
+    let token = feishu_get_token_inner(&app_id, &app_secret, &client).await?;
     // 读取范围 A2:E 跳过表头
-    feishu_get_sheet_inner(&token, SPREADSHEET_TOKEN, SHEET_ID, "!A2:E").await
+    feishu_get_sheet_inner(
+        &token,
+        SPREADSHEET_TOKEN,
+        SHEET_ID,
+        "!A2:E",
+        &client,
+    )
+    .await
 }
 
 /// 向统计表末尾追加行数据（自动获取 token 并写入）
@@ -87,8 +100,9 @@ pub async fn feishu_append_rows(
     if rows.is_empty() {
         return Ok(FeishuAppendResult { updated_range: None, style_warnings: Vec::new() });
     }
-    let token = feishu_get_token_inner(&app_id, &app_secret).await?;
-    feishu_append_rows_inner(&token, existing_row_count, rows).await
+    let client = crate::http::build_client(Duration::from_secs(REQUEST_TIMEOUT_SECS))?;
+    let token = feishu_get_token_inner(&app_id, &app_secret, &client).await?;
+    feishu_append_rows_inner(&token, existing_row_count, rows, &client).await
 }
 
 /// 追加行数据到统计表工作表末尾
@@ -100,6 +114,7 @@ async fn feishu_append_rows_inner(
     token: &str,
     existing_row_count: usize,
     rows: Vec<FeishuAppendRow>,
+    client: &reqwest::Client,
 ) -> Result<FeishuAppendResult, String> {
     let url = format!(
         "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{SPREADSHEET_TOKEN}/values_append"
@@ -131,7 +146,6 @@ async fn feishu_append_rows_inner(
         }
     });
 
-    let client = reqwest::Client::new();
     let resp = client
         .post(&url)
         .query(&[("insertDataOption", "INSERT_ROWS")])
@@ -317,9 +331,12 @@ async fn set_styles_batch_request(
 }
 
 /// 获取飞书 tenant_access_token
-async fn feishu_get_token_inner(app_id: &str, app_secret: &str) -> Result<String, String> {
+async fn feishu_get_token_inner(
+    app_id: &str,
+    app_secret: &str,
+    client: &reqwest::Client,
+) -> Result<String, String> {
     let url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
-    let client = reqwest::Client::new();
     let resp = client
         .post(url)
         .header("Content-Type", "application/json")
@@ -367,13 +384,13 @@ async fn feishu_get_sheet_inner(
     spreadsheet_token: &str,
     sheet_id: &str,
     range: &str,
+    client: &reqwest::Client,
 ) -> Result<Vec<Vec<String>>, String> {
     let url = format!(
         "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{}/values/{}{}",
         spreadsheet_token, sheet_id, range
     );
 
-    let client = reqwest::Client::new();
     let resp = client
         .get(&url)
         .header("Authorization", format!("Bearer {token}"))
