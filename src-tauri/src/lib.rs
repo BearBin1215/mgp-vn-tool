@@ -46,7 +46,7 @@ pub fn run() {
 
             // 根据颜色主题设置窗口主题和 webview 背景色，减少闪屏
             // （仅 dark/light 生效；其他值或未设置时直接返回，不做处理）
-            if let Some(color_mode) = settings::get_string(&app.handle(), "colorMode") {
+            if let Some(color_mode) = settings::get_string(app.handle(), "colorMode") {
                 let (theme, bg_color) = match color_mode.as_str() {
                     "dark" => (Some(tauri::Theme::Dark), Some(Color(0, 0, 0, 255))),
                     "light" => (Some(tauri::Theme::Light), Some(Color(255, 255, 255, 255))),

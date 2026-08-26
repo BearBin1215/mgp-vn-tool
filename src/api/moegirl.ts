@@ -36,25 +36,45 @@ interface UsersQueryResponse {
 /** 本次会话中使用过的 token，减少重复获取 */
 const tokenCache = new Map<string, string>();
 
-const moegirl = {
-  get(params: ApiParams) {
-    const { moegirlApiHost: host, moegirlUserAgent: userAgent } = useSettingsStore.getState();
-    return invoke<Record<string, unknown>>('moegirl_request', {
+/** 服务端明确表示未登录时，清理本地凭据和用户信息缓存 */
+const clearInvalidLogin = async (error: unknown): Promise<void> => {
+  if (!String(error).includes('[notloggedin]')) {
+    return;
+  }
+  tokenCache.clear();
+  useSettingsStore.setState({ moegirlUsername: '' });
+  await Promise.allSettled([
+    invoke<void>('moegirl_logout'),
+    useMoegirlStore.getState().clearUserInfo(),
+  ]);
+};
+
+/** 调用萌百后端命令，并在服务端明确判定未登录时同步清理本地状态 */
+const request = async (
+  method: 'GET' | 'POST',
+  params: ApiParams,
+): Promise<Record<string, unknown>> => {
+  const { moegirlApiHost: host, moegirlUserAgent: userAgent } = useSettingsStore.getState();
+  try {
+    return await invoke<Record<string, unknown>>('moegirl_request', {
       host,
-      method: 'GET',
+      method,
       params,
       userAgent,
     });
+  } catch (e) {
+    await clearInvalidLogin(e);
+    throw e;
+  }
+};
+
+const moegirl = {
+  get(params: ApiParams) {
+    return request('GET', params);
   },
 
   post(params: ApiParams) {
-    const { moegirlApiHost: host, moegirlUserAgent: userAgent } = useSettingsStore.getState();
-    return invoke<Record<string, unknown>>('moegirl_request', {
-      host,
-      method: 'POST',
-      params,
-      userAgent,
-    });
+    return request('POST', params);
   },
 
   /** 获取指定类型的 token，优先使用缓存 */
