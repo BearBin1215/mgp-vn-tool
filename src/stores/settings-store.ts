@@ -83,125 +83,28 @@ interface SettingsStore {
 /** Tauri store 实例（路径由后端统一解析到用户配置目录） */
 const storePromise = loadConfigStore('settings.json');
 
-/** 从 Tauri store 读取保存的颜色模式 */
-const getInitialColorMode = async (): Promise<ColorMode> => {
+/** 从 Tauri store 读取设置；校验失败或未保存时返回默认值。 */
+const readSetting = async <T>(
+  key: string,
+  fallback: T,
+  isValid: (value: unknown) => boolean = (value) => value !== undefined && value !== null,
+): Promise<T> => {
   const store = await storePromise;
-  const saved = await store.get<ColorMode>('colorMode');
-  return saved === 'light' || saved === 'dark' ? saved : 'light';
+  const saved = await store.get<unknown>(key);
+  return isValid(saved) ? saved as T : fallback;
 };
 
-/** 从 Tauri store 读取保存的界面字体 */
-const getInitialUiFont = async (): Promise<string> => {
+/** 将设置写入 Tauri store 并保存。 */
+const persistSetting = async (key: string, value: unknown): Promise<void> => {
   const store = await storePromise;
-  return (await store.get<string>('uiFont')) || '';
+  await store.set(key, value);
+  await store.save();
 };
 
-/** 从 Tauri store 读取保存的代码块字体 */
-const getInitialCodeFont = async (): Promise<string> => {
-  const store = await storePromise;
-  return (await store.get<string>('codeFont')) || '';
-};
-
-/** 从 Tauri store 读取保存的批评空间地址 */
-const getInitialErogamescapeHost = async (): Promise<ErogamescapeUrl> => {
-  const store = await storePromise;
-  const saved = await store.get<ErogamescapeUrl>('erogamescapeUrl');
-  return saved || 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki';
-};
-
-/** 从 Tauri store 读取保存的萌百请求地址设置 */
-const getInitialMoegirlApiHost = async (): Promise<MoegirlHost> => {
-  const store = await storePromise;
-  const saved = await store.get<MoegirlHost>('moegirlApiHost');
-  return saved || 'mzh.moegirl.org.cn';
-};
-
-/** 从 Tauri store 读取保存的萌百跳转地址设置 */
-const getInitialMoegirlJumpHost = async (): Promise<MoegirlHost | 'same'> => {
-  const store = await storePromise;
-  const saved = await store.get<MoegirlHost | 'same'>('moegirlJumpHost');
-  return saved || 'same';
-};
-
-/** 从 Tauri store 读取保存的萌百 User-Agent 设置 */
-const getInitialMoegirlUserAgent = async (): Promise<string> => {
-  const store = await storePromise;
-  return (await store.get<string>('moegirlUserAgent')) || DEFAULT_USER_AGENT;
-};
-
-/** 从 Tauri store 读取保存的萌百请求重试次数 */
-const getInitialMoegirlRetries = async (): Promise<number> => {
-  const store = await storePromise;
-  const saved = await store.get<number>('moegirlRetries');
-  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 1;
-};
-
-/** 从 Tauri store 读取保存的萌百请求重试间隔 */
-const getInitialMoegirlRetryDelay = async (): Promise<number> => {
-  const store = await storePromise;
-  const saved = await store.get<number>('moegirlRetryDelay');
-  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 1000;
-};
-
-/** 从 Tauri store 读取保存的批评空间请求超时时长 */
-const getInitialErogamescapeTimeout = async (): Promise<number> => {
-  const store = await storePromise;
-  const saved = await store.get<number>('erogamescapeTimeout');
-  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 30;
-};
-
-/** 从 Tauri store 读取保存的 Bangumi 请求超时时长 */
-const getInitialBangumiTimeout = async (): Promise<number> => {
-  const store = await storePromise;
-  const saved = await store.get<number>('bangumiTimeout');
-  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 30;
-};
-
-/** 从 Tauri store 读取保存的 Bangumi 请求重试次数 */
-const getInitialBangumiRetries = async (): Promise<number> => {
-  const store = await storePromise;
-  const saved = await store.get<number>('bangumiRetries');
-  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 2;
-};
-
-/** 从 Tauri store 读取保存的 Bangumi 请求重试间隔 */
-const getInitialBangumiRetryDelay = async (): Promise<number> => {
-  const store = await storePromise;
-  const saved = await store.get<number>('bangumiRetryDelay');
-  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 1000;
-};
-
-/** 从 Tauri store 读取保存的 Galgame 统计表应用 App ID */
-const getInitialFeishuStatsTableAppId = async (): Promise<string> => {
-  const store = await storePromise;
-  return (await store.get<string>('feishuStatsTableAppId')) || DEFAULT_FEISHU_APP_ID;
-};
-
-/** 从 Tauri store 读取保存的 Galgame 统计表应用 App Secret */
-const getInitialFeishuStatsTableAppSecret = async (): Promise<string> => {
-  const store = await storePromise;
-  return (await store.get<string>('feishuStatsTableAppSecret')) || '';
-};
-
-/** 从 Tauri store 读取保存的条目统计页每页条数 */
-const getInitialArticlePageSize = async (): Promise<number> => {
-  const store = await storePromise;
-  const saved = await store.get<number>('articlePageSize');
-  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 100;
-};
-
-/** 从 Tauri store 读取保存的背景图片路径 */
-const getInitialBackgroundImage = async (): Promise<string> => {
-  const store = await storePromise;
-  return (await store.get<string>('backgroundImage')) || '';
-};
-
-/** 从 Tauri store 读取保存的背景图片透明度 */
-const getInitialBackgroundImageTransparency = async (): Promise<number> => {
-  const store = await storePromise;
-  const saved = await store.get<number>('backgroundImageTransparency');
-  return typeof saved === 'number' && Number.isFinite(saved) ? saved : 90;
-};
+/** 检查值是否为有限数字。 */
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+/** 检查值是否为非空字符串。 */
+const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 
 /** 应用设置 store，持久化到 Tauri store */
 export const useSettingsStore = create<SettingsStore>((set) => ({
@@ -212,133 +115,99 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   articlePageSize: 100,
   backgroundImage: '',
   setBackgroundImage: async (path) => {
-    const store = await storePromise;
-    await store.set('backgroundImage', path);
-    await store.save();
+    await persistSetting('backgroundImage', path);
     set({ backgroundImage: path });
   },
   backgroundImageTransparency: 90,
   setBackgroundImageTransparency: async (value) => {
-    const store = await storePromise;
-    await store.set('backgroundImageTransparency', value);
-    await store.save();
+    await persistSetting('backgroundImageTransparency', value);
     set({ backgroundImageTransparency: value });
   },
   previewBackgroundImageTransparency: (value) => set({ backgroundImageTransparency: value }),
   setColorMode: async (mode) => {
-    const store = await storePromise;
-    await store.set('colorMode', mode);
-    await store.save();
+    await persistSetting('colorMode', mode);
     await getCurrentWindow().setTheme(mode);
     set({ colorMode: mode });
   },
 
   uiFont: '',
   setUiFont: async (font) => {
-    const store = await storePromise;
-    await store.set('uiFont', font);
-    await store.save();
+    await persistSetting('uiFont', font);
     set({ uiFont: font });
   },
 
   codeFont: '',
   setCodeFont: async (font) => {
-    const store = await storePromise;
-    await store.set('codeFont', font);
-    await store.save();
+    await persistSetting('codeFont', font);
     set({ codeFont: font });
   },
 
   erogamescapeUrl: 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki',
   setErogamescapeHost: async (host) => {
-    const store = await storePromise;
-    await store.set('erogamescapeUrl', host);
-    await store.save();
+    await persistSetting('erogamescapeUrl', host);
     set({ erogamescapeUrl: host });
   },
   erogamescapeUsername: '',
   setErogamescapeUsername: async (username) => {
-    const store = await storePromise;
-    await store.set('erogamescapeUsername', username);
-    await store.save();
+    await persistSetting('erogamescapeUsername', username);
     set({ erogamescapeUsername: username });
   },
   erogamescapePassword: '',
   setErogamescapePassword: async (password) => {
-    const store = await storePromise;
-    await store.set('erogamescapePassword', password);
-    await store.save();
+    await persistSetting('erogamescapePassword', password);
     set({ erogamescapePassword: password });
   },
   erogamescapeTimeout: 30,
   setErogamescapeTimeout: async (seconds) => {
-    const store = await storePromise;
-    await store.set('erogamescapeTimeout', seconds);
-    await store.save();
+    await persistSetting('erogamescapeTimeout', seconds);
     set({ erogamescapeTimeout: seconds });
   },
 
   bangumiTimeout: 30,
   setBangumiTimeout: async (seconds) => {
-    const store = await storePromise;
-    await store.set('bangumiTimeout', seconds);
-    await store.save();
+    await persistSetting('bangumiTimeout', seconds);
     set({ bangumiTimeout: seconds });
   },
 
-  bangumiRetries: 1,
+  bangumiRetries: 2,
   setBangumiRetries: async (n) => {
-    const store = await storePromise;
-    await store.set('bangumiRetries', n);
-    await store.save();
+    await persistSetting('bangumiRetries', n);
     set({ bangumiRetries: n });
   },
 
   bangumiRetryDelay: 1000,
   setBangumiRetryDelay: async (ms) => {
-    const store = await storePromise;
-    await store.set('bangumiRetryDelay', ms);
-    await store.save();
+    await persistSetting('bangumiRetryDelay', ms);
     set({ bangumiRetryDelay: ms });
   },
 
   moegirlApiHost: 'mzh.moegirl.org.cn',
   setMoegirlApiHost: async (host) => {
-    const store = await storePromise;
-    await store.set('moegirlApiHost', host);
-    await store.save();
+    await persistSetting('moegirlApiHost', host);
     set({ moegirlApiHost: host });
   },
 
   moegirlJumpHost: 'same',
   setMoegirlJumpHost: async (host) => {
-    const store = await storePromise;
-    await store.set('moegirlJumpHost', host);
-    await store.save();
+    await persistSetting('moegirlJumpHost', host);
     set({ moegirlJumpHost: host });
   },
 
   moegirlUserAgent: DEFAULT_USER_AGENT,
   setMoegirlUserAgent: async (ua) => {
-    const store = await storePromise;
-    await store.set('moegirlUserAgent', ua);
-    await store.save();
+    await persistSetting('moegirlUserAgent', ua);
     set({ moegirlUserAgent: ua });
   },
 
   moegirlRetries: 1,
   setMoegirlRetries: async (n) => {
-    const store = await storePromise;
-    await store.set('moegirlRetries', n);
-    await store.save();
+    await persistSetting('moegirlRetries', n);
     set({ moegirlRetries: n });
   },
 
   moegirlRetryDelay: 1000,
   setMoegirlRetryDelay: async (ms) => {
-    const store = await storePromise;
-    await store.set('moegirlRetryDelay', ms);
-    await store.save();
+    await persistSetting('moegirlRetryDelay', ms);
     set({ moegirlRetryDelay: ms });
   },
 
@@ -371,23 +240,17 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   },
 
   setFeishuStatsTableAppId: async (id) => {
-    const store = await storePromise;
-    await store.set('feishuStatsTableAppId', id);
-    await store.save();
+    await persistSetting('feishuStatsTableAppId', id);
     set({ feishuStatsTableAppId: id });
   },
 
   setFeishuStatsTableAppSecret: async (secret) => {
-    const store = await storePromise;
-    await store.set('feishuStatsTableAppSecret', secret);
-    await store.save();
+    await persistSetting('feishuStatsTableAppSecret', secret);
     set({ feishuStatsTableAppSecret: secret });
   },
 
   setArticlePageSize: async (size) => {
-    const store = await storePromise;
-    await store.set('articlePageSize', size);
-    await store.save();
+    await persistSetting('articlePageSize', size);
     set({ articlePageSize: size });
   },
 }));
@@ -415,24 +278,24 @@ export const initSettings = async () => {
     moegirlRetries,
     moegirlRetryDelay,
   ] = await Promise.all([
-    getInitialColorMode(),
-    getInitialUiFont(),
-    getInitialCodeFont(),
-    getInitialBackgroundImage(),
-    getInitialBackgroundImageTransparency(),
-    getInitialErogamescapeHost(),
-    getInitialErogamescapeTimeout(),
-    getInitialBangumiTimeout(),
-    getInitialBangumiRetries(),
-    getInitialBangumiRetryDelay(),
-    getInitialMoegirlApiHost(),
-    getInitialMoegirlJumpHost(),
-    getInitialFeishuStatsTableAppId(),
-    getInitialFeishuStatsTableAppSecret(),
-    getInitialArticlePageSize(),
-    getInitialMoegirlUserAgent(),
-    getInitialMoegirlRetries(),
-    getInitialMoegirlRetryDelay(),
+    readSetting<ColorMode>('colorMode', 'light', (v): v is ColorMode => v === 'light' || v === 'dark'),
+    readSetting('uiFont', '', isNonEmptyString),
+    readSetting('codeFont', '', isNonEmptyString),
+    readSetting('backgroundImage', '', isNonEmptyString),
+    readSetting('backgroundImageTransparency', 90, isFiniteNumber),
+    readSetting<ErogamescapeUrl>('erogamescapeUrl', 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki', isNonEmptyString),
+    readSetting('erogamescapeTimeout', 30, isFiniteNumber),
+    readSetting('bangumiTimeout', 30, isFiniteNumber),
+    readSetting('bangumiRetries', 2, isFiniteNumber),
+    readSetting('bangumiRetryDelay', 1000, isFiniteNumber),
+    readSetting<MoegirlHost>('moegirlApiHost', 'mzh.moegirl.org.cn', isNonEmptyString),
+    readSetting<MoegirlHost | 'same'>('moegirlJumpHost', 'same', isNonEmptyString),
+    readSetting('feishuStatsTableAppId', DEFAULT_FEISHU_APP_ID, isNonEmptyString),
+    readSetting('feishuStatsTableAppSecret', '', isNonEmptyString),
+    readSetting('articlePageSize', 100, isFiniteNumber),
+    readSetting('moegirlUserAgent', DEFAULT_USER_AGENT, isNonEmptyString),
+    readSetting('moegirlRetries', 1, isFiniteNumber),
+    readSetting('moegirlRetryDelay', 1000, isFiniteNumber),
   ]);
   const [erogamescapeUsername, erogamescapePassword, moegirlUsername] = await Promise.all([
     store.get<string>('erogamescapeUsername').then((v) => v || ''),

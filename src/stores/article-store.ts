@@ -1,11 +1,10 @@
 import { create } from 'zustand';
 import dayjs from 'dayjs';
 import feishu from '@/api/feishu';
-import moegirl, { fetchPageInfo } from '@/api/moegirl';
+import moegirl, { fetchPageInfo, getMoegirlQueryBatchSize } from '@/api/moegirl';
 import { ApiParams } from '@/lib/types';
 import { extractBrand, extractJa, extractReleaseDate } from '@/utils/text';
 import { loadConfigStore } from '@/lib/config-store';
-import { useMoegirlStore } from './moegirl-store';
 
 
 /** 条目数据 */
@@ -126,11 +125,10 @@ const fetchPageData = async (titles: string[]): Promise<FetchPageDataResult> => 
   const redirects = new Map<string, string>();
   /** 页面重定向映射：标题 -> 指向该页面的重定向标题列表 */
   const pageRedirects = new Map<string, string[]>();
-  /** 根据用户权限调整批量大小 */
-  const BATCH_SIZE = useMoegirlStore.getState().rights.includes('apihighlimits') ? 500 : 50;
+  const batchSize = getMoegirlQueryBatchSize();
 
-  for (let i = 0; i < titles.length; i += BATCH_SIZE) {
-    const batch = titles.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < titles.length; i += batchSize) {
+    const batch = titles.slice(i, i + batchSize);
 
     let continueParams: ApiParams = {};
     let hasMore = true;
@@ -324,11 +322,10 @@ const resolveMovedTitle = (
  */
 const fetchPageWikitexts = async (titles: string[]): Promise<Map<string, string>> => {
   const result = new Map<string, string>();
-  /** 根据用户权限调整批量大小 */
-  const BATCH_SIZE = useMoegirlStore.getState().rights.includes('apihighlimits') ? 500 : 50;
+  const batchSize = getMoegirlQueryBatchSize();
 
-  for (let i = 0; i < titles.length; i += BATCH_SIZE) {
-    const batch = titles.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < titles.length; i += batchSize) {
+    const batch = titles.slice(i, i + batchSize);
     const res = await moegirl.post({
       action: 'query',
       prop: 'revisions',

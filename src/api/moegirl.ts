@@ -36,6 +36,10 @@ interface UsersQueryResponse {
 /** 本次会话中使用过的 token，减少重复获取 */
 const tokenCache = new Map<string, string>();
 
+/** 根据当前用户权限返回 MediaWiki 标题查询的单批上限。 */
+export const getMoegirlQueryBatchSize = (): number =>
+  useMoegirlStore.getState().rights.includes('apihighlimits') ? 500 : 50;
+
 /** 服务端明确表示未登录时，清理本地凭据和用户信息缓存 */
 const clearInvalidLogin = async (error: unknown): Promise<void> => {
   if (!String(error).includes('[notloggedin]')) {
@@ -155,11 +159,10 @@ export const fetchPageInfo = async (titles: string[]): Promise<Map<string, PageI
   const result = new Map<string, PageInfo>();
   const convertedMap = new Map<string, string>();
   const redirectMap = new Map<string, string>();
-  /** 根据用户权限调整批量大小 */
-  const BATCH_SIZE = useMoegirlStore.getState().rights.includes('apihighlimits') ? 500 : 50;
+  const batchSize = getMoegirlQueryBatchSize();
 
-  for (let i = 0; i < titles.length; i += BATCH_SIZE) {
-    const batch = titles.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < titles.length; i += batchSize) {
+    const batch = titles.slice(i, i + batchSize);
     let continueParams: Record<string, string> = {};
     let hasMore = true;
 
