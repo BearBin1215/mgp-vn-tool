@@ -46,6 +46,7 @@ mgp-vn-tool/
 ├── src/                        # 前端源码
 │   ├── api/                    # API 封装
 │   │   ├── erogamescape.ts     # 批评空间 API 封装
+│   │   ├── feishu.ts           # 飞书统计表 API 封装
 │   │   └── ...
 │   ├── assets/                 # 静态资源
 │   ├── icons/                  # 图标组件目录
@@ -62,6 +63,7 @@ mgp-vn-tool/
 │   │   ├── about/              # 关于页面（首页）
 │   │   ├── settings/           # 设置页面
 │   │   ├── article-stats/      # 条目统计
+│   │   │   └── update-check-modal.tsx # 检查更新弹窗
 │   │   └── ...
 │   ├── stores/                 # Zustand 状态管理及对应持久化存储
 │   │   ├── settings-store.ts   # 应用设置
@@ -74,6 +76,7 @@ mgp-vn-tool/
 ├── src-tauri/                  # Tauri 后端
 │   ├── src/
 │   │   ├── lib.rs              # Tauri 配置和 Rust API 命令
+│   │   ├── feishu.rs           # 飞书统计表读写与样式设置
 │   │   ├── http.rs             # 网络请求模块
 │   │   ├── settings.rs         # 统一从 Tauri Store 读取 settings.json
 │   │   ├── main.rs             # 入口
@@ -87,7 +90,8 @@ mgp-vn-tool/
 │   ├── moegirl_api.md          # 萌娘百科 API 说明
 │   ├── erogamescape_api.md     # 批评空间 API 说明
 │   ├── vndb_api.md             # VNDB API 说明
-│   └── bangumi_api.md          # Bangumi API 说明
+│   ├── bangumi_api.md          # Bangumi API 说明
+│   └── feishu_api.md           # 飞书统计表 API 说明
 ├── CONTRIBUTING.md             # 协作指南
 ├── package.json                # 前端依赖
 ├── eslint.config.ts            # eslint 配置
@@ -109,7 +113,8 @@ mgp-vn-tool/
 - 遵循`eslint.config.ts`内的ESLint规则（2空格缩进、分号结尾、优先单引号等）
 - 每个函数开头都需要用jsdoc说明作用，utils内的复杂工具函数需要给每个参数添加对应的`@param`
 - 禁止未使用的变量和参数（`_` 前缀可忽略）
-- 工具函数优先检查lodash库是否提供
+- 工具函数优先检查 `es-toolkit` 或现有依赖是否提供；简单逻辑优先使用原生 API，避免为使用工具库而增加间接性
+- 积极引入现有成熟库，避免重复造轮子
 
 ### React
 
@@ -143,6 +148,7 @@ function Component() {
 - 使用 4 空格缩进
 - 遵循 Rust 标准风格
 - 每个函数开头需有文档注释
+- 积极引入现有成熟 crate，避免重复造轮子
 
 ## 架构模式
 
@@ -180,7 +186,7 @@ export const routes: RouteConfig[] = [
 前端通过 Tauri `invoke()` 调用 Rust 命令。不同 API 的响应处理方式不同：
 
 - **萌娘百科**：Rust 后端转发请求，前端直接使用 MediaWiki API 返回的 JSON，无需额外处理
-- **飞书**：Rust 后端转发请求并返回结构化数据（自动获取 token 并请求表格）
+- **飞书**：Rust 后端统一获取 token，负责统计表读取、业务字段转 A-F 表格数据、追加行和新增行样式设置；前端通过 API 封装调用，并接收结构化的实际写入范围和样式警告
 - **批评空间**：Rust 后端解析 HTML 返回结构化数据，前端通过 `unwrap()` 解包响应：
 
 ```typescript
@@ -291,5 +297,5 @@ Props：
 
 ## 代码审查
 
-- 审查安全性时，批评空间镜像站账号密码、飞书统计表 App Secret 仅涉及读取且半公开，因此使用明文存储，无需视为安全风险。现阶段不涉及提交内容到萌娘百科的功能，因此唯一的通信安全审查点是Cookie泄露
+- 审查安全性时，批评空间镜像站账号密码、飞书统计表 App Secret 属于应用配置，按现有产品范围使用明文存储；飞书功能包含向统计表追加数据和设置样式，审查时应关注写入权限、错误信息是否泄露凭据，以及萌百请求中的 Cookie 是否泄露。现阶段不涉及提交内容到萌娘百科的功能
 - 批评空间 SQL 执行页只能用于读取，且本身有防注入，无需考虑安全风险

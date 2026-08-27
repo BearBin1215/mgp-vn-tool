@@ -194,3 +194,93 @@ export const formatDateCN = (date: string | null): string => {
 /** 将任意值格式化为可读的错误信息字符串 */
 export const formatError = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
+
+/**
+ * 从条目 wikitext 源代码中提取游戏发行时间
+ *
+ * 优先取信息框中的 `|发行时间 = ...` 参数（页面存在多个 Infobox 时取首个，即本篇），
+ * 未命中时兜底匹配正文的「于XXXX年X月X日发行/发售」句式。关键字兼容繁简
+ * （发行/發行、发售/發售、于/於），「年/月/日」繁简同形无需区分。
+ * @param wikitext 页面源代码
+ * @returns YYYY-MM-DD 格式日期，无法提取时返回空串
+ */
+export const extractReleaseDate = (wikitext: string): string => {
+  const patterns = [
+    /^\s*\|\s*发行时间\s*=\s*(\d{4})年(\d{1,2})月(\d{1,2})日/m,
+    /[于於](\d{4})年(\d{1,2})月(\d{1,2})日(?:发行|發行|发售|發售)/,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(wikitext);
+    if (!match) { continue; }
+    const [, y, m, d] = match;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return '';
+};
+
+/**
+ * 从条目 wikitext 源代码中提取日文原名
+ *
+ * 优先取信息框的 `|原名 = ` 参数值（可能直接是原名文本，也可能包裹
+ * `{{lj|...}}` / `{{lang-ja|'''...'''}}` 等模板或加粗标记）；兜底匹配
+ * 正文 `{{lang-ja|...}}` / `{{lj|...}}` 模板。取到原始片段后剥离模板与
+ * 加粗标记，保留内部日文原名。
+ * @param wikitext 页面源代码
+ * @returns 日文原名，无法提取时返回空串
+ */
+export const extractJa = (wikitext: string): string => {
+  const patterns = [
+    // 信息框参数：|原名 = （值可能带模板包裹，也可能直接是原名）
+    /^\s*\|\s*原名\s*=\s*(.+)/m,
+    // 正文 lang-ja / lj 模板
+    /\{\{\s*(?:lang-ja|lj)\s*\|\s*'*(.+?)'*\s*\}\}/,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(wikitext);
+    if (!match) { continue; }
+    // 若片段本身还包着模板，先取内部；否则取整段（去首尾空白与加粗引号）
+    const inner = /\{\{\s*(?:lang-ja|lj)\s*\|\s*'*(.+?)'*\s*\}\}/.exec(match[1]);
+    const raw = (inner ? inner[1] : match[1]).replace(/^'+|'+$/g, '').trim();
+    if (raw) { return raw; }
+  }
+  return '';
+};
+
+/**
+ * 将 wikitext 内链统一转换为目标页面标题。
+ * @param text 原始 wikitext 片段
+ * @returns 去除内链标记后的文本
+ */
+const normalizeBrandText = (text: string): string => text
+  .replace(/\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g, '$1')
+  .replace(/<br\s*\/?>(.*)$/i, '')
+  .trim();
+
+/**
+ * 从条目 wikitext 源代码中提取制作组织。
+ *
+ * 仅识别顶部信息框的 `开发/開發` 参数，以及序言中的「由…制作/製作、
+ * 开发/開發、创作/創作」句式。两种句式均支持普通文本和 `[[内链]]`。
+ * @param wikitext 页面源代码
+ * @returns 制作组织名，无法提取时返回空串
+ */
+export const extractBrand = (wikitext: string): string => {
+  // 序言和顶部信息框位于首个二级标题之前，后续章节不参与会社提取。
+  const preface = wikitext.split(/\n\s*==/u, 1)[0];
+
+  // 信息框通常位于页面开头；取首个参数，避免误读正文或其他模板中的同名字段。
+  const infoboxMatch = /^\s*\|\s*(?:开发|開發)\s*=\s*(.*?)\s*$/m.exec(preface);
+  if (infoboxMatch) {
+    const brand = normalizeBrandText(infoboxMatch[1]);
+    if (brand) { return brand; }
+  }
+
+  // 序言位于首个二级标题之前，避免把正文后续章节中的其他公司描述当作主导会社。
+  const normalizedPreface = normalizeBrandText(preface);
+  const proseMatch = /由\s*([^\n，。；、]{1,80}?)\s*(?:制作|製作|开发|開發|创作|創作)/u.exec(normalizedPreface);
+  if (proseMatch) {
+    const brand = normalizeBrandText(proseMatch[1]);
+    if (brand) { return brand; }
+  }
+  return '';
+};
