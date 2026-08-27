@@ -7,7 +7,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import { flatMapDeep } from 'es-toolkit';
-import { GameIcon } from '@/icons';
+import { Gamepad2 } from 'lucide-react';
 import About from '@/pages/about';
 import ArticleStats from '@/pages/article-stats';
 import CvGenerator from '@/pages/cv-generator';
@@ -73,7 +73,7 @@ export const routes: RouteConfig[] = [
         path: '/work-generator',
         component: WorkGenerator,
         label: '作品条目生成',
-        icon: <GameIcon />,
+        icon: <Gamepad2 aria-hidden size='1em' />,
         keepAlive: true,
       },
       {

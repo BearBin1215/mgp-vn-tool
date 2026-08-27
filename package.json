@@ -28,6 +28,7 @@
     "antd": "^6.6.0",
     "dayjs": "^1.11.21",
     "es-toolkit": "^1.50.0",
+    "lucide-react": "^1.34.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.3.0",
@@ -52,7 +53,6 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.67.0",
     "vite": "^8.2.1",
-    "vite-plugin-checker": "^0.14.5",
-    "vite-plugin-svgr": "^5.2.0"
+    "vite-plugin-checker": "^0.14.5"
   }
 }
