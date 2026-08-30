@@ -11,8 +11,9 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 
+use crate::error::ToolError;
 use crate::settings;
 
 /// Bangumi 单部作品（原名、中文名、发行日期）
@@ -58,7 +59,7 @@ struct BangumiRequestSettings {
 pub async fn query_bangumi_company(
     app: tauri::AppHandle,
     bgm_person_id: u64,
-) -> Result<BangumiCompanyData, String> {
+) -> Result<BangumiCompanyData, ToolError> {
     let settings = read_bangumi_settings(&app);
     let client = crate::http::build_client(Duration::from_secs(settings.timeout_secs))?;
     let company = fetch_bangumi_company(&client, &settings, bgm_person_id)
@@ -100,7 +101,7 @@ struct BangumiSearchPersonResponse {
 pub async fn search_bangumi_persons(
     app: tauri::AppHandle,
     keyword: String,
-) -> Result<Vec<BangumiPersonSearchResult>, String> {
+) -> Result<Vec<BangumiPersonSearchResult>, ToolError> {
     let settings = read_bangumi_settings(&app);
     let client = crate::http::build_client(Duration::from_secs(settings.timeout_secs))?;
     let url = format!("{API_BASE}/v0/search/persons");
@@ -144,7 +145,7 @@ async fn fetch_bangumi_api<T: DeserializeOwned>(
     client: &reqwest::Client,
     request_settings: &BangumiRequestSettings,
     url: &str,
-) -> Result<T, String> {
+) -> Result<T, ToolError> {
     fetch_bangumi_request(client, request_settings, url, |c| c.get(url)).await
 }
 
@@ -156,7 +157,7 @@ async fn post_bangumi_api<T: DeserializeOwned>(
     request_settings: &BangumiRequestSettings,
     url: &str,
     body: &Value,
-) -> Result<T, String> {
+) -> Result<T, ToolError> {
     fetch_bangumi_request(client, request_settings, url, |c| c.post(url).json(body)).await
 }
 
@@ -168,9 +169,9 @@ async fn fetch_bangumi_request<T: DeserializeOwned>(
     request_settings: &BangumiRequestSettings,
     url: &str,
     build: impl Fn(&reqwest::Client) -> reqwest::RequestBuilder,
-) -> Result<T, String> {
+) -> Result<T, ToolError> {
     let attempts = request_settings.retries + 1;
-    let mut last_error = String::new();
+    let mut last_error: Option<ToolError> = None;
 
     for attempt in 0..attempts {
         let resp = build(client).send().await;
@@ -178,28 +179,42 @@ async fn fetch_bangumi_request<T: DeserializeOwned>(
             Ok(resp) => {
                 let status = resp.status();
                 if status.is_success() {
-                    return resp
-                        .json::<T>()
-                        .await
-                        .map_err(|e| format!("Bangumi API 解析失败 {url}: {e}"));
+                    return resp.json::<T>().await.map_err(|e| {
+                        ToolError::new(
+                            "bangumi_parse_failed",
+                            [("url", json!(url)), ("detail", json!(e.to_string()))],
+                            format!("Bangumi API 解析失败 {url}: {e}"),
+                        )
+                    });
                 }
 
                 // 读取响应体：Bangumi 错误为 JSON（含 title/description），失败时回退裸文本
                 let body = resp.text().await.unwrap_or_default();
-                last_error = format_bangumi_error(status, &body);
+                last_error = Some(format_bangumi_error(status, &body));
                 if !status.is_server_error() {
                     break;
                 }
             }
             Err(e) => {
-                last_error = if e.is_timeout() {
-                    format!(
-                        "Bangumi 请求超时（{}s）: {url}",
-                        request_settings.timeout_secs
+                last_error = Some(if e.is_timeout() {
+                    ToolError::new(
+                        "bangumi_timeout",
+                        [
+                            ("seconds", json!(request_settings.timeout_secs)),
+                            ("url", json!(url)),
+                        ],
+                        format!(
+                            "Bangumi 请求超时（{}s）: {url}",
+                            request_settings.timeout_secs
+                        ),
                     )
                 } else {
-                    format!("Bangumi 请求失败: {url}: {e}")
-                };
+                    ToolError::new(
+                        "bangumi_request_failed",
+                        [("url", json!(url)), ("detail", json!(e.to_string()))],
+                        format!("Bangumi 请求失败: {url}: {e}"),
+                    )
+                });
             }
         }
 
@@ -208,14 +223,14 @@ async fn fetch_bangumi_request<T: DeserializeOwned>(
         }
     }
 
-    Err(last_error)
+    Err(last_error.unwrap_or_else(|| ToolError::raw("Bangumi 请求失败")))
 }
 
-/// 将 Bangumi HTTP 错误响应格式化为可读信息
+/// 将 Bangumi HTTP 错误响应格式化为结构化错误
 ///
 /// 优先取错误 JSON 的 `title`/`description`（如 `Not Found：resource can't be found...`）；
 /// 解析失败或为空时回退到截断后的裸响应体。
-fn format_bangumi_error(status: reqwest::StatusCode, body: &str) -> String {
+fn format_bangumi_error(status: reqwest::StatusCode, body: &str) -> ToolError {
     let trimmed = body.trim();
     let detail = serde_json::from_str::<Value>(trimmed)
         .ok()
@@ -235,9 +250,20 @@ fn format_bangumi_error(status: reqwest::StatusCode, body: &str) -> String {
         .unwrap_or_else(|| truncate(trimmed, 200));
 
     if detail.is_empty() {
-        format!("Bangumi API HTTP {status}")
+        ToolError::new(
+            "bangumi_http_error",
+            [("status", json!(status.to_string()))],
+            format!("Bangumi API HTTP {status}"),
+        )
     } else {
-        format!("Bangumi API HTTP {status}: {detail}")
+        ToolError::new(
+            "bangumi_http_error",
+            [
+                ("status", json!(status.to_string())),
+                ("detail", json!(detail)),
+            ],
+            format!("Bangumi API HTTP {status}: {detail}"),
+        )
     }
 }
 
@@ -269,7 +295,7 @@ async fn fetch_bangumi_company(
     client: &reqwest::Client,
     request_settings: &BangumiRequestSettings,
     person_id: u64,
-) -> Result<BangumiCompany, String> {
+) -> Result<BangumiCompany, ToolError> {
     let url = format!("{API_BASE}/v0/persons/{person_id}");
     let person: BangumiApiPerson = fetch_bangumi_api(client, request_settings, &url).await?;
 
@@ -352,7 +378,7 @@ async fn fetch_bangumi_subjects(
     client: &reqwest::Client,
     request_settings: &BangumiRequestSettings,
     person_id: u64,
-) -> Result<Vec<BangumiApiSubjectItem>, String> {
+) -> Result<Vec<BangumiApiSubjectItem>, ToolError> {
     let url = format!("{API_BASE}/v0/persons/{person_id}/subjects");
     let subjects: Vec<BangumiApiSubjectItem> =
         fetch_bangumi_api(client, request_settings, &url).await?;

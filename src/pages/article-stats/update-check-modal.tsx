@@ -12,6 +12,7 @@ import {
 } from 'antd';
 import { CloudUploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useTranslation } from 'react-i18next';
 import feishu, { type FeishuAppendRow } from '@/api/feishu';
 import MoegirlLink from '@/components/moegirl-link';
 import { useArticleStore, type UpdateCandidate } from '@/stores/article-store';
@@ -33,6 +34,7 @@ type RowPatch = Partial<Pick<UpdateCandidate, 'ja' | 'brand' | 'releaseDate'>>;
 /** 检查更新弹窗：展示增量检测出的候选条目，完善信息后提交到飞书统计表 */
 export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateCheckModalProps) {
   const { message } = App.useApp();
+  const { t } = useTranslation();
 
   // ─── Store 数据 ───
   const candidates = useArticleStore((s) => s.candidates);
@@ -84,7 +86,7 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
   const handleSubmit = async () => {
     const chosen = rows.filter((row) => effectiveSelectedKeys.includes(row.title));
     if (chosen.length === 0) {
-      message.warning('请先勾选要提交的条目');
+      message.warning(t('请先勾选要提交的条目'));
       return;
     }
     setSubmitting(true);
@@ -106,11 +108,14 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
       );
       if (appendResult.style_warnings.length > 0) {
         message.warning(
-          `已追加 ${chosen.length} 条数据，但样式设置失败，请检查线上表格。${appendResult.style_warnings[0]}`,
+          t('已追加 {{count}} 条数据，但样式设置失败，请检查线上表格。{{warning}}', {
+            count: chosen.length,
+            warning: formatError(appendResult.style_warnings[0]),
+          }),
           8,
         );
       } else {
-        message.success(`已向统计表追加 ${chosen.length} 条数据，正在刷新本地缓存…`);
+        message.success(t('已向统计表追加 {{count}} 条数据，正在刷新本地缓存…', { count: chosen.length }));
       }
       clearCandidates();
       resetLocalState();
@@ -125,25 +130,25 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
 
   const columns: TableColumnsType<UpdateCandidate> = [
     {
-      title: '条目名',
+      title: t('条目名'),
       dataIndex: 'title',
       render: (_, record) => <MoegirlLink title={record.title} />,
     },
     {
-      title: '原名',
+      title: t('原名'),
       dataIndex: 'ja',
       width: 190,
       render: (_, record) => (
         <Input
           size='small'
           value={record.ja}
-          placeholder='日文原名'
+          placeholder={t('日文原名')}
           onChange={(e) => updateRow(record.title, { ja: e.target.value })}
         />
       ),
     },
     {
-      title: '制作组织',
+      title: t('制作组织'),
       dataIndex: 'brand',
       width: 150,
       render: (_, record) => (
@@ -155,7 +160,7 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
       ),
     },
     {
-      title: '发行时间',
+      title: t('发行时间'),
       dataIndex: 'releaseDate',
       width: 130,
       render: (_, record) => (
@@ -166,18 +171,18 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
           value={dayjs(record.releaseDate, 'YYYY-MM-DD', true).isValid()
             ? dayjs(record.releaseDate)
             : null}
-          placeholder='未识别'
+          placeholder={t('未识别')}
           onChange={(_date, dateString) => updateRow(record.title, { releaseDate: String(dateString) })}
         />
       ),
     },
     {
-      title: '创建时间',
+      title: t('创建时间'),
       dataIndex: 'creationDate',
       width: 100,
     },
     {
-      title: '分类',
+      title: t('分类'),
       dataIndex: 'categories',
       render: (_, record) => (
         <div className='flex flex-wrap gap-1'>
@@ -190,13 +195,13 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
   return (
     <Modal
       open={open}
-      title='检查更新'
+      title={t('检查更新')}
       width={1000}
       maskClosable={false}
       onCancel={handleClose}
       footer={
         <Space>
-          <Button disabled={submitting} onClick={handleClose}>取消</Button>
+          <Button disabled={submitting} onClick={handleClose}>{t('取消')}</Button>
           <Button
             type='primary'
             icon={<CloudUploadOutlined />}
@@ -204,7 +209,7 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
             disabled={checking}
             onClick={handleSubmit}
           >
-            提交所选（{effectiveSelectedKeys.length}）
+            {t('提交所选（{{count}}）', { count: effectiveSelectedKeys.length })}
           </Button>
         </Space>
       }
@@ -217,7 +222,7 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
         loading={checking}
         pagination={false}
         scroll={{ y: 420 }}
-        locale={{ emptyText: checking ? '正在检测新条目…' : '没有检测到新条目' }}
+        locale={{ emptyText: checking ? t('正在检测新条目…') : t('没有检测到新条目') }}
         rowSelection={{
           selectedRowKeys: effectiveSelectedKeys,
           onChange: (keys) => setSelectedKeys(keys.map(String)),

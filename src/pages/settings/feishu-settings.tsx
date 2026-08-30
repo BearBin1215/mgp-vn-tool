@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card, Input } from 'antd';
 import { useLocation } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '@/stores/settings-store';
 import SettingItem from './setting-item';
 
 /** 飞书设置 */
 export default function FeishuSettings() {
+  const { t } = useTranslation();
   const feishuStatsTableAppId = useSettingsStore((s) => s.feishuStatsTableAppId);
   const setFeishuStatsTableAppId = useSettingsStore((s) => s.setFeishuStatsTableAppId);
   const feishuStatsTableAppSecret = useSettingsStore((s) => s.feishuStatsTableAppSecret);
@@ -24,9 +26,9 @@ export default function FeishuSettings() {
   }, [location.hash]);
 
   return (
-    <Card ref={cardRef} title='飞书'>
+    <Card ref={cardRef} title={t('飞书')}>
       <div className='flex flex-col gap-4'>
-        <SettingItem label='Galgame 统计表 App ID' description='飞书开放平台应用 App ID（找阿熊拿）'>
+        <SettingItem label='Galgame 统计表 App ID' description={t('飞书开放平台应用 App ID（找阿熊拿）')}>
           <Input
             className='w-60!'
             value={appIdDraft}
@@ -34,7 +36,7 @@ export default function FeishuSettings() {
             onBlur={() => setFeishuStatsTableAppId(appIdDraft)}
           />
         </SettingItem>
-        <SettingItem label='Galgame 统计表 App Secret' description='飞书开放平台应用 App Secret（找阿熊拿）'>
+        <SettingItem label={t('Galgame 统计表 App Secret')} description={t('飞书开放平台应用 App Secret（找阿熊拿）')}>
           <Input.Password
             className='w-60!'
             value={appSecretDraft}

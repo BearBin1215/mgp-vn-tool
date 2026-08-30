@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useMoegirlStore } from '@/stores/moegirl-store';
+import { isToolError } from '@/utils/text';
 import type { ApiParams } from '@/lib/types';
 
 interface TokenQueryResponse {
@@ -42,7 +43,11 @@ export const getMoegirlQueryBatchSize = (): number =>
 
 /** 服务端明确表示未登录时，清理本地凭据和用户信息缓存 */
 const clearInvalidLogin = async (error: unknown): Promise<void> => {
-  if (!String(error).includes('[notloggedin]')) {
+  // 后端萌百 API 错误为结构化错误，MediaWiki 错误码位于 params.code
+  const notLoggedIn = isToolError(error)
+    ? error.code === 'moegirl_api_error' && error.params?.code === 'notloggedin'
+    : String(error).includes('[notloggedin]');
+  if (!notLoggedIn) {
     return;
   }
   tokenCache.clear();

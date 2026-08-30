@@ -2,6 +2,7 @@ import { useState, useRef, useMemo } from 'react';
 import { App, Button, Input, Modal, Splitter, type InputRef, type TableColumnsType } from 'antd';
 import { CheckOutlined } from '@ant-design/icons';
 import { uniq } from 'es-toolkit';
+import { useTranslation } from 'react-i18next';
 import Page from '@/components/page';
 import CodePanel from '@/components/code-panel';
 import EmptyPlaceholder from '@/components/empty-placeholder';
@@ -19,7 +20,7 @@ import {
 } from '@/api/erogamescape';
 import { shokushuLabels, shokushuDetailLabels, platforms } from '@/lib/erogamescape-dict';
 import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
-import { resolveInputId, normalizePunctuation } from '@/utils/text';
+import { resolveInputId, normalizePunctuation, formatError } from '@/utils/text';
 import { toTableData } from '@/utils/table';
 import { PENDING_SELL_DATE } from '@/utils/constants';
 import { generateWorkWikitext, parseStaffName, parseMusicStaffName } from './generate-wikitext';
@@ -28,64 +29,66 @@ type TableStaffRecord = StaffRecord & { key: string };
 type TableTransplant = WorkTransplant & { key: string };
 type TableSequel = { name: string; key: string };
 
-const staffColumns: TableColumnsType<TableStaffRecord> = [
-  {
-    title: '职种',
-    dataIndex: 'shubetu',
-    key: 'shubetu',
-    width: 80,
-    render: (value: string) => shokushuLabels[value] || value,
-  },
-  {
-    title: '担当',
-    dataIndex: 'shubetuDetail',
-    key: 'shubetuDetail',
-    width: 80,
-    render: (value: string) => shokushuDetailLabels[value] || value,
-  },
-  {
-    title: '详情',
-    dataIndex: 'shubetuDetailName',
-    key: 'shubetuDetailName',
-    width: 200,
-  },
-  {
-    title: '人员',
-    dataIndex: 'name',
-    key: 'name',
-    width: 150,
-  },
-];
-
-/** 移植版原始数据列 */
-const transplantColumns: TableColumnsType<TableTransplant> = [
-  {
-    title: '平台',
-    dataIndex: 'model',
-    key: 'model',
-    width: 120,
-    render: (value: string) => platforms[value]?.label || value,
-  },
-  {
-    title: '发售日期',
-    dataIndex: 'sellday',
-    key: 'sellday',
-    width: 120,
-  },
-  {
-    title: '制作组织',
-    dataIndex: 'brand',
-    key: 'brand',
-  },
-];
-
-/** 续作原始数据列 */
-const sequelColumns: TableColumnsType<TableSequel> = [
-  { title: '游戏名', dataIndex: 'name', key: 'name' },
-];
-
 export default function WorkGenerator() {
   const { message } = App.useApp();
+  const { t } = useTranslation();
+
+  /** STAFF/CAST/音乐记录列，依赖 t 随界面语言变化重建 */
+  const staffColumns: TableColumnsType<TableStaffRecord> = useMemo(() => [
+    {
+      title: t('职种'),
+      dataIndex: 'shubetu',
+      key: 'shubetu',
+      width: 80,
+      render: (value: string) => shokushuLabels[value] || value,
+    },
+    {
+      title: t('担当'),
+      dataIndex: 'shubetuDetail',
+      key: 'shubetuDetail',
+      width: 80,
+      render: (value: string) => shokushuDetailLabels[value] || value,
+    },
+    {
+      title: t('详情'),
+      dataIndex: 'shubetuDetailName',
+      key: 'shubetuDetailName',
+      width: 200,
+    },
+    {
+      title: t('人员'),
+      dataIndex: 'name',
+      key: 'name',
+      width: 150,
+    },
+  ], [t]);
+
+  /** 移植版原始数据列 */
+  const transplantColumns: TableColumnsType<TableTransplant> = useMemo(() => [
+    {
+      title: t('平台'),
+      dataIndex: 'model',
+      key: 'model',
+      width: 120,
+      render: (value: string) => platforms[value]?.label || value,
+    },
+    {
+      title: t('发售日期'),
+      dataIndex: 'sellday',
+      key: 'sellday',
+      width: 120,
+    },
+    {
+      title: t('制作组织'),
+      dataIndex: 'brand',
+      key: 'brand',
+    },
+  ], [t]);
+
+  /** 续作原始数据列 */
+  const sequelColumns: TableColumnsType<TableSequel> = useMemo(() => [
+    { title: t('游戏名'), dataIndex: 'name', key: 'name' },
+  ], [t]);
 
   const [searchValue, setSearchValue] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -124,10 +127,10 @@ export default function WorkGenerator() {
   const tableSections = useMemo(() => [
     { title: 'CAST', columns: staffColumns, dataSource: castTableData },
     { title: 'STAFF', columns: staffColumns, dataSource: staffTableData },
-    { title: '关联音乐', columns: staffColumns, dataSource: musicStaffTableData },
-    { title: '移植版', columns: transplantColumns, dataSource: transplantTableData },
-    { title: '续作', columns: sequelColumns, dataSource: sequelTableData },
-  ], [castTableData, staffTableData, musicStaffTableData, transplantTableData, sequelTableData]);
+    { title: t('关联音乐'), columns: staffColumns, dataSource: musicStaffTableData },
+    { title: t('移植版'), columns: transplantColumns, dataSource: transplantTableData },
+    { title: t('续作'), columns: sequelColumns, dataSource: sequelTableData },
+  ], [t, castTableData, staffTableData, musicStaffTableData, transplantTableData, sequelTableData]);
 
   // 生成结果
   const [wikitext, setWikitext] = useState('');
@@ -139,7 +142,11 @@ export default function WorkGenerator() {
       .sort((a, b) => a.sellday.localeCompare(b.sellday))
       .map((item) => ({
         value: item.id,
-        label: `${item.gamename}（${item.brandname || '未知制作组织'} - ${item.sellday === PENDING_SELL_DATE ? '待定' : (item.sellday || '未知发售日')}）`,
+        label: t('{{name}}（{{brand}} - {{date}}）', {
+          name: item.gamename,
+          brand: item.brandname || t('未知制作组织'),
+          date: item.sellday === PENDING_SELL_DATE ? t('待定') : (item.sellday || t('未知发售日')),
+        }),
         id: item.id,
         display: item.gamename,
       }));
@@ -196,7 +203,7 @@ export default function WorkGenerator() {
         .map((s) => parseMusicStaffName(s.shubetuDetailName).songName);
       const namesToQuery = [
         detail.brand,
-        ...detail.transplants.map((t) => t.brand),
+        ...detail.transplants.map((item) => item.brand),
         ...detail.staff.filter((s) => ['5', '6'].includes(s.shubetu)).map((s) => parseStaffName(s.name).main),
         ...staffMainNames,
         ...songNames,
@@ -209,7 +216,7 @@ export default function WorkGenerator() {
         try {
           pageInfoMap = await fetchPageInfo(uniqueNames);
         } catch {
-          message.warning('获取页面信息失败，内链将使用原始名称');
+          message.warning(t('获取页面信息失败，内链将使用原始名称'));
         }
       }
 
@@ -228,10 +235,10 @@ export default function WorkGenerator() {
       } finally {
         setRegenerating(false);
         setGenPhase(null);
-        message.success('生成完成');
+        message.success(t('生成完成'));
       }
     } catch (e) {
-      message.error(`查询失败: ${e instanceof Error ? e.message : e}`);
+      message.error(t('查询失败: {{detail}}', { detail: formatError(e) }));
       setRegenerating(false);
       setGenPhase(null);
     } finally {
@@ -244,11 +251,11 @@ export default function WorkGenerator() {
       className='flex flex-col'
       actions={
         <HelpButton>
-          <li>本功能以 <MoegirlLink title='Template:页面格式/视觉小说'>Template:页面格式/视觉小说</MoegirlLink> 为模板，生成后可按个人习惯调整格式、措辞等。</li>
-          <li>数据来自批评空间，使用前建议前往设置调整批评空间相关网络设置。</li>
-          <li>批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。</li>
-          <li>STAFF、CAST等内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。</li>
-          <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
+          <li>{t('本功能以')} <MoegirlLink title='Template:页面格式/视觉小说'>Template:页面格式/视觉小说</MoegirlLink> {t('为模板，生成后可按个人习惯调整格式、措辞等。')}</li>
+          <li>{t('数据来自批评空间，使用前建议前往设置调整批评空间相关网络设置。')}</li>
+          <li>{t('批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。')}</li>
+          <li>{t('STAFF、CAST等内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。')}</li>
+          <li>{t('提交前务必认真检查内容，如有错漏本工具不承担责任。')}</li>
         </HelpButton>
       }
     >
@@ -259,7 +266,7 @@ export default function WorkGenerator() {
           onIdChange={setSelectedId}
           fetchOptions={handleFetchOptions}
           disabled={generating}
-          placeholder='通过名称查找或直接输入批评空间作品 id 开始生成'
+          placeholder={t('通过名称查找或直接输入批评空间作品 id 开始生成')}
         />
         <Button
           type='primary'
@@ -268,7 +275,7 @@ export default function WorkGenerator() {
           disabled={!canConfirm}
           onClick={handleConfirm}
         >
-          开始生成
+          {t('开始生成')}
         </Button>
       </div>
 
@@ -284,7 +291,7 @@ export default function WorkGenerator() {
               variant='inset'
               text={wikitext}
               loading={regenerating}
-              loadingDescription={genPhase === 'wiki' ? '正在查询萌娘百科信息...' : '正在获取音乐详情...'}
+              loadingDescription={genPhase === 'wiki' ? t('正在查询萌娘百科信息...') : t('正在获取音乐详情...')}
             />
           </Splitter.Panel>
 
@@ -297,7 +304,7 @@ export default function WorkGenerator() {
             className='flex flex-col min-w-0'
           >
             <DataTablePanel
-              header='批评空间原始数据'
+              header={t('批评空间原始数据')}
               sections={tableSections}
             />
           </Splitter.Panel>
@@ -312,7 +319,7 @@ export default function WorkGenerator() {
               variant='standalone'
               text={wikitext}
               loading={regenerating}
-              loadingDescription={genPhase === 'wiki' ? '正在查询萌娘百科信息...' : '正在获取音乐详情...'}
+              loadingDescription={genPhase === 'wiki' ? t('正在查询萌娘百科信息...') : t('正在获取音乐详情...')}
             />
           </div>
         </div>
@@ -325,9 +332,9 @@ export default function WorkGenerator() {
       {/* 条目名输入弹窗 */}
       <Modal
         open={modalOpen}
-        title='输入条目名'
-        okText='确定'
-        cancelText='取消'
+        title={t('输入条目名')}
+        okText={t('确定')}
+        cancelText={t('取消')}
         okButtonProps={{ disabled: !articleName.trim() }}
         onOk={handleModalOk}
         onCancel={() => setModalOpen(false)}
@@ -341,7 +348,6 @@ export default function WorkGenerator() {
           onPressEnter={handleModalOk}
         />
       </Modal>
-
     </Page>
   );
 }

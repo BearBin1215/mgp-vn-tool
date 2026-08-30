@@ -9,24 +9,33 @@
 //! 在 Linux 下 `~/.config` 与 `~/.local/share` 不同，会导致前端写入的设置后端读不到。
 use std::path::PathBuf;
 
+use serde_json::json;
 use tauri::Manager;
 use tauri_plugin_store::StoreExt;
+
+use crate::error::ToolError;
 
 /// 把配置文件名解析为用户配置目录下的绝对路径
 ///
 /// 所有需要读写配置文件的代码（前端经命令、后端经 [`store`]）都应通过此处取得路径，
 /// 以保证前后端落在同一文件。
-pub fn config_file_path(app: &tauri::AppHandle, filename: &str) -> Result<PathBuf, String> {
-    let config_dir = app
-        .path()
-        .app_config_dir()
-        .map_err(|e| format!("无法获取配置目录: {e}"))?;
+pub fn config_file_path(app: &tauri::AppHandle, filename: &str) -> Result<PathBuf, ToolError> {
+    let config_dir = app.path().app_config_dir().map_err(|e| {
+        ToolError::new(
+            "config_dir_unavailable",
+            [("detail", json!(e.to_string()))],
+            format!("无法获取配置目录: {e}"),
+        )
+    })?;
     Ok(config_dir.join(filename))
 }
 
 /// 前端调用：取得配置文件的绝对路径（用于传给 `Store.load`）
 #[tauri::command]
-pub fn config_file_path_command(app: tauri::AppHandle, filename: String) -> Result<String, String> {
+pub fn config_file_path_command(
+    app: tauri::AppHandle,
+    filename: String,
+) -> Result<String, ToolError> {
     Ok(config_file_path(&app, &filename)?
         .to_string_lossy()
         .into_owned())
@@ -35,10 +44,15 @@ pub fn config_file_path_command(app: tauri::AppHandle, filename: String) -> Resu
 /// 获取 settings.json 的 Store 实例
 pub fn store(
     app: &tauri::AppHandle,
-) -> Result<std::sync::Arc<tauri_plugin_store::Store<tauri::Wry>>, String> {
+) -> Result<std::sync::Arc<tauri_plugin_store::Store<tauri::Wry>>, ToolError> {
     let path = config_file_path(app, "settings.json")?;
-    app.store(path)
-        .map_err(|e| format!("无法加载设置存储: {e}"))
+    app.store(path).map_err(|e| {
+        ToolError::new(
+            "settings_store_unavailable",
+            [("detail", json!(e.to_string()))],
+            format!("无法加载设置存储: {e}"),
+        )
+    })
 }
 
 /// 读取字符串设置项，缺失或类型不符时返回 None

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { App, Modal, Form, Input, Alert } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '@/stores/settings-store';
+import { formatError } from '@/utils/text';
 
 interface MoegirlLoginDialogProps {
   open: boolean;
@@ -10,6 +12,7 @@ interface MoegirlLoginDialogProps {
 /** 登录萌百弹窗 */
 export default function MoegirlLoginDialog({ open, onClose }: MoegirlLoginDialogProps) {
   const loginMoegirl = useSettingsStore((state) => state.loginMoegirl);
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,13 +26,13 @@ export default function MoegirlLoginDialog({ open, onClose }: MoegirlLoginDialog
 
     try {
       await loginMoegirl(username, password);
-      message.success('登录成功');
+      message.success(t('登录成功'));
       form.resetFields();
       setUsername('');
       setPassword('');
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败');
+      setError(formatError(err));
     } finally {
       setLoading(false);
     }
@@ -45,13 +48,13 @@ export default function MoegirlLoginDialog({ open, onClose }: MoegirlLoginDialog
 
   return (
     <Modal
-      title='登录萌娘百科'
+      title={t('登录萌娘百科')}
       open={open}
       onCancel={handleClose}
       onOk={handleSubmit}
       confirmLoading={loading}
-      okText={loading ? '登录中...' : '登录'}
-      cancelText='取消'
+      okText={loading ? t('登录中...') : t('登录')}
+      cancelText={t('取消')}
     >
       {error && (
         <Alert
@@ -66,23 +69,23 @@ export default function MoegirlLoginDialog({ open, onClose }: MoegirlLoginDialog
         onFinish={handleSubmit}
       >
         <Form.Item
-          label='用户名'
+          label={t('用户名')}
           name='username'
-          rules={[{ required: true, message: '请输入用户名' }]}
+          rules={[{ required: true, message: t('请输入用户名') }]}
         >
           <Input
-            placeholder='请输入用户名'
+            placeholder={t('请输入用户名')}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
         </Form.Item>
         <Form.Item
-          label='密码'
+          label={t('密码')}
           name='password'
-          rules={[{ required: true, message: '请输入密码' }]}
+          rules={[{ required: true, message: t('请输入密码') }]}
         >
           <Input.Password
-            placeholder='请输入密码'
+            placeholder={t('请输入密码')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { handleSubmit(); } }}

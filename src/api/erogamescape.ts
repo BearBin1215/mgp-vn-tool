@@ -1,18 +1,22 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isToolError, type ToolErrorShape } from '@/utils/text';
 
-/** 后端统一响应包装 */
+/** 后端统一响应包装；失败时 response 为结构化错误 */
 export interface ErogamescapeResponse<T> {
   statusCode: string;
   result: 'success' | 'fail';
-  response: T;
+  response: T | ToolErrorShape;
 }
 
-/** 处理后端批评空间响应 */
+/** 处理后端批评空间响应；结构化错误原样抛出，由 formatError 按当前界面语言展示 */
 export function unwrap<T>(res: ErogamescapeResponse<T>): T {
   if (res.result === 'fail') {
+    if (isToolError(res.response)) {
+      throw res.response;
+    }
     throw new Error(String(res.response || '批评空间请求失败'));
   }
-  return res.response;
+  return res.response as T;
 }
 
 /** 批评空间创作者参与单部作品的记录（出演/音乐） */

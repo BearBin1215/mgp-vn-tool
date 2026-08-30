@@ -1,5 +1,6 @@
 mod bangumi;
 mod erogamescape;
+mod error;
 mod feishu;
 mod http;
 mod moegirl;

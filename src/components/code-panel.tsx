@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Spin, Typography } from 'antd';
+import { useTranslation } from 'react-i18next';
 import CopyButton from '@/components/copy-button';
 
 interface CodePanelProps {
@@ -21,10 +22,11 @@ interface CodePanelProps {
  */
 const CodePanel = memo(({ text, loading, loadingDescription, variant = 'inset' }: CodePanelProps) => {
   const standalone = variant === 'standalone';
+  const { t } = useTranslation();
   return (
     <>
       <div className={`flex items-center justify-between shrink-0 px-1 ${standalone ? 'mb-2' : 'h-6'}`}>
-        <Typography.Text strong>生成结果</Typography.Text>
+        <Typography.Text strong>{t('生成结果')}</Typography.Text>
         <CopyButton text={text} />
       </div>
       <div className='relative flex-1 min-h-0'>

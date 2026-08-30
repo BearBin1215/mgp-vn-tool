@@ -4,6 +4,7 @@ import moegirl from '@/api/moegirl';
 import { DEFAULT_USER_AGENT, DEFAULT_FEISHU_APP_ID } from '@/utils/constants';
 import { type ErogamescapeUrl, type MoegirlHost } from '@/lib/types';
 import { loadConfigStore } from '@/lib/config-store';
+import { changeUiLanguage, type UiLanguage } from '@/i18n';
 import { useMoegirlStore } from './moegirl-store';
 
 export type ColorMode = 'light' | 'dark';
@@ -13,6 +14,9 @@ interface SettingsStore {
   /** 当前颜色模式 */
   colorMode: ColorMode;
   setColorMode: (mode: ColorMode) => void;
+  /** 界面语言 */
+  uiLanguage: UiLanguage;
+  setUiLanguage: (lang: UiLanguage) => void;
   /** 界面字体（CSS font-family 值） */
   uiFont: string;
   setUiFont: (font: string) => void;
@@ -109,6 +113,7 @@ const isNonEmptyString = (value: unknown): value is string => typeof value === '
 /** 应用设置 store，持久化到 Tauri store */
 export const useSettingsStore = create<SettingsStore>((set) => ({
   colorMode: 'light',
+  uiLanguage: 'zh-CN',
   moegirlUsername: '',
   feishuStatsTableAppId: DEFAULT_FEISHU_APP_ID,
   feishuStatsTableAppSecret: '',
@@ -128,6 +133,12 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     await persistSetting('colorMode', mode);
     await getCurrentWindow().setTheme(mode);
     set({ colorMode: mode });
+  },
+
+  setUiLanguage: async (lang) => {
+    await persistSetting('uiLanguage', lang);
+    await changeUiLanguage(lang);
+    set({ uiLanguage: lang });
   },
 
   uiFont: '',
@@ -260,6 +271,7 @@ export const initSettings = async () => {
   const store = await storePromise;
   const [
     colorMode,
+    uiLanguage,
     uiFont,
     codeFont,
     backgroundImage,
@@ -279,6 +291,7 @@ export const initSettings = async () => {
     moegirlRetryDelay,
   ] = await Promise.all([
     readSetting<ColorMode>('colorMode', 'light', (v): v is ColorMode => v === 'light' || v === 'dark'),
+    readSetting<UiLanguage>('uiLanguage', 'zh-CN', (v): v is UiLanguage => v === 'zh-CN' || v === 'zh-TW'),
     readSetting('uiFont', '', isNonEmptyString),
     readSetting('codeFont', '', isNonEmptyString),
     readSetting('backgroundImage', '', isNonEmptyString),
@@ -304,6 +317,7 @@ export const initSettings = async () => {
   ]);
   useSettingsStore.setState({
     colorMode,
+    uiLanguage,
     uiFont,
     codeFont,
     backgroundImage,

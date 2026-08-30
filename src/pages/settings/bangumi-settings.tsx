@@ -1,9 +1,11 @@
 import { Card, InputNumber } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '@/stores/settings-store';
 import SettingItem from './setting-item';
 
 /** Bangumi 设置 */
 export default function BangumiSettings() {
+  const { t } = useTranslation();
   const bangumiTimeout = useSettingsStore((s) => s.bangumiTimeout);
   const setBangumiTimeout = useSettingsStore((s) => s.setBangumiTimeout);
   const bangumiRetries = useSettingsStore((s) => s.bangumiRetries);
@@ -15,8 +17,8 @@ export default function BangumiSettings() {
     <Card title='Bangumi'>
       <div className='flex flex-col gap-4'>
         <SettingItem
-          label='请求超时'
-          description='Bangumi 网络波动较多，适当调大可减少偶发超时'
+          label={t('请求超时')}
+          description={t('Bangumi 网络波动较多，适当调大可减少偶发超时')}
         >
           <InputNumber
             className='w-60!'
@@ -29,8 +31,8 @@ export default function BangumiSettings() {
           />
         </SettingItem>
         <SettingItem
-          label='请求重试'
-          description='请求失败时自动重试的次数和间隔'
+          label={t('请求重试')}
+          description={t('请求失败时自动重试的次数和间隔')}
         >
           <div className='flex gap-1'>
             <InputNumber
@@ -41,7 +43,7 @@ export default function BangumiSettings() {
               controls={false}
               value={bangumiRetries}
               onChange={(v) => v !== null && setBangumiRetries(v)}
-              suffix='次'
+              suffix={t('次')}
             />
             <InputNumber
               className='w-37!'
@@ -51,7 +53,7 @@ export default function BangumiSettings() {
               controls={false}
               value={bangumiRetryDelay}
               onChange={(v) => v !== null && setBangumiRetryDelay(v)}
-              prefix='间隔'
+              prefix={t('间隔')}
               suffix='ms'
             />
           </div>

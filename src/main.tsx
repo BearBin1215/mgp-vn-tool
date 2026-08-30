@@ -5,6 +5,7 @@ import 'dayjs/locale/zh-cn';
 import { initSettings, useSettingsStore } from '@/stores/settings-store';
 import { initArticles } from '@/stores/article-store';
 import { initMoegirlData } from '@/stores/moegirl-store';
+import { initI18n } from '@/i18n';
 import App from './App';
 
 dayjs.locale('zh-cn');
@@ -25,6 +26,7 @@ document.addEventListener('keydown', (e) => {
 // 萌百用户数据和条目数据非首屏必需，渲染后异步加载，store 更新自动触发重渲染
 (async () => {
   await initSettings();
+  await initI18n(useSettingsStore.getState().uiLanguage);
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
       <App />

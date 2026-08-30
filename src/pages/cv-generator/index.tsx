@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
 import { Button, App, Splitter, type TableColumnsType } from 'antd';
 import { CheckOutlined, ImportOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useArticleStore } from '@/stores/article-store';
 import Page from '@/components/page';
 import CodePanel from '@/components/code-panel';
@@ -19,7 +20,7 @@ import {
   type GameConnectionKind,
 } from '@/api/erogamescape';
 import { shokushuDetailLabels, gameConnectionKindLabels } from '@/lib/erogamescape-dict';
-import { resolveInputId } from '@/utils/text';
+import { resolveInputId, formatError } from '@/utils/text';
 import { buildGameArticleMap } from '@/utils/article-map';
 import { toTableData } from '@/utils/table';
 import { generateCVWikitext } from './generate-wikitext';
@@ -28,40 +29,44 @@ import TemplateLinkModal from './template-link-modal';
 type TableGameRecord = GameRecord & { key: string };
 type TableGameConnection = GameConnection & { key: string };
 
-const gameColumns: TableColumnsType<TableGameRecord> = [
-  {
-    title: '类型',
-    dataIndex: 'shubetuDetail',
-    key: 'shubetuDetail',
-    width: 80,
-    render: (value: string) => shokushuDetailLabels[value] || value,
-  },
-  { title: '角色', dataIndex: 'shubetuDetailName', key: 'shubetuDetailName', width: 120 },
-  { title: '游戏名', dataIndex: 'gameName', key: 'gameName', width: 240 },
-  { title: '平台', dataIndex: 'model', key: 'model', width: 40 },
-  { title: '发售日期', dataIndex: 'sellDay', key: 'sellDay', width: 120 },
-];
-
-const musicColumns: TableColumnsType<TableGameRecord> = [
-  { title: '歌曲', dataIndex: 'shubetuDetailName', key: 'shubetuDetailName' },
-  { title: '游戏名', dataIndex: 'gameName', key: 'gameName' },
-  { title: '发售日期', dataIndex: 'sellDay', key: 'sellDay', width: 120 },
-];
-
-const connectionColumns: TableColumnsType<TableGameConnection> = [
-  {
-    title: '类型',
-    dataIndex: 'kind',
-    key: 'kind',
-    width: 80,
-    render: (value: GameConnectionKind) => gameConnectionKindLabels[value],
-  },
-  { title: '衍生作品', dataIndex: 'subjectGameName', key: 'subjectGameName' },
-  { title: '原作', dataIndex: 'objectGameName', key: 'objectGameName' },
-];
-
 export default function CvGenerator() {
   const { message } = App.useApp();
+  const { t } = useTranslation();
+
+  /** 出演作品列，依赖 t 随界面语言变化重建 */
+  const gameColumns: TableColumnsType<TableGameRecord> = useMemo(() => [
+    {
+      title: t('类型'),
+      dataIndex: 'shubetuDetail',
+      key: 'shubetuDetail',
+      width: 80,
+      render: (value: string) => shokushuDetailLabels[value] || value,
+    },
+    { title: t('角色'), dataIndex: 'shubetuDetailName', key: 'shubetuDetailName', width: 120 },
+    { title: t('游戏名'), dataIndex: 'gameName', key: 'gameName', width: 240 },
+    { title: t('平台'), dataIndex: 'model', key: 'model', width: 40 },
+    { title: t('发售日期'), dataIndex: 'sellDay', key: 'sellDay', width: 120 },
+  ], [t]);
+
+  /** 音乐作品列 */
+  const musicColumns: TableColumnsType<TableGameRecord> = useMemo(() => [
+    { title: t('歌曲'), dataIndex: 'shubetuDetailName', key: 'shubetuDetailName' },
+    { title: t('游戏名'), dataIndex: 'gameName', key: 'gameName' },
+    { title: t('发售日期'), dataIndex: 'sellDay', key: 'sellDay', width: 120 },
+  ], [t]);
+
+  /** 作品关联列 */
+  const connectionColumns: TableColumnsType<TableGameConnection> = useMemo(() => [
+    {
+      title: t('类型'),
+      dataIndex: 'kind',
+      key: 'kind',
+      width: 80,
+      render: (value: GameConnectionKind) => gameConnectionKindLabels[value],
+    },
+    { title: t('衍生作品'), dataIndex: 'subjectGameName', key: 'subjectGameName' },
+    { title: t('原作'), dataIndex: 'objectGameName', key: 'objectGameName' },
+  ], [t]);
 
   const articles = useArticleStore((s) => s.articles);
   const updatedAt = useArticleStore((s) => s.updatedAt);
@@ -89,10 +94,10 @@ export default function CvGenerator() {
 
   // 右侧原始数据表格分段，memoize 以配合 DataTablePanel 的 memo 优化
   const tableSections = useMemo(() => [
-    { title: '出演作品', columns: gameColumns, dataSource: actingTableData },
-    { title: '音乐作品', columns: musicColumns, dataSource: musicTableData },
-    { title: '作品关联', columns: connectionColumns, dataSource: connectionsTableData },
-  ], [actingTableData, musicTableData, connectionsTableData]);
+    { title: t('出演作品'), columns: gameColumns, dataSource: actingTableData },
+    { title: t('音乐作品'), columns: musicColumns, dataSource: musicTableData },
+    { title: t('作品关联'), columns: connectionColumns, dataSource: connectionsTableData },
+  ], [t, actingTableData, musicTableData, connectionsTableData]);
 
   // 生成的代码
   const [wikitext, setWikitext] = useState('');
@@ -105,7 +110,7 @@ export default function CvGenerator() {
     const results = await searchCreators(keyword);
     return results.map((item) => ({
       value: item.id,
-      label: `${item.name} - 配音${item.voiceCount}丨音乐${item.musicCount}`,
+      label: t('{{name}} - 配音{{voice}}丨音乐{{music}}', { name: item.name, voice: item.voiceCount, music: item.musicCount }),
       id: item.id,
       display: item.name,
     }));
@@ -132,7 +137,7 @@ export default function CvGenerator() {
       const result = await queryCreatorWorks(Number(id));
       setCreatorWorks(result);
       if (result.acting.length === 0 && result.music.length === 0) {
-        message.info('未查询到数据');
+        message.info(t('未查询到数据'));
         return;
       }
 
@@ -152,15 +157,15 @@ export default function CvGenerator() {
         try {
           pageInfoMap = await fetchPageInfo([...charNames]);
         } catch {
-          message.warning('获取角色页面信息失败，生成的条目文本将不包含内链');
+          message.warning(t('获取角色页面信息失败，生成的条目文本将不包含内链'));
         }
       }
 
       setWikitext(generateCVWikitext(result, gameArticleMap, pageInfoMap));
       setRegenerating(false);
-      message.success('生成完成');
+      message.success(t('生成完成'));
     } catch (e) {
-      message.error(`查询失败: ${e instanceof Error ? e.message : e}`);
+      message.error(t('查询失败: {{detail}}', { detail: formatError(e) }));
     } finally {
       setGenerating(false);
       setRegenerating(false);
@@ -172,17 +177,17 @@ export default function CvGenerator() {
       <Page
         actions={
           <HelpButton>
-            <li>作品内链根据条目统计及重定向页判断添加，出现续作、特殊符号等会导致判断不到，需要手动添加。</li>
-            <li>角色内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。</li>
-            <li>声优信息模板、序言、大家族模板默认填写女性，如果是男性声优要自己改。</li>
-            <li>批评空间提供的声优名假名不带空格；"汉字姓＋假名名"的形式已自动拆分，其余情况仍需自行调整</li>
-            <li>批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。</li>
-            <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
+            <li>{t('作品内链根据条目统计及重定向页判断添加，出现续作、特殊符号等会导致判断不到，需要手动添加。')}</li>
+            <li>{t('角色内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。')}</li>
+            <li>{t('声优信息模板、序言、大家族模板默认填写女性，如果是男性声优要自己改。')}</li>
+            <li>{t('批评空间提供的声优名假名不带空格；"汉字姓＋假名名"的形式已自动拆分，其余情况仍需自行调整')}</li>
+            <li>{t('批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。')}</li>
+            <li>{t('提交前务必认真检查内容，如有错漏本工具不承担责任。')}</li>
           </HelpButton>
         }
       >
         <EmptyArticleWarning
-          subTitle='条目统计数据为空，生成条目时可能无法正常生成内链等信息。建议先前往条目统计页面获取数据。'
+          subTitle={t('条目统计数据为空，生成条目时可能无法正常生成内链等信息。建议先前往条目统计页面获取数据。')}
           onDismiss={() => setDismissedEmptyWarning(true)}
         />
       </Page>
@@ -194,13 +199,13 @@ export default function CvGenerator() {
       className='flex flex-col'
       actions={
         <HelpButton>
-          <li>数据来自批评空间，使用前建议前往设置调整批评空间相关网络设置。</li>
-          <li>作品内链根据条目统计及重定向页判断添加，出现续作、特殊符号等会导致判断不到，需要手动添加。</li>
-          <li>角色内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。</li>
-          <li>声优信息模板、序言、大家族模板默认填写女性，如果是男性声优要自己改。</li>
-          <li>批评空间提供的声优名假名不带空格；"汉字姓＋假名名"的形式已自动拆分，其余情况仍需自行调整</li>
-          <li>批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。</li>
-          <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
+          <li>{t('数据来自批评空间，使用前建议前往设置调整批评空间相关网络设置。')}</li>
+          <li>{t('作品内链根据条目统计及重定向页判断添加，出现续作、特殊符号等会导致判断不到，需要手动添加。')}</li>
+          <li>{t('角色内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。')}</li>
+          <li>{t('声优信息模板、序言、大家族模板默认填写女性，如果是男性声优要自己改。')}</li>
+          <li>{t('批评空间提供的声优名假名不带空格；"汉字姓＋假名名"的形式已自动拆分，其余情况仍需自行调整')}</li>
+          <li>{t('批评空间会把全角！？一律转换成半角，这里一律改全角，可能也要另外确认。')}</li>
+          <li>{t('提交前务必认真检查内容，如有错漏本工具不承担责任。')}</li>
         </HelpButton>
       }
     >
@@ -212,14 +217,14 @@ export default function CvGenerator() {
           onIdChange={setSelectedId}
           fetchOptions={handleFetchOptions}
           disabled={generating}
-          placeholder='通过名称查找或直接输入批评空间创作者id开始生成'
+          placeholder={t('通过名称查找或直接输入批评空间创作者id开始生成')}
         />
         <Button
           icon={<ImportOutlined />}
           disabled={generating}
           onClick={() => setTemplateModalOpen(true)}
         >
-          从模板获取
+          {t('从模板获取')}
         </Button>
         <Button
           type='primary'
@@ -228,7 +233,7 @@ export default function CvGenerator() {
           disabled={!canConfirm}
           onClick={handleConfirm}
         >
-          开始生成
+          {t('开始生成')}
         </Button>
       </div>
 
@@ -244,7 +249,7 @@ export default function CvGenerator() {
               variant='inset'
               text={wikitext}
               loading={regenerating}
-              loadingDescription='正在查询萌娘百科信息...'
+              loadingDescription={t('正在查询萌娘百科信息...')}
             />
           </Splitter.Panel>
 
@@ -257,7 +262,7 @@ export default function CvGenerator() {
             className='flex flex-col min-w-0'
           >
             <DataTablePanel
-              header='批评空间原始数据'
+              header={t('批评空间原始数据')}
               sections={tableSections}
             />
           </Splitter.Panel>
@@ -271,7 +276,7 @@ export default function CvGenerator() {
               variant='standalone'
               text={wikitext}
               loading={regenerating}
-              loadingDescription='正在查询萌娘百科信息...'
+              loadingDescription={t('正在查询萌娘百科信息...')}
             />
           </div>
         </div>

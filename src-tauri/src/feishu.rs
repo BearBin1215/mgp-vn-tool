@@ -6,6 +6,9 @@
 use std::time::Duration;
 
 use chrono::NaiveDate;
+use serde_json::json;
+
+use crate::error::ToolError;
 
 /// Galgame 条目统计表的 spreadsheet_token
 const SPREADSHEET_TOKEN: &str = "shtcnTQQ5n5HkdGwiiYEtE1FHZ9";
@@ -17,31 +20,49 @@ const SHEET_ID: &str = "0rCQAp";
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 
 /// 按 HTTP 状态分类飞书请求错误，保留服务端返回的业务错误信息。
+///
+/// 错误码反映失败类别，操作名与上游详情作为插值参数透传；
+/// `detail` 保持简体原文，供日志与简体界面展示。
 fn format_feishu_error(
     operation: &str,
     status: reqwest::StatusCode,
     code: Option<i64>,
     msg: &str,
     permission_hint: &str,
-) -> String {
+) -> ToolError {
     let detail = format!("{msg}（HTTP {status}，错误码 {code:?}）");
+    let params = [
+        ("operation", json!(operation)),
+        ("detail", json!(detail)),
+        ("hint", json!(permission_hint)),
+    ];
     match status {
-        reqwest::StatusCode::UNAUTHORIZED => {
-            format!("{operation}失败：飞书访问凭证无效或已过期。{detail}")
-        }
-        reqwest::StatusCode::FORBIDDEN => {
-            format!("{operation}失败：{permission_hint}。{detail}")
-        }
-        reqwest::StatusCode::NOT_FOUND => {
-            format!("{operation}失败：目标飞书表格或工作表不存在，请检查配置。{detail}")
-        }
-        reqwest::StatusCode::TOO_MANY_REQUESTS => {
-            format!("{operation}失败：飞书接口请求过于频繁，请稍后重试。{detail}")
-        }
-        status if status.is_server_error() => {
-            format!("{operation}失败：飞书服务暂时异常，请稍后重试。{detail}")
-        }
-        _ => format!("{operation}失败：{detail}"),
+        reqwest::StatusCode::UNAUTHORIZED => ToolError::new(
+            "feishu_unauthorized",
+            params,
+            format!("{operation}失败：飞书访问凭证无效或已过期。{detail}"),
+        ),
+        reqwest::StatusCode::FORBIDDEN => ToolError::new(
+            "feishu_forbidden",
+            params,
+            format!("{operation}失败：{permission_hint}。{detail}"),
+        ),
+        reqwest::StatusCode::NOT_FOUND => ToolError::new(
+            "feishu_not_found",
+            params,
+            format!("{operation}失败：目标飞书表格或工作表不存在，请检查配置。{detail}"),
+        ),
+        reqwest::StatusCode::TOO_MANY_REQUESTS => ToolError::new(
+            "feishu_rate_limited",
+            params,
+            format!("{operation}失败：飞书接口请求过于频繁，请稍后重试。{detail}"),
+        ),
+        status if status.is_server_error() => ToolError::new(
+            "feishu_server_error",
+            params,
+            format!("{operation}失败：飞书服务暂时异常，请稍后重试。{detail}"),
+        ),
+        _ => ToolError::new("feishu_error", params, format!("{operation}失败：{detail}")),
     }
 }
 
@@ -51,7 +72,7 @@ pub struct FeishuAppendResult {
     /// 飞书返回的实际写入范围
     pub updated_range: Option<String>,
     /// 数据已写入但样式设置失败时的警告
-    pub style_warnings: Vec<String>,
+    pub style_warnings: Vec<ToolError>,
 }
 
 /// 统计表追加行的业务字段。物理列顺序和飞书公式对象由后端统一组装。
@@ -69,18 +90,11 @@ pub struct FeishuAppendRow {
 pub async fn feishu_fetch_sheet(
     app_id: String,
     app_secret: String,
-) -> Result<Vec<Vec<String>>, String> {
+) -> Result<Vec<Vec<String>>, ToolError> {
     let client = crate::http::build_client(Duration::from_secs(REQUEST_TIMEOUT_SECS))?;
     let token = feishu_get_token_inner(&app_id, &app_secret, &client).await?;
     // 读取范围 A2:E 跳过表头
-    feishu_get_sheet_inner(
-        &token,
-        SPREADSHEET_TOKEN,
-        SHEET_ID,
-        "!A2:E",
-        &client,
-    )
-    .await
+    feishu_get_sheet_inner(&token, SPREADSHEET_TOKEN, SHEET_ID, "!A2:E", &client).await
 }
 
 /// 向统计表末尾追加行数据（自动获取 token 并写入）
@@ -96,9 +110,12 @@ pub async fn feishu_append_rows(
     app_secret: String,
     existing_row_count: usize,
     rows: Vec<FeishuAppendRow>,
-) -> Result<FeishuAppendResult, String> {
+) -> Result<FeishuAppendResult, ToolError> {
     if rows.is_empty() {
-        return Ok(FeishuAppendResult { updated_range: None, style_warnings: Vec::new() });
+        return Ok(FeishuAppendResult {
+            updated_range: None,
+            style_warnings: Vec::new(),
+        });
     }
     let client = crate::http::build_client(Duration::from_secs(REQUEST_TIMEOUT_SECS))?;
     let token = feishu_get_token_inner(&app_id, &app_secret, &client).await?;
@@ -115,7 +132,7 @@ async fn feishu_append_rows_inner(
     existing_row_count: usize,
     rows: Vec<FeishuAppendRow>,
     client: &reqwest::Client,
-) -> Result<FeishuAppendResult, String> {
+) -> Result<FeishuAppendResult, ToolError> {
     let url = format!(
         "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{SPREADSHEET_TOKEN}/values_append"
     );
@@ -155,16 +172,18 @@ async fn feishu_append_rows_inner(
         .await
         .map_err(|e| {
             log::error!("飞书追加行请求失败\n  URL: {url}\n  错误: {e}");
-            e.to_string()
+            ToolError::raw(e.to_string())
         })?;
 
     let status = resp.status();
-    let data: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let data: serde_json::Value = resp.json().await?;
     let code = data["code"].as_i64();
 
     if !status.is_success() || code != Some(0) {
         let msg = data["msg"].as_str().unwrap_or("未知错误");
-        log::error!("飞书追加行失败\n  URL: {url}\n  状态码: {status}\n  错误码: {code:?}\n  响应: {msg}");
+        log::error!(
+            "飞书追加行失败\n  URL: {url}\n  状态码: {status}\n  错误码: {code:?}\n  响应: {msg}"
+        );
         return Err(format_feishu_error(
             "追加统计表数据",
             status,
@@ -184,8 +203,12 @@ async fn feishu_append_rows_inner(
             style_warnings.push(e);
         }
     } else {
-        let warning = "追加成功，但飞书响应缺少实际写入范围，无法设置新增行样式".to_string();
-        log::warn!("{warning}\n  响应: {data}");
+        let warning = ToolError::new(
+            "feishu_missing_updated_range",
+            [],
+            "追加成功，但飞书响应缺少实际写入范围，无法设置新增行样式",
+        );
+        log::warn!("{}\n  响应: {data}", warning.detail);
         style_warnings.push(warning);
     }
 
@@ -226,27 +249,27 @@ async fn set_new_row_style_inner(
     token: &str,
     updated_range: &str,
     client: &reqwest::Client,
-) -> Result<(), String> {
+) -> Result<(), ToolError> {
     // 解析 `{sheetId}!{col}{row}:{col}{row}` 中的首尾行号
     let range_part = updated_range
         .split('!')
         .nth(1)
-        .ok_or_else(|| format!("无法解析写入范围: {updated_range}"))?;
+        .ok_or_else(|| ToolError::raw(format!("无法解析写入范围: {updated_range}")))?;
     let mut parts = range_part.split(':');
     let start = parts
         .next()
-        .ok_or_else(|| format!("无法解析写入范围起始: {updated_range}"))?;
+        .ok_or_else(|| ToolError::raw(format!("无法解析写入范围起始: {updated_range}")))?;
     let end = parts
         .next()
-        .ok_or_else(|| format!("无法解析写入范围结束: {updated_range}"))?;
+        .ok_or_else(|| ToolError::raw(format!("无法解析写入范围结束: {updated_range}")))?;
     let start_row = start
         .trim_start_matches(|c: char| c.is_ascii_alphabetic())
         .parse::<i64>()
-        .map_err(|_| format!("无法解析写入范围起始行号: {updated_range}"))?;
+        .map_err(|_| ToolError::raw(format!("无法解析写入范围起始行号: {updated_range}")))?;
     let end_row = end
         .trim_start_matches(|c: char| c.is_ascii_alphabetic())
         .parse::<i64>()
-        .map_err(|_| format!("无法解析写入范围结束行号: {updated_range}"))?;
+        .map_err(|_| ToolError::raw(format!("无法解析写入范围结束行号: {updated_range}")))?;
 
     let column_range = |column: char| format!("{SHEET_ID}!{column}{start_row}:{column}{end_row}");
     let body = serde_json::json!({
@@ -288,7 +311,7 @@ async fn set_styles_batch_request(
     token: &str,
     body: &serde_json::Value,
     client: &reqwest::Client,
-) -> Result<(), String> {
+) -> Result<(), ToolError> {
     let style_url = format!(
         "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{SPREADSHEET_TOKEN}/styles_batch_update"
     );
@@ -300,12 +323,14 @@ async fn set_styles_batch_request(
         .send()
         .await
         .map_err(|e| {
-            format!("飞书设置单元格样式请求失败: {e}")
+            log::error!("飞书设置单元格样式请求失败: {e}");
+            ToolError::raw(e.to_string())
         })?;
 
     let status = resp.status();
     let raw = resp.text().await.map_err(|e| {
-        format!("飞书设置单元格样式响应读取失败: {e}")
+        log::error!("飞书设置单元格样式响应读取失败: {e}");
+        ToolError::raw(e.to_string())
     })?;
 
     let data: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::Value::Null);
@@ -335,7 +360,7 @@ async fn feishu_get_token_inner(
     app_id: &str,
     app_secret: &str,
     client: &reqwest::Client,
-) -> Result<String, String> {
+) -> Result<String, ToolError> {
     let url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
     let resp = client
         .post(url)
@@ -351,11 +376,11 @@ async fn feishu_get_token_inner(
         .await
         .map_err(|e| {
             log::error!("飞书获取 token 请求失败\n  URL: {url}\n  错误: {e}");
-            e.to_string()
+            ToolError::raw(e.to_string())
         })?;
 
     let status = resp.status();
-    let data: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let data: serde_json::Value = resp.json().await?;
 
     if !status.is_success() || data["code"].as_i64() != Some(0) {
         let msg = data["msg"].as_str().unwrap_or("未知错误");
@@ -374,7 +399,7 @@ async fn feishu_get_token_inner(
         .map(|s| s.to_string())
         .ok_or_else(|| {
             let msg = data["msg"].as_str().unwrap_or("未知错误");
-            format!("获取 token 失败: {msg}")
+            ToolError::raw(format!("获取 token 失败: {msg}"))
         })
 }
 
@@ -385,7 +410,7 @@ async fn feishu_get_sheet_inner(
     sheet_id: &str,
     range: &str,
     client: &reqwest::Client,
-) -> Result<Vec<Vec<String>>, String> {
+) -> Result<Vec<Vec<String>>, ToolError> {
     let url = format!(
         "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{}/values/{}{}",
         spreadsheet_token, sheet_id, range
@@ -398,15 +423,18 @@ async fn feishu_get_sheet_inner(
         .await
         .map_err(|e| {
             log::error!("飞书读取表格请求失败\n  URL: {url}\n  错误: {e}");
-            e.to_string()
+            ToolError::raw(e.to_string())
         })?;
 
     let status = resp.status();
-    let data: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let data: serde_json::Value = resp.json().await?;
 
     if !status.is_success() || data["code"].as_i64() != Some(0) {
         let msg = data["msg"].as_str().unwrap_or("未知错误");
-        log::error!("飞书读取表格失败\n  URL: {url}\n  状态码: {status}\n  错误码: {:?}\n  响应: {msg}", data["code"].as_i64());
+        log::error!(
+            "飞书读取表格失败\n  URL: {url}\n  状态码: {status}\n  错误码: {:?}\n  响应: {msg}",
+            data["code"].as_i64()
+        );
         return Err(format_feishu_error(
             "读取统计表",
             status,

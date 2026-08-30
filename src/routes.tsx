@@ -24,7 +24,7 @@ export interface RouteConfig {
   /** 保持页面活跃（切换页面不卸载） */
   keepAlive?: boolean;
   /** 菜单标签（菜单及页顶显示名称） */
-  label?: string;
+  label: string;
   /** 菜单图标 */
   icon?: React.ReactNode;
   /** 菜单位置 */

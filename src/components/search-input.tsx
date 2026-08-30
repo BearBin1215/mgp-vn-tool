@@ -1,7 +1,8 @@
 import { useImperativeHandle, useRef, useState, useEffect, type Ref } from 'react';
 import { App, AutoComplete, Input } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
-import { isNumeric } from '@/utils/text';
+import { useTranslation } from 'react-i18next';
+import { isNumeric, formatError } from '@/utils/text';
 
 /** 搜索下拉选项 */
 export interface SearchInputOption {
@@ -54,6 +55,7 @@ export default function SearchInput({
   onSearchError,
 }: SearchInputProps) {
   const { message } = App.useApp();
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [options, setOptions] = useState<SearchInputOption[]>([]);
   // 搜索中状态：仅影响输入框 suffix 的「搜索中...」提示
@@ -76,7 +78,7 @@ export default function SearchInput({
     if (onSearchError) {
       onSearchError(e);
     } else {
-      message.error(`搜索失败: ${e instanceof Error ? e.message : e}`);
+      message.error(t('搜索失败: {{detail}}', { detail: formatError(e) }));
     }
   };
 
