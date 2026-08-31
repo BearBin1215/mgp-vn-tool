@@ -297,7 +297,7 @@ export const initSettings = async () => {
     moegirlRetryDelay,
   ] = await Promise.all([
     readSetting<ColorMode>('colorMode', 'light', (v): v is ColorMode => v === 'light' || v === 'dark'),
-    readSetting<UiLanguage>('uiLanguage', 'zh-CN', (v): v is UiLanguage => v === 'zh-CN' || v === 'zh-TW'),
+    readSetting<UiLanguage>('uiLanguage', 'zh-CN', (v): v is UiLanguage => v === 'zh-CN' || v === 'zh-TW' || v === 'zh-HK'),
     readSetting('uiFont', '', isNonEmptyString),
     readSetting('codeFont', '', isNonEmptyString),
     readSetting('backgroundImage', '', isNonEmptyString),

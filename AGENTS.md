@@ -53,7 +53,8 @@ mgp-vn-tool/
 │   ├── icons/                  # 图标组件目录
 │   ├── i18n/                   # 多语言（基于 react-i18next 的简繁支持）
 │   │   ├── index.ts            # i18next 初始化与界面语言切换
-│   │   └── zh-TW.ts            # 繁体中文文案映射
+│   │   ├── zh-TW.ts            # 台湾繁体文案映射
+│   │   └── zh-HK.ts            # 香港繁体文案映射
 │   ├── components/             # 共享组件
 │   │   ├── layout/             # 布局组件（Layout + Menu）
 │   │   ├── page.tsx            # 页面外壳组件
@@ -158,7 +159,7 @@ function Component() {
 ### 简繁变体
 
 - 本工程通过 `react-i18next` 实现简繁支持，采用 natural key 模式直接将简中文本作为键值，其他变体缺失时显示简中
-- 前端在 UI 组件中使用`const { t } = useTranslation();`和`t('默认简体')`，然后在`src/i18n/zh-TW.ts`中写繁体文本
+- 前端在 UI 组件中使用`const { t } = useTranslation();`和`t('默认简体')`，然后在`src/i18n/zh-TW.ts`（台湾繁体）或`src/i18n/zh-HK.ts`（香港繁体）中写繁体文本
 - 前后端通信显示文本如错误信息、接口响应时，后端返回编码、前端查表实现多语言支持
 
 ## 架构模式

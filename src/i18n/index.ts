@@ -1,10 +1,11 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import zhHK from './zh-HK';
 import zhTW from './zh-TW';
 
-/** 界面语言；繁体暂只支持台湾正体 */
-export type UiLanguage = 'zh-CN' | 'zh-TW';
+/** 界面语言；繁体支持台湾繁体与香港繁体 */
+export type UiLanguage = 'zh-CN' | 'zh-TW' | 'zh-HK';
 
 /** 窗口标题的文案 key，即简体原文 */
 const APP_TITLE_KEY = '萌百视研会条目工具';
@@ -27,7 +28,7 @@ async function syncWindowTitle(): Promise<void> {
  * 初始化 i18next 并切换到指定语言
  *
  * 采用 natural key 模式：key 即简体原文（含 {{}} 插值占位），
- * 简体语言包为空，缺失 key 返回原文；繁体查 zh-TW 映射包，未收录的 key 回退简体。
+ * 简体语言包为空，缺失 key 返回原文；繁体查对应地区映射包（zh-TW / zh-HK），未收录的 key 回退简体。
  * @param lang 初始界面语言
  */
 export async function initI18n(lang: UiLanguage = 'zh-CN'): Promise<void> {
@@ -41,6 +42,7 @@ export async function initI18n(lang: UiLanguage = 'zh-CN'): Promise<void> {
       resources: {
         'zh-CN': { translation: {} },
         'zh-TW': { translation: zhTW },
+        'zh-HK': { translation: zhHK },
       },
       // 文案中可能包含用户数据等 HTML 内容，禁用转义（React 自行处理）
       interpolation: { escapeValue: false },

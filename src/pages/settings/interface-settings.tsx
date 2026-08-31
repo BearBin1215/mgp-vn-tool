@@ -75,6 +75,7 @@ export default function InterfaceSettings() {
               // 语言选项以各自语言展示，不做简繁转换
               { value: 'zh-CN', label: '简体中文' },
               { value: 'zh-TW', label: '繁體中文（臺灣）' },
+              { value: 'zh-HK', label: '繁體中文（香港）' },
             ]}
           />
         </SettingItem>
