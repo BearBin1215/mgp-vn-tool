@@ -1,7 +1,7 @@
 /**
  * 统一修改项目版本号脚本。
  * 读取命令行参数（显式版本号或递增关键字），计算目标版本号后写入
- * package.json、src-tauri/tauri.conf.json、src-tauri/Cargo.toml 三处。
+ * package.json、src-tauri/tauri.conf.json、src-tauri/Cargo.toml、src-tauri/Cargo.lock 四处。
  * 仅修改文件，git commit 与打 tag 由人工执行。
  *
  * 用法：
@@ -10,6 +10,7 @@
  *   pnpm bump preminor     预发布递增（premajor/preminor/prepatch/prerelease）
  */
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import semver from 'semver';
@@ -65,7 +66,8 @@ function resolveTargetVersion(): string {
   }
 
   // 显式版本号：校验合法性
-  if (!semver.valid(arg)) {
+  // node-semver 会宽松接受 v 前缀和首尾空白，但 Cargo.toml 不接受这些写法。
+  if (!semver.valid(arg) || !/^\d/.test(arg) || arg.trim() !== arg) {
     console.error(`版本号格式不合法：${arg}（应为 x.y.z 或 x.y.z-后缀）`);
     process.exit(1);
   }
@@ -124,8 +126,27 @@ function bumpCargoToml(version: string): void {
   writeFileSync(path, newContent, 'utf8');
 }
 
+/**
+ * 让 Cargo 同步工作区包在 Cargo.lock 中的版本。
+ * --workspace 仅更新工作区成员，不会顺带升级第三方依赖；
+ * --offline 避免仅修改本包版本时访问依赖注册表。
+ */
+function updateCargoLock(): void {
+  try {
+    execFileSync(
+      'cargo',
+      ['update', '--workspace', '--offline', '--manifest-path', resolve(ROOT, FILES.cargoToml)],
+      { cwd: ROOT, stdio: 'inherit' },
+    );
+  } catch {
+    console.error('Cargo.lock 更新失败，请确认 Rust 工具链可用后重试');
+    process.exit(1);
+  }
+}
+
 const version = resolveTargetVersion();
 bumpJsonFile(FILES.packageJson, version);
 bumpJsonFile(FILES.tauriConf, version);
 bumpCargoToml(version);
-console.log(`已将版本号统一修改为 ${version}（package.json、tauri.conf.json、Cargo.toml）`);
+updateCargoLock();
+console.log(`已将版本号统一修改为 ${version}（package.json、tauri.conf.json、Cargo.toml、Cargo.lock）`);

@@ -54,7 +54,7 @@ pnpm tauri dev
 
 发版步骤如下：
 
-1. 用脚本统一修改版本号（会同步修改 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`）。支持显式版本号或自增关键字：
+1. 用脚本统一修改版本号（会修改 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`，并通过 Cargo 同步 `src-tauri/Cargo.lock`）。支持显式版本号或自增关键字：
    ```bash
    pnpm bump <version>   # 显式指定，如 pnpm bump 1.2.3
    pnpm bump <keyword>   # 基于当前版本自增：major / minor / patch
