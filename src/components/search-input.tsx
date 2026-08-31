@@ -2,7 +2,8 @@ import { useImperativeHandle, useRef, useState, useEffect, type Ref } from 'reac
 import { App, AutoComplete, Input } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import { isNumeric, formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
+import { isNumeric } from '@/utils/text';
 
 /** 搜索下拉选项 */
 export interface SearchInputOption {

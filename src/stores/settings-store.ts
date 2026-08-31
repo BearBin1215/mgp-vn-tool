@@ -5,6 +5,7 @@ import { DEFAULT_USER_AGENT, DEFAULT_FEISHU_APP_ID } from '@/utils/constants';
 import { type ErogamescapeUrl, type MoegirlHost } from '@/lib/types';
 import { loadConfigStore } from '@/lib/config-store';
 import { changeUiLanguage, type UiLanguage } from '@/i18n';
+import { createLocalizedError } from '@/utils/error';
 import { useMoegirlStore } from './moegirl-store';
 
 export type ColorMode = 'light' | 'dark';
@@ -240,7 +241,12 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       set({ moegirlUsername: name });
       void useMoegirlStore.getState().fetchUserInfo();
     } else {
-      throw new Error(error?.info || clientlogin?.message || '登录失败');
+      const detail = error?.info || clientlogin?.message;
+      if (detail) {
+        // MediaWiki 返回的原始错误不做简繁转换，避免改变服务端语义
+        throw new Error(detail);
+      }
+      throw createLocalizedError('moegirl_login_failed', '登录失败');
     }
   },
 

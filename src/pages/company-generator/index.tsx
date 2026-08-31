@@ -28,7 +28,8 @@ import {
 import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
 import { useArticleStore } from '@/stores/article-store';
 import { buildGameArticleMap } from '@/utils/article-map';
-import { resolveInputId, formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
+import { resolveInputId } from '@/utils/text';
 import { toTableData } from '@/utils/table';
 import { generateCompanyWikitext, ensureSameCompany, type CompanyData } from './generate-wikitext';
 
@@ -336,7 +337,7 @@ export default function CompanyGenerator() {
         if (!check.ok) {
           modal.confirm({
             title: t('会社匹配警告'),
-            content: t(check.message),
+            content: t(check.key, check.params),
             okText: t('仍要继续'),
             cancelText: t('取消'),
             onOk: () => {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { App, Modal, Form, Input, Alert } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '@/stores/settings-store';
-import { formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
 
 interface MoegirlLoginDialogProps {
   open: boolean;

@@ -2,7 +2,7 @@ import { Button, Tooltip, App } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
 
 interface CopyButtonProps {
   /** 待复制的文本 */

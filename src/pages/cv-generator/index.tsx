@@ -20,7 +20,8 @@ import {
   type GameConnectionKind,
 } from '@/api/erogamescape';
 import { shokushuDetailLabels, gameConnectionKindLabels } from '@/lib/erogamescape-dict';
-import { resolveInputId, formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
+import { resolveInputId } from '@/utils/text';
 import { buildGameArticleMap } from '@/utils/article-map';
 import { toTableData } from '@/utils/table';
 import { generateCVWikitext } from './generate-wikitext';
@@ -177,7 +178,7 @@ export default function CvGenerator() {
       <Page
         actions={
           <HelpButton>
-            <li>{t('作品内链根据条目统计及重定向页判断添加，出现续作、特殊符号等会导致判断不到，需要手动添加。')}</li>
+            <li>{t('作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。')}</li>
             <li>{t('角色内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。')}</li>
             <li>{t('声优信息模板、序言、大家族模板默认填写女性，如果是男性声优要自己改。')}</li>
             <li>{t('批评空间提供的声优名假名不带空格；"汉字姓＋假名名"的形式已自动拆分，其余情况仍需自行调整')}</li>
@@ -200,7 +201,7 @@ export default function CvGenerator() {
       actions={
         <HelpButton>
           <li>{t('数据来自批评空间，使用前建议前往设置调整批评空间相关网络设置。')}</li>
-          <li>{t('作品内链根据条目统计及重定向页判断添加，出现续作、特殊符号等会导致判断不到，需要手动添加。')}</li>
+          <li>{t('作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。')}</li>
           <li>{t('角色内链根据名称获取站内页面名称，遇到假名等如果没有重定向就查不到。')}</li>
           <li>{t('声优信息模板、序言、大家族模板默认填写女性，如果是男性声优要自己改。')}</li>
           <li>{t('批评空间提供的声优名假名不带空格；"汉字姓＋假名名"的形式已自动拆分，其余情况仍需自行调整')}</li>

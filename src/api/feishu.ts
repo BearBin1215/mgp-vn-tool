@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { ToolErrorShape } from '@/utils/text';
+import type { ToolErrorShape } from '@/utils/error';
 
 /** 飞书追加结果；样式失败不会回滚已写入的数据。 */
 export interface FeishuAppendResult {

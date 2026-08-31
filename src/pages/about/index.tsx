@@ -8,7 +8,7 @@ import Page from '@/components/page';
 import MoegirlLink from '@/components/moegirl-link';
 import ExternalLink from '@/components/external-link';
 import avatar from '@/assets/BearBin.jpg';
-import { formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
 import { version } from '../../../package.json';
 import AboutItem from './about-item';
 

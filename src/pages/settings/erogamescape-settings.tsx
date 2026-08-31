@@ -16,7 +16,7 @@ import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined } from '@ant-desi
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '@/stores/settings-store';
-import { formatError, type ToolErrorShape } from '@/utils/text';
+import { formatError, type ToolErrorShape } from '@/utils/error';
 import SettingItem from './setting-item';
 
 /** 批评空间设置 */

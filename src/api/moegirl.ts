@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useMoegirlStore } from '@/stores/moegirl-store';
-import { isToolError } from '@/utils/text';
+import { createLocalizedError, isToolError } from '@/utils/error';
 import type { ApiParams } from '@/lib/types';
 
 interface TokenQueryResponse {
@@ -101,7 +101,11 @@ const moegirl = {
       const tokens = (res as TokenQueryResponse).query?.tokens;
       const token = tokens?.[`${tokenType}token`];
       if (!token) {
-        throw new Error(`获取 ${tokenType} Token 失败`);
+        throw createLocalizedError(
+          'moegirl_token_missing',
+          `获取 ${tokenType} Token 失败`,
+          { token_type: tokenType },
+        );
       }
       tokenCache.set(tokenType, token);
       return token;

@@ -20,7 +20,8 @@ import {
 } from '@/api/erogamescape';
 import { shokushuLabels, shokushuDetailLabels, platforms } from '@/lib/erogamescape-dict';
 import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
-import { resolveInputId, normalizePunctuation, formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
+import { resolveInputId, normalizePunctuation } from '@/utils/text';
 import { toTableData } from '@/utils/table';
 import { PENDING_SELL_DATE } from '@/utils/constants';
 import { generateWorkWikitext, parseStaffName, parseMusicStaffName } from './generate-wikitext';

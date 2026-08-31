@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { isToolError, type ToolErrorShape } from '@/utils/text';
+import { createLocalizedError, isToolError, type ToolErrorShape } from '@/utils/error';
 
 /** 后端统一响应包装；失败时 response 为结构化错误 */
 export interface ErogamescapeResponse<T> {
@@ -14,7 +14,10 @@ export function unwrap<T>(res: ErogamescapeResponse<T>): T {
     if (isToolError(res.response)) {
       throw res.response;
     }
-    throw new Error(String(res.response || '批评空间请求失败'));
+    if (res.response) {
+      throw new Error(String(res.response));
+    }
+    throw createLocalizedError('ero_unknown_failure', '批评空间请求失败');
   }
   return res.response as T;
 }

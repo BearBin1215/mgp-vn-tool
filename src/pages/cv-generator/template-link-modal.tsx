@@ -4,7 +4,7 @@ import { CheckOutlined, SearchOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import moegirl from '@/api/moegirl';
 import MoegirlLink from '@/components/moegirl-link';
-import { formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
 
 interface TemplateLink {
   text: string;

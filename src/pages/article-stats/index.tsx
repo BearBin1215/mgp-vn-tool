@@ -35,7 +35,7 @@ import Page from '@/components/page';
 import MoegirlLink from '@/components/moegirl-link';
 import { useArticleStore, initArticles, type Article } from '@/stores/article-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
 import UpdateCheckModal from './update-check-modal';
 import './index.css';
 

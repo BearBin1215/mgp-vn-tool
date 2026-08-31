@@ -17,7 +17,7 @@ import feishu, { type FeishuAppendRow } from '@/api/feishu';
 import MoegirlLink from '@/components/moegirl-link';
 import { useArticleStore, type UpdateCandidate } from '@/stores/article-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
 
 interface UpdateCheckModalProps {
   /** 弹窗是否可见 */
@@ -197,7 +197,7 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
       open={open}
       title={t('检查更新')}
       width={1000}
-      maskClosable={false}
+      mask={{ closable: false }}
       onCancel={handleClose}
       footer={
         <Space>
