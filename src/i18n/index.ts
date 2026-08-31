@@ -1,12 +1,27 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import zhTW from './zh-TW';
 
 /** 界面语言；繁体暂只支持台湾正体 */
 export type UiLanguage = 'zh-CN' | 'zh-TW';
 
+/** 窗口标题的文案 key，即简体原文 */
+const APP_TITLE_KEY = '萌百视研会条目工具';
+
 /** i18next 是否已完成初始化 */
 let initialized = false;
+
+/**
+ * 将原生窗口标题同步为当前界面语言的文案
+ */
+async function syncWindowTitle(): Promise<void> {
+  try {
+    await getCurrentWindow().setTitle(i18next.t(APP_TITLE_KEY));
+  } catch (error) {
+    console.error('同步窗口标题失败:', error);
+  }
+}
 
 /**
  * 初始化 i18next 并切换到指定语言
@@ -36,6 +51,8 @@ export async function initI18n(lang: UiLanguage = 'zh-CN'): Promise<void> {
   if (i18next.language !== lang) {
     await i18next.changeLanguage(lang);
   }
+  // 启动语言就绪后同步原生窗口标题
+  void syncWindowTitle();
 }
 
 /**
@@ -45,5 +62,7 @@ export async function initI18n(lang: UiLanguage = 'zh-CN'): Promise<void> {
 export async function changeUiLanguage(lang: UiLanguage): Promise<void> {
   if (initialized && i18next.language !== lang) {
     await i18next.changeLanguage(lang);
+    // 切换语言后同步原生窗口标题
+    void syncWindowTitle();
   }
 }
