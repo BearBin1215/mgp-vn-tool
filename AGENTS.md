@@ -35,6 +35,9 @@ pnpm lint
 
 # 前端 eslint 检查并修复
 pnpm lint:fix
+
+# 前端单元测试（vitest）
+pnpm test
 ```
 
 ## 项目结构
