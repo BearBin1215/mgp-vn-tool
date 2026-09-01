@@ -14,8 +14,19 @@ import {
 } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
+import { EROGAMESCAPE_URLS, type ErogamescapeUrl } from '@/lib/types';
 import { useSettingsStore } from '@/stores/settings-store';
 import SettingItem from './setting-item';
+
+/** 各批评空间地址的显示标签，键与 ErogamescapeUrl 联合类型对齐，新增地址时编译器会提示补全 */
+const URL_LABELS: Record<ErogamescapeUrl, string> = {
+  'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki': 'erogamescape.dyndns.org',
+  'https://erogamescape.org/~ap2/ero/toukei_kaiseki': 'erogamescape.org',
+  'https://ero.plumz.me': 'ero.plumz.me（镜像站）',
+};
+
+/** Select 的地址选项，从地址白名单生成保证无尾斜杠 */
+const urlOptions = EROGAMESCAPE_URLS.map((url) => ({ value: url, label: URL_LABELS[url] }));
 
 /** 批评空间设置 */
 export default function ErogamescapeSettings() {
@@ -91,11 +102,7 @@ export default function ErogamescapeSettings() {
                 className='grow'
                 value={erogamescapeUrl}
                 onChange={setErogamescapeHost}
-                options={[
-                  { value: 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/', label: 'erogamescape.dyndns.org' },
-                  { value: 'https://erogamescape.org/~ap2/ero/toukei_kaiseki/', label: 'erogamescape.org' },
-                  { value: 'https://ero.plumz.me', label: 'ero.plumz.me（镜像站）' },
-                ]}
+                options={urlOptions}
               />
               <Tooltip title='检测连通性'>
                 <Button
