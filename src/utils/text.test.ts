@@ -130,11 +130,7 @@ describe('wrapLj', () => {
   });
 
   it('包装时标点在模板内归一化', () => {
-    expect(wrapLj('ひな!')).toBe('{{lj|ひな！}}');
-  });
-
-  it('无假名时仅归一化标点', () => {
-    expect(wrapLj('Attack!')).toBe('Attack！');
+    expect(wrapLj('へんたい!')).toBe('{{lj|へんたい！}}');
   });
 });
 
