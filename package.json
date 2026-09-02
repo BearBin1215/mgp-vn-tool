@@ -14,7 +14,9 @@
     "tauri": "tauri",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
     "bump": "tsx scripts/bump-version.ts"
   },
   "dependencies": {

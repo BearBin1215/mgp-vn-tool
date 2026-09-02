@@ -6,6 +6,7 @@
 - [前端技术栈](#前端技术栈)
 - [构建并发布](#构建并发布)
 - [代码规范](#代码规范)
+  - [检查](#检查)
   - [TypeScript / React](#typescript--react)
   - [样式](#样式)
 - [持久化存储](#持久化存储)
@@ -77,6 +78,28 @@ pnpm tauri build
 
 
 ## 代码规范
+
+### 检查
+
+提交代码前，应当通过如下指令检查无错误：
+
+在src-tauri目录内执行：
+```bash
+# 后端静态检查
+cargo check
+
+# 后端代码静态分析
+cargo clippy
+
+# 后端测试
+cargo test
+```
+
+在根目录执行：
+```bash
+# 前端检查
+pnpm check
+```
 
 ### TypeScript / React
 

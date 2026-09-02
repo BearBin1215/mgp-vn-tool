@@ -24,11 +24,17 @@ pnpm install
 # 启动开发服务器（同时启动前端和 Tauri）
 pnpm tauri dev
 
-# 前端类型检查
-pnpm tsc --noEmit
-
-# 后端检查
+# 后端静态检查
 cargo check
+
+# 后端代码静态分析
+cargo clippy
+
+# 后端测试
+cargo test
+
+# 前端类型检查
+pnpm typecheck
 
 # 前端 eslint 检查
 pnpm lint
@@ -38,6 +44,9 @@ pnpm lint:fix
 
 # 前端单元测试（vitest）
 pnpm test
+
+# 前端聚合检查（typecheck + lint + test）
+pnpm check
 ```
 
 ## 项目结构
