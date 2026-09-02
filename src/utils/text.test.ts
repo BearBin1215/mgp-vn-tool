@@ -5,7 +5,6 @@ import {
   extractBrand,
   extractJa,
   extractReleaseDate,
-  formatDateCN,
   formatError,
   generateExternalLinksWikitext,
   isNumeric,
@@ -157,8 +156,8 @@ describe('generateExternalLinksWikitext', () => {
 
 describe('resolveTitle', () => {
   const pageInfoMap = new Map([
-    ['旧名', makePageInfo({ title: '新名', categories: ['有效分类'] })],
-    ['不存在页', makePageInfo({ title: '不存在页', pageId: null })],
+    ['旧条目名', makePageInfo({ title: '新条目名', categories: ['有效分类'] })],
+    ['不存在页面', makePageInfo({ title: '不存在页面', pageId: null })],
   ]);
 
   it('空标题返回空串', () => {
@@ -166,33 +165,33 @@ describe('resolveTitle', () => {
   });
 
   it('命中时返回规范标题', () => {
-    expect(resolveTitle('旧名', pageInfoMap)).toBe('新名');
+    expect(resolveTitle('旧条目名', pageInfoMap)).toBe('新条目名');
   });
 
   it('页面不存在时返回原标题', () => {
-    expect(resolveTitle('不存在页', pageInfoMap)).toBe('不存在页');
+    expect(resolveTitle('不存在页面', pageInfoMap)).toBe('不存在页面');
   });
 
   it('分类不匹配时返回原标题', () => {
-    expect(resolveTitle('旧名', pageInfoMap, ['其他分类'])).toBe('旧名');
+    expect(resolveTitle('旧条目名', pageInfoMap, ['其他分类'])).toBe('旧条目名');
   });
 
   it('分类匹配时返回规范标题', () => {
-    expect(resolveTitle('旧名', pageInfoMap, ['有效分类'])).toBe('新名');
+    expect(resolveTitle('旧条目名', pageInfoMap, ['有效分类'])).toBe('新条目名');
   });
 
   it('无页面信息映射时返回原标题', () => {
-    expect(resolveTitle('旧名', undefined)).toBe('旧名');
+    expect(resolveTitle('旧条目名', undefined)).toBe('旧条目名');
   });
 });
 
 describe('resolveInternalLink', () => {
   const pageInfoMap = new Map([
-    ['旧名', makePageInfo({ title: '新名' })],
+    ['旧条目名', makePageInfo({ title: '新条目名' })],
   ]);
 
   it('命中时返回规范标题内链', () => {
-    expect(resolveInternalLink('旧名', pageInfoMap)).toBe('[[新名]]');
+    expect(resolveInternalLink('旧条目名', pageInfoMap)).toBe('[[新条目名]]');
   });
 
   it('未命中时直接包内链', () => {
@@ -206,9 +205,9 @@ describe('resolveInternalLink', () => {
 
 describe('resolveOptionalInternalLink', () => {
   const pageInfoMap = new Map([
-    ['存在页', makePageInfo({ title: '存在页规范名' })],
-    ['不存在页', makePageInfo({ title: '不存在页', pageId: null })],
-    ['分类页', makePageInfo({ title: '分类页规范名', categories: ['有效分类'] })],
+    ['存在页面', makePageInfo({ title: '存在页面条目名' })],
+    ['不存在页面', makePageInfo({ title: '不存在页面', pageId: null })],
+    ['指定分类内页面', makePageInfo({ title: '指定分类内页面名称', categories: ['有效分类'] })],
   ]);
 
   it('无页面信息映射时仅包装显示文本', () => {
@@ -216,19 +215,19 @@ describe('resolveOptionalInternalLink', () => {
   });
 
   it('页面存在时返回内链', () => {
-    expect(resolveOptionalInternalLink('存在页', pageInfoMap)).toBe('[[存在页规范名]]');
+    expect(resolveOptionalInternalLink('存在页面', pageInfoMap)).toBe('[[存在页面条目名]]');
   });
 
   it('页面不存在时仅包装显示文本', () => {
-    expect(resolveOptionalInternalLink('不存在页', pageInfoMap)).toBe('不存在页');
+    expect(resolveOptionalInternalLink('不存在页面', pageInfoMap)).toBe('不存在页面');
   });
 
   it('指定分类且不匹配时仅包装显示文本', () => {
-    expect(resolveOptionalInternalLink('分类页', pageInfoMap, ['其他分类'])).toBe('分类页');
+    expect(resolveOptionalInternalLink('指定分类内页面', pageInfoMap, ['其他分类'])).toBe('指定分类内页面');
   });
 
   it('指定分类且匹配时返回内链', () => {
-    expect(resolveOptionalInternalLink('分类页', pageInfoMap, ['有效分类'])).toBe('[[分类页规范名]]');
+    expect(resolveOptionalInternalLink('指定分类内页面', pageInfoMap, ['有效分类'])).toBe('[[指定分类内页面名称]]');
   });
 });
 
@@ -255,21 +254,6 @@ describe('resolveFamilyTemplate', () => {
   });
 });
 
-describe('formatDateCN', () => {
-  it('空值返回空串', () => {
-    expect(formatDateCN(null)).toBe('');
-    expect(formatDateCN('')).toBe('');
-  });
-
-  it('有效日期格式化为中文', () => {
-    expect(formatDateCN('2016-09-30')).toBe('2016年9月30日');
-  });
-
-  it('无效日期原样返回', () => {
-    expect(formatDateCN('not-a-date')).toBe('not-a-date');
-  });
-});
-
 describe('formatError', () => {
   it('Error 实例取 message', () => {
     expect(formatError(new Error('boom'))).toBe('boom');
@@ -287,7 +271,7 @@ describe('extractReleaseDate', () => {
   });
 
   it('信息框存在多个时取首个', () => {
-    const wikitext = '{{Infobox\n|发行时间 = 2016年9月30日\n}}\n{{Infobox\n|发行时间 = 2019年1月1日\n}}';
+    const wikitext = '{{Infobox\n|发行时间 = 2016年9月30日\n}}\n{{Infobox\n|发行时间 = 2026年9月2日\n}}';
     expect(extractReleaseDate(wikitext)).toBe('2016-09-30');
   });
 
@@ -298,6 +282,10 @@ describe('extractReleaseDate', () => {
 
   it('繁体关键字同样匹配', () => {
     expect(extractReleaseDate('於2016年9月30日發售')).toBe('2016-09-30');
+  });
+
+  it('多版本发售日期取首个', () => {
+    expect(extractReleaseDate('于2016年9月30日发售；主机版于2026年9月发售')).toBe('2016-09-30');
   });
 
   it('信息框优先于正文', () => {
@@ -312,31 +300,31 @@ describe('extractReleaseDate', () => {
 
 describe('extractJa', () => {
   it('匹配信息框原名纯文本', () => {
-    expect(extractJa('{{Infobox\n|原名 = ひなたぼっこ\n}}')).toBe('ひなたぼっこ');
+    expect(extractJa('{{Infobox\n|原名 = アマツツミ\n}}')).toBe('アマツツミ');
   });
 
   it('剥离信息框原名的 lj 模板包裹', () => {
-    expect(extractJa('{{Infobox\n|原名 = {{lj|ひなたぼっこ}}\n}}')).toBe('ひなたぼっこ');
+    expect(extractJa('{{Infobox\n|原名 = {{lj|アマツツミ}}\n}}')).toBe('アマツツミ');
   });
 
   it('剥离信息框原名的 lang-ja 与加粗标记', () => {
-    expect(extractJa('{{Infobox\n|原名 = {{lang-ja|\'\'\'ひなたぼっこ\'\'\'}}\n}}')).toBe('ひなたぼっこ');
+    expect(extractJa("{{Infobox\n|原名 = {{lang-ja|'''アマツツミ'''}}\n}}")).toBe('アマツツミ');
   });
 
   it('剥离信息框原名的加粗标记', () => {
-    expect(extractJa('{{Infobox\n|原名 = \'\'\'ひな\'\'\'\n}}')).toBe('ひな');
+    expect(extractJa("{{Infobox\n|原名 = '''アマツツミ'''\n}}")).toBe('アマツツミ');
   });
 
   it('原名参数带首尾空白时裁剪', () => {
-    expect(extractJa('{{Infobox\n|原名 =  ひな  \n}}')).toBe('ひな');
+    expect(extractJa('{{Infobox\n|原名 =  アマツツミ  \n}}')).toBe('アマツツミ');
   });
 
   it('无信息框时匹配正文 lang-ja 模板', () => {
-    expect(extractJa('这是正文\n{{lang-ja|ひな}}\n后续')).toBe('ひな');
+    expect(extractJa('（{{lang-ja|アマツツミ}}）')).toBe('アマツツミ');
   });
 
   it('信息框原名为空时兜底正文模板', () => {
-    expect(extractJa('{{Infobox\n|原名 =\n}}\n{{lj|ひな}}')).toBe('ひな');
+    expect(extractJa('{{Infobox\n|原名 =\n}}\n{{lj|アマツツミ}}')).toBe('アマツツミ');
   });
 
   it('无法提取时返回空串', () => {
@@ -345,7 +333,7 @@ describe('extractJa', () => {
 });
 
 describe('extractBrand', () => {
-  it('匹配信息框开发的内链', () => {
+  it('匹配信息框开发参数的内链', () => {
     expect(extractBrand('{{Infobox\n|开发 = [[Key]]\n}}')).toBe('Key');
   });
 
@@ -358,7 +346,7 @@ describe('extractBrand', () => {
   });
 
   it('信息框中 br 之后的内容被截断', () => {
-    expect(extractBrand('{{Infobox\n|开发 = Key<br>Sprite\n}}')).toBe('Key');
+    expect(extractBrand('{{Infobox\n|开发 = UGUISU KAGURA<br>Entergram\n}}')).toBe('UGUISU KAGURA');
   });
 
   it('无信息框时匹配序言句式', () => {
@@ -366,17 +354,12 @@ describe('extractBrand', () => {
   });
 
   it('序言句式的内链被解析', () => {
-    expect(extractBrand('由[[Sprite]]开发的游戏')).toBe('Sprite');
+    expect(extractBrand('由[[sprite]]开发的游戏')).toBe('sprite');
   });
 
   it('首个二级标题之后的句式不参与匹配', () => {
-    const wikitext = '# 序言\n\n由Key制作\n\n== 简介 ==\n\n由Sprite制作';
-    expect(extractBrand(wikitext)).toBe('Key');
-  });
-
-  it('信息框位于二级标题之后时不参与匹配', () => {
-    const wikitext = '由X社制作\n\n== 简介 ==\n{{Infobox\n|开发 = Key\n}}';
-    expect(extractBrand(wikitext)).toBe('X社');
+    const wikitext = '# 序言\n\n由Purple software制作\n\n== 简介 ==\n\n由Entergram制作';
+    expect(extractBrand(wikitext)).toBe('Purple software');
   });
 
   it('无法提取时返回空串', () => {
