@@ -1,6 +1,7 @@
 import { type FormInstance, Button, Col, DatePicker, Form, Input, Row, Select, Tooltip } from 'antd';
 import { UndoOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
+import { useTranslation } from 'react-i18next';
 
 const { RangePicker } = DatePicker;
 
@@ -38,6 +39,8 @@ interface FilterPanelProps {
 
 /** 条件筛选面板：作品名、制作组织与时间范围 */
 export default function FilterPanel({ form, allBrands, onValuesChange, onReset }: FilterPanelProps) {
+  const { t } = useTranslation();
+
   return (
     <div
       className={`
@@ -56,15 +59,15 @@ export default function FilterPanel({ form, allBrands, onValuesChange, onReset }
         >
           <Row gutter={24}>
             <Col span={12}>
-              <Form.Item name='name' label='作品名称'>
-                <Input placeholder='搜索原名或条目名' />
+              <Form.Item name='name' label={t('作品名称')}>
+                <Input placeholder={t('搜索原名或条目名')} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name='brands' label='制作组织'>
+              <Form.Item name='brands' label={t('制作组织')}>
                 <Select
                   mode='multiple'
-                  placeholder='搜索或选择'
+                  placeholder={t('搜索或选择')}
                   showSearch
                   options={allBrands.map((brand) => ({
                     value: brand,
@@ -78,7 +81,7 @@ export default function FilterPanel({ form, allBrands, onValuesChange, onReset }
             <Col span={12}>
               <Form.Item
                 name='releaseDateRange'
-                label='发行时间'
+                label={t('发行时间')}
                 className='mb-2!'
               >
                 <RangePicker className='w-full' />
@@ -87,7 +90,7 @@ export default function FilterPanel({ form, allBrands, onValuesChange, onReset }
             <Col span={12}>
               <Form.Item
                 name='creationDateRange'
-                label='创建时间'
+                label={t('创建时间')}
                 className='mb-2!'
               >
                 <RangePicker className='w-full' />
@@ -95,7 +98,7 @@ export default function FilterPanel({ form, allBrands, onValuesChange, onReset }
             </Col>
           </Row>
         </Form>
-        <Tooltip title='重置'>
+        <Tooltip title={t('重置')}>
           <Button
             variant='outlined'
             icon={<UndoOutlined />}

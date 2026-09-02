@@ -5,6 +5,9 @@
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+
+use crate::error::ToolError;
 
 /// VNDB 单部作品（原名、中文名、发行日期、VN id、关联关系）
 #[derive(Debug, Clone, Serialize)]
@@ -111,7 +114,7 @@ pub struct VndbProducerSearchItem {
 
 /// 根据 VNDB producer id 查询制作组织信息与开发作品列表
 #[tauri::command]
-pub async fn query_vndb_producer(producer_id: u64) -> Result<VndbProducerData, String> {
+pub async fn query_vndb_producer(producer_id: u64) -> Result<VndbProducerData, ToolError> {
     let client = crate::http::build_client(Duration::from_secs(30))?;
     let producer = fetch_vndb_producer(&client, producer_id).await?;
     let galgames = fetch_vndb_galgames(&client, producer_id).await?;
@@ -120,7 +123,9 @@ pub async fn query_vndb_producer(producer_id: u64) -> Result<VndbProducerData, S
 
 /// 按名称搜索 VNDB producer，返回最多 10 个匹配项（id/名称/别名/类型）
 #[tauri::command]
-pub async fn search_vndb_producers(keyword: String) -> Result<Vec<VndbProducerSearchItem>, String> {
+pub async fn search_vndb_producers(
+    keyword: String,
+) -> Result<Vec<VndbProducerSearchItem>, ToolError> {
     let client = crate::http::build_client(Duration::from_secs(30))?;
     let resp = client
         .post("https://api.vndb.org/kana/producer")
@@ -135,19 +140,23 @@ pub async fn search_vndb_producers(keyword: String) -> Result<Vec<VndbProducerSe
         .map_err(|e| {
             let msg = format!("VNDB producer 搜索请求失败: {e}");
             log::error!("{msg}");
-            msg
+            ToolError::new(
+                "vndb_request_failed",
+                [("detail", json!(e.to_string()))],
+                msg,
+            )
         })?;
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        let msg = vndb_http_error("VNDB producer 搜索", status, &body);
-        log::error!("{msg}");
-        return Err(msg);
+        let err = vndb_http_error("VNDB producer 搜索", status, &body);
+        log::error!("{err}");
+        return Err(err);
     }
     let data = resp.json::<serde_json::Value>().await.map_err(|e| {
         let msg = format!("VNDB producer 搜索解析失败: {e}");
         log::error!("{msg}");
-        msg
+        ToolError::new("vndb_parse_failed", [("detail", json!(e.to_string()))], msg)
     })?;
     let results = data
         .get("results")
@@ -159,10 +168,7 @@ pub async fn search_vndb_producers(keyword: String) -> Result<Vec<VndbProducerSe
         .filter_map(|v| {
             let producer: VndbApiProducer = serde_json::from_value(v).ok()?;
             let raw_id = producer.id.as_deref().unwrap_or("");
-            let id = raw_id
-                .strip_prefix('p')
-                .unwrap_or(raw_id)
-                .to_string();
+            let id = raw_id.strip_prefix('p').unwrap_or(raw_id).to_string();
             if id.is_empty() {
                 log::warn!("VNDB producer 搜索结果 id 解析失败: {raw_id}");
                 return None;
@@ -185,20 +191,31 @@ pub async fn search_vndb_producers(keyword: String) -> Result<Vec<VndbProducerSe
 }
 
 /// 拼接 VNDB HTTP 错误信息：状态码 + 响应体（VNDB 错误体为纯文本，如 `Invalid 'id' filter: ...`）
-fn vndb_http_error(prefix: &str, status: reqwest::StatusCode, body: &str) -> String {
+fn vndb_http_error(prefix: &str, status: reqwest::StatusCode, body: &str) -> ToolError {
     let body = body.trim();
-    if body.is_empty() {
+    let detail = if body.is_empty() {
         format!("{prefix} HTTP {status}")
     } else {
         format!("{prefix} HTTP {status}: {body}")
-    }
+    };
+    // suffix 参数供翻译模板渲染冒号后缀，body 为空时保持空串，避免出现悬挂的「: 」
+    let suffix = if body.is_empty() {
+        json!("")
+    } else {
+        json!(format!(": {body}"))
+    };
+    ToolError::new(
+        "vndb_http_error",
+        [("status", json!(status.to_string())), ("suffix", suffix)],
+        detail,
+    )
 }
 
 /// 通过 VNDB kana API 查询制作组织基本信息（名称、别名、官网、简介）
 async fn fetch_vndb_producer(
     client: &reqwest::Client,
     producer_id: u64,
-) -> Result<VndbProducer, String> {
+) -> Result<VndbProducer, ToolError> {
     let resp = client
         .post("https://api.vndb.org/kana/producer")
         .json(&serde_json::json!({
@@ -211,26 +228,38 @@ async fn fetch_vndb_producer(
         .map_err(|e| {
             let msg = format!("VNDB producer API 请求失败: {e}");
             log::error!("{msg}");
-            msg
+            ToolError::new(
+                "vndb_request_failed",
+                [("detail", json!(e.to_string()))],
+                msg,
+            )
         })?;
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        let msg = vndb_http_error("VNDB producer API", status, &body);
-        log::error!("{msg}");
-        return Err(msg);
+        let err = vndb_http_error("VNDB producer API", status, &body);
+        log::error!("{err}");
+        return Err(err);
     }
     let data = resp.json::<serde_json::Value>().await.map_err(|e| {
         let msg = format!("VNDB producer API 解析失败: {e}");
         log::error!("{msg}");
-        msg
+        ToolError::new("vndb_parse_failed", [("detail", json!(e.to_string()))], msg)
     })?;
-    let producer = data
-        .get("results")
-        .and_then(|r| r.get(0))
-        .ok_or_else(|| format!("VNDB 未找到 producer p{producer_id}"))?;
-    let producer: VndbApiProducer = serde_json::from_value(producer.clone())
-        .map_err(|e| format!("VNDB producer API 解析失败: {e}"))?;
+    let producer = data.get("results").and_then(|r| r.get(0)).ok_or_else(|| {
+        ToolError::new(
+            "vndb_producer_not_found",
+            [("producer_id", json!(producer_id))],
+            format!("VNDB 未找到 producer p{producer_id}"),
+        )
+    })?;
+    let producer: VndbApiProducer = serde_json::from_value(producer.clone()).map_err(|e| {
+        ToolError::new(
+            "vndb_parse_failed",
+            [("detail", json!(e.to_string()))],
+            format!("VNDB producer API 解析失败: {e}"),
+        )
+    })?;
 
     let name = producer
         .name
@@ -303,7 +332,7 @@ fn extract_titles(vn: &VndbApiVn) -> (String, Option<String>) {
 async fn fetch_vndb_galgames(
     client: &reqwest::Client,
     producer_id: u64,
-) -> Result<Vec<VndbWork>, String> {
+) -> Result<Vec<VndbWork>, ToolError> {
     let mut works = Vec::new();
     let mut page = 1u32;
     loop {
@@ -320,19 +349,23 @@ async fn fetch_vndb_galgames(
             .map_err(|e| {
                 let msg = format!("VNDB vn API 请求失败: {e}");
                 log::error!("{msg}");
-                msg
+                ToolError::new(
+                    "vndb_request_failed",
+                    [("detail", json!(e.to_string()))],
+                    msg,
+                )
             })?;
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            let msg = vndb_http_error("VNDB vn API", status, &body);
-            log::error!("{msg}");
-            return Err(msg);
+            let err = vndb_http_error("VNDB vn API", status, &body);
+            log::error!("{err}");
+            return Err(err);
         }
         let data = resp.json::<VndbApiResponse>().await.map_err(|e| {
             let msg = format!("VNDB vn API 解析失败: {e}");
             log::error!("{msg}");
-            msg
+            ToolError::new("vndb_parse_failed", [("detail", json!(e.to_string()))], msg)
         })?;
         for vn in data.results {
             let (original_title, chinese_title) = extract_titles(&vn);

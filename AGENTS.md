@@ -14,6 +14,7 @@
 - **状态管理**: Zustand
 - **路由**: React Router v8（无需react-router-dom）
 - **UI 组件库**: Ant Design (antd) v6
+- **多语言变体**: i18next v26 + react-i18next v17（简繁变体，natural key 模式）
 
 ## 常用命令
 
@@ -62,6 +63,10 @@ mgp-vn-tool/
 │   │   └── ...
 │   ├── assets/                 # 静态资源
 │   ├── icons/                  # 图标组件目录
+│   ├── i18n/                   # 多语言（基于 react-i18next 的简繁支持）
+│   │   ├── index.ts            # i18next 初始化与界面语言切换
+│   │   ├── zh-TW.ts            # 台湾繁体文案映射
+│   │   └── zh-HK.ts            # 香港繁体文案映射
 │   ├── components/             # 共享组件
 │   │   ├── layout/             # 布局组件（Layout + Menu）
 │   │   ├── page.tsx            # 页面外壳组件
@@ -87,6 +92,7 @@ mgp-vn-tool/
 ├── src-tauri/                  # Tauri 后端
 │   ├── src/
 │   │   ├── lib.rs              # Tauri 配置和 Rust API 命令
+│   │   ├── error.rs            # 前端可识别的结构化错误（错误码 + 插值参数 + 简体原文）
 │   │   ├── feishu.rs           # 飞书统计表读写与样式设置
 │   │   ├── http.rs             # 网络请求模块
 │   │   ├── settings.rs         # 统一从 Tauri Store 读取 settings.json
@@ -160,6 +166,12 @@ function Component() {
 - 遵循 Rust 标准风格
 - 每个函数开头需有文档注释
 - 积极引入现有成熟 crate，避免重复造轮子
+
+### 简繁变体
+
+- 本工程通过 `react-i18next` 实现简繁支持，采用 natural key 模式直接将简中文本作为键值，其他变体缺失时显示简中
+- 前端在 UI 组件中使用`const { t } = useTranslation();`和`t('默认简体')`，然后在`src/i18n/zh-TW.ts`（台湾繁体）或`src/i18n/zh-HK.ts`（香港繁体）中写繁体文本
+- 前后端通信显示文本如错误信息、接口响应时，后端返回编码、前端查表实现多语言支持
 
 ## 架构模式
 

@@ -320,12 +320,13 @@ const normalizeWebsite = (url: string): string =>
 /**
  * 校验 VNDB 与 Bangumi 是否同一主体
  *
- * 名称集合相交或官网归一化相等即通过；否则返回警告文案（不阻断，由调用方决定是否继续）。
+ * 名称集合相交或官网归一化相等即通过；否则返回警告文案的翻译键与插值参数
+ * （不阻断，由调用方决定是否继续）。
  */
 export function ensureSameCompany(
   vndb: VndbProducer,
   bangumi: BangumiCompany,
-): { ok: true } | { ok: false; message: string } {
+): { ok: true } | { ok: false; key: string; params: Record<string, unknown> } {
   const vndbNames = new Set([vndb.name, ...vndb.aliases].map(normalizeName).filter(Boolean));
   const bgmNames = new Set([bangumi.name, ...bangumi.aliases].map(normalizeName).filter(Boolean));
   const nameMatch = [...vndbNames].some((n) => bgmNames.has(n));
@@ -339,6 +340,7 @@ export function ensureSameCompany(
   }
   return {
     ok: false,
-    message: `VNDB 与 Bangumi 公司信息可能不一致：VNDB=${vndb.name}，Bangumi=${bangumi.name}。如确认无误，可忽略此警告继续生成。`,
+    key: 'VNDB 与 Bangumi 公司信息可能不一致：VNDB={{vndb}}，Bangumi={{bgm}}。如确认无误，可忽略此警告继续生成。',
+    params: { vndb: vndb.name, bgm: bangumi.name },
   };
 }

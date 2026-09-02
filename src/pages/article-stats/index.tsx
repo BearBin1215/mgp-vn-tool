@@ -20,114 +20,117 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { uniq } from 'es-toolkit';
+import { useTranslation } from 'react-i18next';
 import Page from '@/components/page';
 import MoegirlLink from '@/components/moegirl-link';
 import { useArticleStore, initArticles, type Article } from '@/stores/article-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
 import UpdateCheckModal from './update-check-modal';
 import FilterPanel, { filterInitialValues, type FilterValues } from './filter-panel';
 import CategoryPanel, { type CategorySelection } from './category-panel';
 import './index.css';
-
-const columns: TableColumnsType<Article> = [
-  {
-    title: '原名',
-    dataIndex: 'ja',
-    key: 'ja',
-  },
-  {
-    title: '条目名',
-    dataIndex: 'title',
-    key: 'title',
-    render: (_, record) => record.redirect ? (
-      <>
-        <MoegirlLink title={record.title} params={{ redirect: 'no' }}>
-          <i>{record.title}</i>
-        </MoegirlLink>
-        →
-        <MoegirlLink title={record.redirect} />
-      </>
-    ) : <MoegirlLink title={record.title} />,
-  },
-  {
-    title: '制作组织',
-    dataIndex: 'brand',
-    key: 'brand',
-  },
-  {
-    title: '分类',
-    dataIndex: 'categories',
-    key: 'categories',
-    render: (_, record) => {
-      /** 游戏平台分类折叠起来放进 `+N` 标签内 */
-      const platformCategories = (record.categories || []).filter((c) => c.endsWith('游戏') && !c.endsWith('冒险游戏'));
-      const otherCategories = (record.categories || []).filter((c) => !(c.endsWith('游戏') && !c.endsWith('冒险游戏')));
-      return (
-        <div className='flex flex-wrap gap-1'>
-          {otherCategories.map((c) => <Tag key={c}>{c}</Tag>)}
-          {platformCategories.length === 1 && <Tag>{platformCategories[0]}</Tag>}
-          {platformCategories.length > 1 && (
-            <Popover
-              content={
-                <div className='flex flex-wrap gap-1 max-w-80'>
-                  {platformCategories.map((c) => <Tag key={c}>{c}</Tag>)}
-                </div>
-              }
-            >
-              <Tag className='cursor-default' color='processing'>+{platformCategories.length}</Tag>
-            </Popover>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    title: '重定向',
-    dataIndex: 'redirects',
-    key: 'redirects',
-    width: 80,
-    align: 'center',
-    render: (_, record) => record.redirects?.length ? (
-      <Tooltip
-        title={
-          <ul className='pl-4 m-0 list-disc'>
-            {record.redirects.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
-        }
-      >
-        <span className='cursor-default inline-flex items-center gap-1'>
-          <EnterOutlined />
-          {record.redirects.length}
-        </span>
-      </Tooltip>
-    ) : null,
-  },
-  {
-    title: '发行时间',
-    dataIndex: 'releaseDate',
-    key: 'releaseDate',
-    width: 120,
-    sorter: (a, b) => a.releaseDate.localeCompare(b.releaseDate),
-  },
-  {
-    title: '创建时间',
-    dataIndex: 'creationDate',
-    key: 'creationDate',
-    width: 120,
-    defaultSortOrder: 'ascend',
-    sorter: (a, b) => a.creationDate.localeCompare(b.creationDate),
-  },
-];
 
 /** 当前展开的筛选面板 */
 type ActivePanel = 'filter' | 'category' | null;
 
 export default function ArticleStats() {
   const { message, modal } = App.useApp();
+  const { t } = useTranslation();
   const navigate = useNavigate();
+
+  // 表格列定义依赖 t，随界面语言变化重建
+  const columns: TableColumnsType<Article> = useMemo(() => [
+    {
+      title: t('原名'),
+      dataIndex: 'ja',
+      key: 'ja',
+    },
+    {
+      title: t('条目名'),
+      dataIndex: 'title',
+      key: 'title',
+      render: (_, record) => record.redirect ? (
+        <>
+          <MoegirlLink title={record.title} params={{ redirect: 'no' }}>
+            <i>{record.title}</i>
+          </MoegirlLink>
+          →
+          <MoegirlLink title={record.redirect} />
+        </>
+      ) : <MoegirlLink title={record.title} />,
+    },
+    {
+      title: t('制作组织'),
+      dataIndex: 'brand',
+      key: 'brand',
+    },
+    {
+      title: t('分类'),
+      dataIndex: 'categories',
+      key: 'categories',
+      render: (_, record) => {
+        /** 游戏平台分类折叠起来放进 `+N` 标签内 */
+        const platformCategories = (record.categories || []).filter((c) => c.endsWith('游戏') && !c.endsWith('冒险游戏'));
+        const otherCategories = (record.categories || []).filter((c) => !(c.endsWith('游戏') && !c.endsWith('冒险游戏')));
+        return (
+          <div className='flex flex-wrap gap-1'>
+            {otherCategories.map((c) => <Tag key={c}>{c}</Tag>)}
+            {platformCategories.length === 1 && <Tag>{platformCategories[0]}</Tag>}
+            {platformCategories.length > 1 && (
+              <Popover
+                content={
+                  <div className='flex flex-wrap gap-1 max-w-80'>
+                    {platformCategories.map((c) => <Tag key={c}>{c}</Tag>)}
+                  </div>
+                }
+              >
+                <Tag className='cursor-default' color='processing'>+{platformCategories.length}</Tag>
+              </Popover>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      title: t('重定向'),
+      dataIndex: 'redirects',
+      key: 'redirects',
+      width: 80,
+      align: 'center',
+      render: (_, record) => record.redirects?.length ? (
+        <Tooltip
+          title={
+            <ul className='pl-4 m-0 list-disc'>
+              {record.redirects.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          }
+        >
+          <span className='cursor-default inline-flex items-center gap-1'>
+            <EnterOutlined />
+            {record.redirects.length}
+          </span>
+        </Tooltip>
+      ) : null,
+    },
+    {
+      title: t('发行时间'),
+      dataIndex: 'releaseDate',
+      key: 'releaseDate',
+      width: 120,
+      sorter: (a, b) => a.releaseDate.localeCompare(b.releaseDate),
+    },
+    {
+      title: t('创建时间'),
+      dataIndex: 'creationDate',
+      key: 'creationDate',
+      width: 120,
+      defaultSortOrder: 'ascend',
+      sorter: (a, b) => a.creationDate.localeCompare(b.creationDate),
+    },
+  ], [t]);
 
   // ─── Store 数据 ───
   const articles = useArticleStore((s) => s.articles);
@@ -230,10 +233,10 @@ export default function ArticleStats() {
   const ensureFeishuConfig = () => {
     if (feishuStatsTableAppId && feishuStatsTableAppSecret) { return true; }
     modal.confirm({
-      title: '缺少配置',
-      content: '请先在设置页面填写飞书 App ID 和 App Secret',
-      okText: '前往设置',
-      cancelText: '取消',
+      title: t('缺少配置'),
+      content: t('请先在设置页面填写飞书 App ID 和 App Secret'),
+      okText: t('前往设置'),
+      cancelText: t('取消'),
       onOk: () => {
         navigate('/settings#feishu');
       },
@@ -248,9 +251,9 @@ export default function ArticleStats() {
     useArticleStore.getState().checkUpdates(feishuStatsTableAppId, feishuStatsTableAppSecret)
       .then((count) => {
         if (count > 0) {
-          message.success(`检测到 ${count} 个候选条目，请完善后提交`);
+          message.success(t('检测到 {{count}} 个候选条目，请完善后提交', { count }));
         } else {
-          message.info('没有检测到新条目');
+          message.info(t('没有检测到新条目'));
           setUpdateCheckOpen(false);
         }
       })
@@ -275,9 +278,9 @@ export default function ArticleStats() {
     if (!ensureFeishuConfig()) { return; }
     try {
       await useArticleStore.getState().fetchFeishuTable(feishuStatsTableAppId, feishuStatsTableAppSecret);
-      message.success('获取条目列表成功，正在获取分类和重定向信息…');
+      message.success(t('获取条目列表成功，正在获取分类和重定向信息…'));
       await useArticleStore.getState().fetchPageData();
-      message.success('数据更新成功');
+      message.success(t('数据更新成功'));
     } catch (err) {
       message.error(formatError(err), 5);
     }
@@ -297,10 +300,10 @@ export default function ArticleStats() {
     <Page
       className='flex flex-col'
       padding={false}
-      subtitle={updatedAt ? `最近更新：${dayjs(updatedAt).format('YYYY年M月D日 HH:mm')}` : undefined}
+      subtitle={updatedAt ? t('最近更新：{{time}}', { time: dayjs(updatedAt).format('YYYY年M月D日 HH:mm') }) : undefined}
       actions={
         <>
-          <Tooltip title='条件筛选'>
+          <Tooltip title={t('条件筛选')}>
             <Button
               variant='outlined'
               color={activePanel === 'filter' ? 'primary' : undefined}
@@ -308,7 +311,7 @@ export default function ArticleStats() {
               onClick={() => togglePanel('filter')}
             />
           </Tooltip>
-          <Tooltip title='分类筛选'>
+          <Tooltip title={t('分类筛选')}>
             <Button
               variant='outlined'
               color={activePanel === 'category' ? 'primary' : undefined}
@@ -316,7 +319,7 @@ export default function ArticleStats() {
               onClick={() => togglePanel('category')}
             />
           </Tooltip>
-          <Tooltip title='检查更新'>
+          <Tooltip title={t('检查更新')}>
             <Button
               variant='outlined'
               icon={<CloudDownloadOutlined />}
@@ -325,7 +328,7 @@ export default function ArticleStats() {
               onClick={handleCheckUpdates}
             />
           </Tooltip>
-          <Tooltip title='更新'>
+          <Tooltip title={t('更新')}>
             <Button
               variant='outlined'
               icon={<ReloadOutlined />}
@@ -362,14 +365,14 @@ export default function ArticleStats() {
           bordered={false}
           pagination={{
             pageSize: articlePageSize,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: (total) => t('共 {{total}} 条', { total }),
             onChange: (_page: number, pageSize: number) => {
               setArticlePageSize(pageSize);
             },
           }}
           virtual
           scroll={{ y: tableHeight }}
-          locale={{ emptyText: '暂无数据' }}
+          locale={{ emptyText: t('暂无数据') }}
           rowKey={(record) => `${record.ja}-${record.title}`}
           className='article-stats-table flex-1!'
         />
@@ -377,9 +380,9 @@ export default function ArticleStats() {
 
       <Modal
         open={!!updateModalOpen}
-        title='数据更新提示'
-        okText='更新'
-        cancelText='取消'
+        title={t('数据更新提示')}
+        okText={t('更新')}
+        cancelText={t('取消')}
         onOk={() => {
           setUpdateModalOpen(false);
           handleRefresh();
@@ -387,8 +390,11 @@ export default function ArticleStats() {
         onCancel={() => setUpdateModalOpen(false)}
       >
         {articles.length === 0
-          ? '当前暂无条目数据，是否立即获取？'
-          : `上次数据更新于${dayjs(updatedAt).format('YYYY年M月D日 HH:mm')}（${updateModalOpen}天前），是否更新？`}
+          ? t('当前暂无条目数据，是否立即获取？')
+          : t('上次数据更新于{{time}}（{{days}}天前），是否更新？', {
+            time: dayjs(updatedAt).format('YYYY年M月D日 HH:mm'),
+            days: updateModalOpen,
+          })}
       </Modal>
 
       <UpdateCheckModal

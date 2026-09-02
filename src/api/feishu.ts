@@ -1,11 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { ToolErrorShape } from '@/utils/error';
 
 /** 飞书追加结果；样式失败不会回滚已写入的数据。 */
 export interface FeishuAppendResult {
   /** 飞书返回的实际写入范围 */
   updated_range: string | null;
-  /** 数据已写入但样式设置失败时的警告 */
-  style_warnings: string[];
+  /** 数据已写入但样式设置失败时的警告（结构化错误，展示时经 formatError 翻译） */
+  style_warnings: ToolErrorShape[];
 }
 
 /** 统计表追加行的业务字段；物理列顺序由 Rust 端统一处理。 */

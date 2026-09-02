@@ -31,9 +31,11 @@
     "antd": "^6.6.2",
     "dayjs": "^1.11.23",
     "es-toolkit": "^1.52.0",
+    "i18next": "^26.4.1",
     "lucide-react": "^1.37.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-i18next": "^17.0.12",
     "react-router": "^8.3.1",
     "zustand": "^5.0.15"
   },

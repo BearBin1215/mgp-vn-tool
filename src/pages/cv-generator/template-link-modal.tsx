@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import { App, Button, Input, Table, Modal, type TableColumnsType } from 'antd';
 import { CheckOutlined, SearchOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import moegirl from '@/api/moegirl';
 import MoegirlLink from '@/components/moegirl-link';
+import { formatError } from '@/utils/error';
 
 interface TemplateLink {
   text: string;
@@ -17,6 +19,7 @@ interface TemplateLinkModalProps {
 
 export default function TemplateLinkModal({ open, onClose, onSelect }: TemplateLinkModalProps) {
   const { message } = App.useApp();
+  const { t } = useTranslation();
   const [links, setLinks] = useState<TemplateLink[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -50,7 +53,7 @@ export default function TemplateLinkModal({ open, onClose, onSelect }: TemplateL
         href: a.getAttribute('href') || '',
       })));
     } catch (e) {
-      message.error(`获取模板失败: ${e instanceof Error ? e.message : e}`);
+      message.error(t('获取模板失败: {{detail}}', { detail: formatError(e) }));
     } finally {
       setLoading(false);
     }
@@ -67,9 +70,9 @@ export default function TemplateLinkModal({ open, onClose, onSelect }: TemplateL
   };
 
   const columns: TableColumnsType<TemplateLink & { key: string }> = useMemo(() => [
-    { title: '声优名', dataIndex: 'text', key: 'text' },
+    { title: t('声优名'), dataIndex: 'text', key: 'text' },
     {
-      title: '条目名',
+      title: t('条目名'),
       dataIndex: 'href',
       key: 'href',
       render: (href: string) => {
@@ -87,7 +90,7 @@ export default function TemplateLinkModal({ open, onClose, onSelect }: TemplateL
       },
     },
     {
-      title: '操作',
+      title: t('操作'),
       key: 'action',
       width: 100,
       align: 'center',
@@ -101,16 +104,16 @@ export default function TemplateLinkModal({ open, onClose, onSelect }: TemplateL
             handleClose();
           }}
         >
-          选择
+          {t('选择')}
         </Button>
       ),
     },
-  ], [onSelect]);
+  ], [t, onSelect]);
 
   return (
     <Modal
       open={open}
-      title={<><MoegirlLink title='Template:R-18作品声优索引'>{'{{R-18作品声优索引}}'}</MoegirlLink>中未创建的页面</>}
+      title={<><MoegirlLink title='Template:R-18作品声优索引'>{'{{R-18作品声优索引}}'}</MoegirlLink>{t('中未创建的页面')}</>}
       footer={null}
       onCancel={handleClose}
       afterOpenChange={(visible) => { if (visible) { handleOpen(); } }}
@@ -132,7 +135,7 @@ export default function TemplateLinkModal({ open, onClose, onSelect }: TemplateL
             size='small'
             pagination={{
               pageSize,
-              showTotal: (total) => `共 ${total} 条`,
+              showTotal: (total) => t('共 {{total}} 条', { total }),
               onChange: (_page, size) => setPageSize(size),
             }}
           />

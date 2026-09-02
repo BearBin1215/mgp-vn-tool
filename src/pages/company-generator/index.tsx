@@ -10,6 +10,7 @@ import {
   type TableColumnsType,
 } from 'antd';
 import { CheckOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import Page from '@/components/page';
 import CodePanel from '@/components/code-panel';
 import EmptyPlaceholder from '@/components/empty-placeholder';
@@ -27,7 +28,8 @@ import {
 import { fetchPageInfo, type PageInfo } from '@/api/moegirl';
 import { useArticleStore } from '@/stores/article-store';
 import { buildGameArticleMap } from '@/utils/article-map';
-import { resolveInputId, formatError } from '@/utils/text';
+import { formatError } from '@/utils/error';
+import { resolveInputId } from '@/utils/text';
 import { toTableData } from '@/utils/table';
 import { generateCompanyWikitext, ensureSameCompany, type CompanyData } from './generate-wikitext';
 
@@ -94,12 +96,15 @@ const PRODUCER_TYPE_LABELS: Record<string, string> = {
 };
 
 /** 生成 VNDB 搜索下拉项的展示文本：名称（原文、别名…）【类型】 */
-const producerOptionLabel = (item: {
-  name: string;
-  original: string | null;
-  aliases: string[];
-  type: string | null;
-}): string => {
+const producerOptionLabel = (
+  item: {
+    name: string;
+    original: string | null;
+    aliases: string[];
+    type: string | null;
+  },
+  t: (text: string) => string,
+): string => {
   const parts: string[] = [item.name];
   // 括号内收集 original 与所有别名，去空、去重、去掉与 name 重复项，用顿号连接
   const extras: string[] = [];
@@ -116,17 +121,22 @@ const producerOptionLabel = (item: {
     parts.push(`（${extras.join('、')}）`);
   }
   if (item.type && PRODUCER_TYPE_LABELS[item.type]) {
-    parts.push(`【${PRODUCER_TYPE_LABELS[item.type]}】`);
+    parts.push(`【${t(PRODUCER_TYPE_LABELS[item.type])}】`);
   }
   return parts.join('');
 };
 
 /** 生成人类可读的作品数量摘要 */
-function countLabel(data: CompanyData | null) {
+function countLabel(data: CompanyData | null, t: (key: string, options?: Record<string, unknown>) => string) {
   if (!data) {
-    return '尚未生成';
+    return t('尚未生成');
   }
-  return `Galgame ${data.galgames.length} / 动画 ${data.anime.length} / 音乐 ${data.music.length} / 书籍 ${data.book.length}`;
+  return t('Galgame {{galgame}} / 动画 {{anime}} / 音乐 {{music}} / 书籍 {{book}}', {
+    galgame: data.galgames.length,
+    anime: data.anime.length,
+    music: data.music.length,
+    book: data.book.length,
+  });
 }
 
 /** 日期或占位：空值显示 '-' */
@@ -134,72 +144,73 @@ const dateOrDash = (v: string | null) => v || '-';
 
 type TableVndbWork = VndbWork & { key: string };
 
-/** 游戏作品表格列定义（VNDB Galgame） */
-const galgameColumns: TableColumnsType<TableVndbWork> = [
-  {
-    title: '原名',
-    dataIndex: 'original_title',
-    key: 'original_title',
-  },
-  {
-    title: '中文名',
-    dataIndex: 'chinese_title',
-    key: 'chinese_title',
-    render: (v: string | null) => v || '-',
-  },
-  {
-    title: '发售日期',
-    dataIndex: 'date',
-    key: 'date',
-    width: 120,
-    render: dateOrDash,
-  },
-  {
-    title: 'VN',
-    dataIndex: 'id',
-    key: 'id',
-    width: 80,
-    render: (id: string) => (
-      <a
-        href={`https://vndb.org/${id}`}
-        target='_blank'
-        rel='noreferrer'
-      >
-        {id}
-      </a>
-    ),
-  },
-];
-
 type TableBangumiWork = BangumiWork & { key: string };
-
-/** 衍生作品表格列定义（Bangumi 动画/音乐/书籍通用） */
-const bangumiWorkColumns: TableColumnsType<TableBangumiWork> = [
-  {
-    title: '原名',
-    dataIndex: 'name',
-    key: 'name',
-  },
-  {
-    title: '中文名',
-    dataIndex: 'name_cn',
-    key: 'name_cn',
-    render: (v: string | null) => v || '-',
-  },
-  {
-    title: '发售日期',
-    dataIndex: 'date',
-    key: 'date',
-    width: 120,
-    render: dateOrDash,
-  },
-];
 
 /** Galgame 会社条目生成页面 */
 export default function CompanyGenerator() {
   const { message, modal } = App.useApp();
+  const { t } = useTranslation();
   const articles = useArticleStore((s) => s.articles);
   const updatedAt = useArticleStore((s) => s.updatedAt);
+
+  /** 游戏作品表格列定义（VNDB Galgame），依赖 t 随界面语言变化重建 */
+  const galgameColumns: TableColumnsType<TableVndbWork> = useMemo(() => [
+    {
+      title: t('原名'),
+      dataIndex: 'original_title',
+      key: 'original_title',
+    },
+    {
+      title: t('中文名'),
+      dataIndex: 'chinese_title',
+      key: 'chinese_title',
+      render: (v: string | null) => v || '-',
+    },
+    {
+      title: t('发售日期'),
+      dataIndex: 'date',
+      key: 'date',
+      width: 120,
+      render: dateOrDash,
+    },
+    {
+      title: 'VN',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+      render: (id: string) => (
+        <a
+          href={`https://vndb.org/${id}`}
+          target='_blank'
+          rel='noreferrer'
+        >
+          {id}
+        </a>
+      ),
+    },
+  ], [t]);
+
+  /** 衍生作品表格列定义（Bangumi 动画/音乐/书籍通用） */
+  const bangumiWorkColumns: TableColumnsType<TableBangumiWork> = useMemo(() => [
+    {
+      title: t('原名'),
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: t('中文名'),
+      dataIndex: 'name_cn',
+      key: 'name_cn',
+      render: (v: string | null) => v || '-',
+    },
+    {
+      title: t('发售日期'),
+      dataIndex: 'date',
+      key: 'date',
+      width: 120,
+      render: dateOrDash,
+    },
+  ], [t]);
 
   const gameArticleMap = useMemo(() => buildGameArticleMap(articles), [articles]);
   const searchInputRef = useRef<SearchInputHandle>(null);
@@ -236,7 +247,7 @@ export default function CompanyGenerator() {
     const results = await searchVndbProducers(keyword);
     return results.map((item) => ({
       value: item.name,
-      label: producerOptionLabel(item),
+      label: producerOptionLabel(item, t),
       id: item.id,
     }));
   };
@@ -288,11 +299,11 @@ export default function CompanyGenerator() {
   /** 根据当前输入抓取数据并生成条目 wikitext */
   const handleGenerate = async () => {
     if (!producerId) {
-      message.warning('请通过名称搜索选择会社，或直接输入 VNDB producer id');
+      message.warning(t('请通过名称搜索选择会社，或直接输入 VNDB producer id'));
       return;
     }
     if (bangumiInvalid) {
-      message.warning('Bangumi 输入无法识别，请输入 person id 或条目链接');
+      message.warning(t('Bangumi 输入无法识别，请输入 person id 或条目链接'));
       return;
     }
 
@@ -307,7 +318,7 @@ export default function CompanyGenerator() {
 
       // Bangumi 为可选数据源：用户填了 id 但请求失败降级为空时，非阻断提示（含失败原因）
       if (bgmPersonId && bangumiError) {
-        message.warning(`Bangumi 数据获取失败，已仅以 VNDB 数据生成：${formatError(bangumiError)}`, 5);
+        message.warning(t('Bangumi 数据获取失败，已仅以 VNDB 数据生成：{{detail}}', { detail: formatError(bangumiError) }), 5);
       }
 
       // 查询会社大家族模板页面信息（Template:{会社名}）
@@ -316,7 +327,7 @@ export default function CompanyGenerator() {
         try {
           pageInfoMap = await fetchPageInfo([`Template:${companyData.vndb.name}`]);
         } catch {
-          message.warning('获取会社大家族模板信息失败，将跳过模板');
+          message.warning(t('获取会社大家族模板信息失败，将跳过模板'));
         }
       }
 
@@ -325,13 +336,13 @@ export default function CompanyGenerator() {
         const check = ensureSameCompany(companyData.vndb, companyData.bangumi);
         if (!check.ok) {
           modal.confirm({
-            title: '会社匹配警告',
-            content: check.message,
-            okText: '仍要继续',
-            cancelText: '取消',
+            title: t('会社匹配警告'),
+            content: t(check.key, check.params),
+            okText: t('仍要继续'),
+            cancelText: t('取消'),
             onOk: () => {
               render(companyData, pageInfoMap);
-              message.success('生成完成');
+              message.success(t('生成完成'));
             },
           });
           return;
@@ -339,9 +350,9 @@ export default function CompanyGenerator() {
       }
 
       render(companyData, pageInfoMap);
-      message.success('生成完成');
+      message.success(t('生成完成'));
     } catch (e) {
-      message.error(`生成失败: ${formatError(e)}`);
+      message.error(t('生成失败: {{detail}}', { detail: formatError(e) }));
     } finally {
       setLoading(false);
     }
@@ -352,16 +363,16 @@ export default function CompanyGenerator() {
       <Page
         actions={
           <HelpButton>
-            <li>VNDB 为必填项，用于生成会社基础信息与 Galgame 作品列表。</li>
-            <li>Bangumi 为可选项，用于补充 Logo、别名、官网和衍生作品（动画、音乐、书籍）。</li>
-            <li>Bangumi 网络环境较差，请求失败时会自动跳过，仅以 VNDB 数据生成条目。</li>
-            <li>作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。</li>
-            <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
+            <li>{t('VNDB 为必填项，用于生成会社基础信息与 Galgame 作品列表。')}</li>
+            <li>{t('Bangumi 为可选项，用于补充 Logo、别名、官网和衍生作品（动画、音乐、书籍）。')}</li>
+            <li>{t('Bangumi 网络环境较差，请求失败时会自动跳过，仅以 VNDB 数据生成条目。')}</li>
+            <li>{t('作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。')}</li>
+            <li>{t('提交前务必认真检查内容，如有错漏本工具不承担责任。')}</li>
           </HelpButton>
         }
       >
         <EmptyArticleWarning
-          subTitle='条目统计数据为空，生成条目时可能无法正常生成作品内链。建议先前往条目统计页面获取数据。'
+          subTitle={t('条目统计数据为空，生成条目时可能无法正常生成作品内链。建议先前往条目统计页面获取数据。')}
           onDismiss={() => setDismissedEmptyWarning(true)}
         />
       </Page>
@@ -373,11 +384,11 @@ export default function CompanyGenerator() {
       className='flex flex-col'
       actions={
         <HelpButton>
-          <li>VNDB 为必填项，用于生成会社基础信息与 Galgame 作品列表。</li>
-          <li>Bangumi 为可选项，用于补充 Logo、别名、官网和衍生作品（动画、音乐、书籍）。</li>
-          <li>Bangumi 网络环境较差，请求失败时会自动跳过，仅以 VNDB 数据生成条目。</li>
-          <li>作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。</li>
-          <li>提交前务必认真检查内容，如有错漏本工具不承担责任。</li>
+          <li>{t('VNDB 为必填项，用于生成会社基础信息与 Galgame 作品列表。')}</li>
+          <li>{t('Bangumi 为可选项，用于补充 Logo、别名、官网和衍生作品（动画、音乐、书籍）。')}</li>
+          <li>{t('Bangumi 网络环境较差，请求失败时会自动跳过，仅以 VNDB 数据生成条目。')}</li>
+          <li>{t('作品内链根据条目统计及重定向页判断添加，遇到续作、特殊符号等无法判断，可能需要手动补充。')}</li>
+          <li>{t('提交前务必认真检查内容，如有错漏本工具不承担责任。')}</li>
         </HelpButton>
       }
     >
@@ -390,7 +401,7 @@ export default function CompanyGenerator() {
             onValueChange={handleProducerValueChange}
             onIdChange={handleProducerIdChange}
             disabled={loading}
-            placeholder='通过名称搜索 VNDB 会社，或直接输入 producer id'
+            placeholder={t('通过名称搜索 VNDB 会社，或直接输入 producer id')}
           />
           <SearchInput
             ref={bangumiInputRef}
@@ -399,7 +410,7 @@ export default function CompanyGenerator() {
             onValueChange={handleBangumiValueChange}
             onIdChange={handleBangumiIdChange}
             disabled={loading}
-            placeholder='通过名称搜索 Bangumi 会社，或直接输入 person id / 链接'
+            placeholder={t('通过名称搜索 Bangumi 会社，或直接输入 person id / 链接')}
           />
           <Button
             type='primary'
@@ -408,18 +419,18 @@ export default function CompanyGenerator() {
             disabled={!producerId || bangumiInvalid}
             onClick={handleGenerate}
           >
-            开始生成
+            {t('开始生成')}
           </Button>
         </div>
         <div className='flex flex-wrap items-center gap-4 text-xs text-(--ant-color-text-secondary)'>
-          <span>已识别：VNDB {producerId || '-'}，Bangumi {bgmPersonId || '-'}</span>
-          <span>{countLabel(data)}</span>
+          <span>{t('已识别：VNDB {{vndb}}，Bangumi {{bgm}}', { vndb: producerId || '-', bgm: bgmPersonId || '-' })}</span>
+          <span>{countLabel(data, t)}</span>
         </div>
       </div>
 
       {loading && (
         <div className='flex-1 flex items-center justify-center'>
-          <Spin description='正在生成会社条目...' />
+          <Spin description={t('正在生成会社条目...')} />
         </div>
       )}
       {!loading && data && (
@@ -440,7 +451,7 @@ export default function CompanyGenerator() {
             className='flex flex-col min-w-0'
           >
             <div className='flex items-center justify-between shrink-0 px-1 h-6'>
-              <Typography.Text strong>VNDB/Bangumi原始数据</Typography.Text>
+              <Typography.Text strong>{t('VNDB/Bangumi原始数据')}</Typography.Text>
             </div>
             <div className='overflow-auto flex-1 min-h-0 border border-(--ant-color-border)'>
               <Descriptions
@@ -457,10 +468,10 @@ export default function CompanyGenerator() {
                     {data.vndb.name}
                   </a>
                 </Descriptions.Item>
-                <Descriptions.Item label='VNDB 别名'>
+                <Descriptions.Item label={t('VNDB 别名')}>
                   {data.vndb.aliases?.join('、') || '-'}
                 </Descriptions.Item>
-                <Descriptions.Item label='VNDB 官网'>
+                <Descriptions.Item label={t('VNDB 官网')}>
                   {data.vndb.official_website || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label='Bangumi'>
@@ -474,17 +485,17 @@ export default function CompanyGenerator() {
                     </a>
                   ) : '-'}
                 </Descriptions.Item>
-                <Descriptions.Item label='Bangumi 别名'>
+                <Descriptions.Item label={t('Bangumi 别名')}>
                   {data.bangumi?.aliases?.join('、') || '-'}
                 </Descriptions.Item>
-                <Descriptions.Item label='作品数量'>
-                  {countLabel(data)}
+                <Descriptions.Item label={t('作品数量')}>
+                  {countLabel(data, t)}
                 </Descriptions.Item>
               </Descriptions>
 
               {tableData.galgame.length > 0 && (
                 <>
-                  <Typography.Text strong>游戏作品</Typography.Text>
+                  <Typography.Text strong>{t('游戏作品')}</Typography.Text>
                   <Table
                     columns={galgameColumns}
                     dataSource={tableData.galgame}
@@ -495,7 +506,7 @@ export default function CompanyGenerator() {
               )}
               {tableData.anime.length > 0 && (
                 <>
-                  <Typography.Text strong>衍生动画</Typography.Text>
+                  <Typography.Text strong>{t('衍生动画')}</Typography.Text>
                   <Table
                     columns={bangumiWorkColumns}
                     dataSource={tableData.anime}
@@ -506,7 +517,7 @@ export default function CompanyGenerator() {
               )}
               {tableData.music.length > 0 && (
                 <>
-                  <Typography.Text strong>衍生音乐</Typography.Text>
+                  <Typography.Text strong>{t('衍生音乐')}</Typography.Text>
                   <Table
                     columns={bangumiWorkColumns}
                     dataSource={tableData.music}
@@ -517,7 +528,7 @@ export default function CompanyGenerator() {
               )}
               {tableData.book.length > 0 && (
                 <>
-                  <Typography.Text strong>衍生书籍</Typography.Text>
+                  <Typography.Text strong>{t('衍生书籍')}</Typography.Text>
                   <Table
                     columns={bangumiWorkColumns}
                     dataSource={tableData.book}
@@ -531,7 +542,7 @@ export default function CompanyGenerator() {
         </Splitter>
       )}
       {!loading && !data && (
-        <EmptyPlaceholder description='输入 VNDB 公司条目后开始生成会社条目 wikitext' />
+        <EmptyPlaceholder description={t('输入 VNDB 公司条目后开始生成会社条目 wikitext')} />
       )}
     </Page>
   );

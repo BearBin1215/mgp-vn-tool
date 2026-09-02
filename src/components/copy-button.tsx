@@ -1,6 +1,8 @@
 import { Button, Tooltip, App } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+import { formatError } from '@/utils/error';
 
 interface CopyButtonProps {
   /** 待复制的文本 */
@@ -10,8 +12,9 @@ interface CopyButtonProps {
 /** 复制文本到剪贴板的按钮 */
 export default function CopyButton({ text }: CopyButtonProps) {
   const { message } = App.useApp();
+  const { t } = useTranslation();
   return (
-    <Tooltip title='复制到剪贴板'>
+    <Tooltip title={t('复制到剪贴板')}>
       <Button
         type='text'
         size='small'
@@ -20,13 +23,13 @@ export default function CopyButton({ text }: CopyButtonProps) {
         onClick={async () => {
           try {
             await writeText(text);
-            message.success('已复制到剪贴板');
+            message.success(t('已复制到剪贴板'));
           } catch (e) {
-            message.error(`复制失败: ${e instanceof Error ? e.message : e}`);
+            message.error(t('复制失败: {{detail}}', { detail: formatError(e) }));
           }
         }}
       >
-        复制
+        {t('复制')}
       </Button>
     </Tooltip>
   );

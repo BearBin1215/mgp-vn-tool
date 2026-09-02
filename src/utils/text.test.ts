@@ -5,7 +5,6 @@ import {
   extractBrand,
   extractJa,
   extractReleaseDate,
-  formatError,
   generateExternalLinksWikitext,
   isNumeric,
   kataToHira,
@@ -251,16 +250,6 @@ describe('resolveFamilyTemplate', () => {
 
   it('空名称返回 null', () => {
     expect(resolveFamilyTemplate('', pageInfoMap)).toBe(null);
-  });
-});
-
-describe('formatError', () => {
-  it('Error 实例取 message', () => {
-    expect(formatError(new Error('boom'))).toBe('boom');
-  });
-
-  it('非 Error 值转为字符串', () => {
-    expect(formatError(42)).toBe('42');
   });
 });
 

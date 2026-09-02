@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import feishu from '@/api/feishu';
 import moegirl, { fetchPageInfo, getMoegirlQueryBatchSize } from '@/api/moegirl';
 import { ApiParams } from '@/lib/types';
+import { createLocalizedError } from '@/utils/error';
 import { extractBrand, extractJa, extractReleaseDate } from '@/utils/text';
 import { loadConfigStore } from '@/lib/config-store';
 
@@ -420,7 +421,10 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
         '',
       );
       if (!latestCreationDate || !dayjs(latestCreationDate).isValid()) {
-        throw new Error('表格中没有可用的创建时间基准，无法确定增量起点');
+        throw createLocalizedError(
+          'article_creation_date_baseline_missing',
+          '表格中没有可用的创建时间基准，无法确定增量起点',
+        );
       }
 
       // E 列仅有日期精度，起点取该日零点；终点为当前时间

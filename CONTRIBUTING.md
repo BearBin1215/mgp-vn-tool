@@ -9,6 +9,7 @@
   - [检查](#检查)
   - [TypeScript / React](#typescript--react)
   - [样式](#样式)
+- [简繁支持](#简繁支持)
 - [持久化存储](#持久化存储)
   - [与 Zustand 集成](#与-zustand-集成)
   - [存储文件](#存储文件)
@@ -47,6 +48,7 @@ pnpm tauri dev
 - **样式**: [Tailwind CSS v4](https://tailwindcss.com/) + [Ant Design v6](https://ant.design/index-cn/)
 - **状态管理**: [Zustand](https://zustand.docs.pmnd.rs/)
 - **路由**: [React Router v8](https://reactrouter.com/)（无需react-router-dom）
+- **国际化**: [i18next](https://www.i18next.com/) + [react-i18next](https://react.i18next.com/)（简繁变体）
 - **构建**: [Vite 8](https://cn.vitejs.dev/) + [Tauri v2](https://tauri.app/zh-cn/)
 
 ## 构建并发布
@@ -154,6 +156,37 @@ function App() {
 - `--ant-color-border`：边框色
 - `--ant-color-border-secondary`：次级边框色
 
+
+## 简繁支持
+
+应用界面支持简体中文、繁体中文（臺灣）与繁体中文（香港），基于 i18next 实现。用户在设置页的「界面语言」切换，选择持久化在 `settings.json` 的 `uiLanguage` 字段，启动时由 `initI18n()` 初始化。
+
+采用 natural key 模式，即**界面文案的 key 就是简体原文**，因此代码中直接写简体中文即可运行，不需要预先维护语言包：
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+function MyComponent() {
+  const { t } = useTranslation();
+  return <Button>{t('生成条目')}</Button>;
+}
+```
+
+新增或修改界面文案时：
+
+1. 代码中直接写简体原文，并用 `t()` 包裹
+2. 需要动态内容的，用 `{{}}` 插值，不要拼接字符串：
+   ```tsx
+   t('共 {{count}} 条结果', { count: total })
+   ```
+3. 在 [`src/i18n/zh-TW.ts`](/src/i18n/zh-TW.ts)（台湾繁体）和 [`src/i18n/zh-HK.ts`](/src/i18n/zh-HK.ts)（香港繁体）中补充对应的繁体映射，key 必须与简体原文完全一致；未收录的 key 会自动回退显示简体，不会白屏
+
+注意事项：
+
+- 已禁用 `keySeparator` 和 `nsSeparator`，避免原文中的冒号、点号被误解析为分隔符
+- 不要在业务代码里自行做简繁转换或手写语言映射表
+- 语言选项名称（如「简体中文」「繁體中文（臺灣）」「繁體中文（香港）」）按各自语言展示，不参与转换
+- 代码注释、提交信息、文档统一使用简体中文，只有面向用户的界面文案才需要转换
 
 ## 持久化存储
 

@@ -5,8 +5,9 @@ use std::collections::HashMap;
 
 use futures_util::stream::StreamExt;
 use scraper::Element;
-use serde_json::Value;
+use serde_json::{json, Value};
 
+use crate::error::ToolError;
 use crate::settings;
 
 /// 批评空间连接配置
@@ -22,7 +23,7 @@ struct ErogamescapeSettings {
 }
 
 /// 从 Tauri Store 读取批评空间连接配置
-fn read_settings(app: &tauri::AppHandle) -> Result<ErogamescapeSettings, String> {
+fn read_settings(app: &tauri::AppHandle) -> Result<ErogamescapeSettings, ToolError> {
     let store = settings::store(app)?;
 
     let url = store
@@ -55,7 +56,7 @@ fn log_snippet(text: &str) -> String {
 }
 
 /// 向批评空间 SQL 接口发送 POST 请求，返回原始 HTML 响应
-async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), String> {
+async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), ToolError> {
     let settings = read_settings(app)?;
     let sql_url = format!(
         "{}/sql_for_erogamer_form.php",
@@ -65,8 +66,7 @@ async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), St
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(timeout))
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build()?;
 
     let mut req = client.post(&sql_url).form(&[("sql", sql)]);
 
@@ -76,16 +76,24 @@ async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), St
     }
 
     let resp = req.send().await.map_err(|e| {
-        let msg = if e.is_timeout() {
-            format!("请求超时（{timeout}秒）")
+        let err = if e.is_timeout() {
+            ToolError::new(
+                "ero_timeout",
+                [("seconds", json!(timeout))],
+                format!("请求超时（{timeout}秒）"),
+            )
         } else {
-            format!("请求失败: {e}")
+            ToolError::new(
+                "ero_request_failed",
+                [("detail", json!(e.to_string()))],
+                format!("请求失败: {e}"),
+            )
         };
-        log::error!("批评空间请求失败\n  URL: {sql_url}\n  错误: {msg}");
-        msg
+        log::error!("批评空间请求失败\n  URL: {sql_url}\n  错误: {err}");
+        err
     })?;
     let status = resp.status().as_u16();
-    let text = resp.text().await.map_err(|e| e.to_string())?;
+    let text = resp.text().await?;
     if !(200..300).contains(&status) {
         let snippet = log_snippet(&text);
         log::error!("批评空间请求失败\n  URL: {sql_url}\n  SQL: {sql}\n  状态码: {status}\n  响应: {snippet}");
@@ -97,10 +105,10 @@ async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), St
 ///
 /// `#query_result_main` 容器内仅有一个结果表格。若未找到数据表格但容器内存在错误
 /// 提示（如 SQL 执行成本超限、语法错误），返回该提示文本作为错误，以便上层透传给前端。
-fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
+fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), ToolError> {
     let document = scraper::Html::parse_document(html);
-    let container_selector =
-        scraper::Selector::parse("#query_result_main").map_err(|e| format!("{e:?}"))?;
+    let container_selector = scraper::Selector::parse("#query_result_main")
+        .map_err(|e| ToolError::raw(format!("{e:?}")))?;
     let tr_selector = scraper::Selector::parse("tr").unwrap();
     let th_selector = scraper::Selector::parse("th").unwrap();
     let td_selector = scraper::Selector::parse("td").unwrap();
@@ -141,7 +149,8 @@ fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Str
     if let Some(p) = container.select(&p_selector).next() {
         let msg = p.text().collect::<String>().trim().to_string();
         if !msg.is_empty() {
-            return Err(msg);
+            // 上游错误提示为日文原文，不翻译，直接透传展示
+            return Err(ToolError::raw(msg));
         }
     }
 
@@ -158,10 +167,12 @@ fn build_col_idx(columns: &[String]) -> HashMap<String, usize> {
 }
 
 /// 将结果包装为统一的 `{ statusCode, result, response }` JSON
+///
+/// HTTP 状态类错误（`ero_http_status`）从参数中提取状态码作为 statusCode，其余记为 0。
 async fn wrap_response<F, Fut>(f: F) -> Value
 where
     F: FnOnce() -> Fut,
-    Fut: std::future::Future<Output = Result<Value, String>>,
+    Fut: std::future::Future<Output = Result<Value, ToolError>>,
 {
     match f().await {
         Ok(data) => serde_json::json!({
@@ -170,13 +181,17 @@ where
             "response": data,
         }),
         Err(e) => {
-            let code = e
-                .strip_prefix("HTTP ")
-                .and_then(|r| r.split(':').next())
-                .unwrap_or("0");
+            let status_code = if e.code == "ero_http_status" {
+                e.params
+                    .get("status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("0")
+            } else {
+                "0"
+            };
             log::error!("批评空间查询失败: {e}");
             serde_json::json!({
-                "statusCode": code,
+                "statusCode": status_code,
                 "result": "fail",
                 "response": e,
             })
@@ -185,11 +200,15 @@ where
 }
 
 /// 检查 HTTP 状态码，非 2xx 时返回带状态码的错误信息
-fn check_status(status: u16) -> Result<(), String> {
+fn check_status(status: u16) -> Result<(), ToolError> {
     if (200..300).contains(&status) {
         Ok(())
     } else {
-        Err(format!("HTTP {status}"))
+        Err(ToolError::new(
+            "ero_http_status",
+            [("status", json!(status.to_string()))],
+            format!("HTTP {status}"),
+        ))
     }
 }
 
@@ -203,13 +222,12 @@ fn escape_sql_like(keyword: &str) -> String {
 
 /// 检测批评空间连通性
 #[tauri::command]
-pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, String> {
+pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, ToolError> {
     let settings = read_settings(&app)?;
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(settings.timeout))
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build()?;
 
     // 向sql执行页而不是有较多动态内容的主页发请求，减少压力和响应内容
     let sql_url = format!(
@@ -225,16 +243,20 @@ pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, String> 
     let resp = match req.send().await {
         Ok(r) => r,
         Err(e) => {
-            let msg = if e.is_timeout() {
-                format!("请求超时（{}秒）", settings.timeout)
+            let err = if e.is_timeout() {
+                ToolError::new(
+                    "ero_timeout",
+                    [("seconds", json!(settings.timeout))],
+                    format!("请求超时（{}秒）", settings.timeout),
+                )
             } else {
-                e.to_string()
+                ToolError::raw(e.to_string())
             };
-            log::error!("批评空间连通性检测失败\n  URL: {sql_url}\n  错误: {msg}");
+            log::error!("批评空间连通性检测失败\n  URL: {sql_url}\n  错误: {err}");
             return Ok(serde_json::json!({
                 "statusCode": "0",
                 "result": "fail",
-                "response": msg,
+                "response": err,
             }));
         }
     };
@@ -272,11 +294,17 @@ pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, String> 
 ///   - sellDay: 发售日
 ///   - model: 机型/平台
 #[tauri::command]
-pub async fn query_creator_works(app: tauri::AppHandle, creator_id: u64) -> Result<Value, String> {
+pub async fn query_creator_works(
+    app: tauri::AppHandle,
+    creator_id: u64,
+) -> Result<Value, ToolError> {
     Ok(wrap_response(|| do_query_creator_works(&app, creator_id)).await)
 }
 
-async fn do_query_creator_works(app: &tauri::AppHandle, creator_id: u64) -> Result<Value, String> {
+async fn do_query_creator_works(
+    app: &tauri::AppHandle,
+    creator_id: u64,
+) -> Result<Value, ToolError> {
     // 查询创作者信息及参与作品
     // game_id 仅后端内部使用，用于追加 Fan Disk/追加篇/重制版 关联查询，不输出到前端 GameRecord
     let sql = format!(
@@ -429,7 +457,7 @@ async fn query_game_connections(app: &tauri::AppHandle, game_ids: &[String]) -> 
                 }))
             })
             .collect();
-        Ok::<Vec<Value>, String>(connections)
+        Ok::<Vec<Value>, ToolError>(connections)
     }
     .await;
 
@@ -446,11 +474,11 @@ async fn query_game_connections(app: &tauri::AppHandle, game_ids: &[String]) -> 
 ///
 /// 使用 LIKE 进行模糊匹配，最多返回 10 条结果
 #[tauri::command]
-pub async fn search_creators(app: tauri::AppHandle, keyword: String) -> Result<Value, String> {
+pub async fn search_creators(app: tauri::AppHandle, keyword: String) -> Result<Value, ToolError> {
     Ok(wrap_response(|| do_search_creators(&app, &keyword)).await)
 }
 
-async fn do_search_creators(app: &tauri::AppHandle, keyword: &str) -> Result<Value, String> {
+async fn do_search_creators(app: &tauri::AppHandle, keyword: &str) -> Result<Value, ToolError> {
     // 转义单引号（关键词由用户输入）
     let safe_keyword = escape_sql_like(keyword);
     // 使用 JOIN + GROUP BY 替代多个相关子查询，避免对每个候选 creater 重复扫描 shokushu 表：
@@ -499,11 +527,11 @@ async fn do_search_creators(app: &tauri::AppHandle, keyword: &str) -> Result<Val
 /// gamelist.brandname 是 brandlist.id 的外键，需 JOIN brandlist 取制作组织名称。
 /// 使用 LIKE 对 gamename 进行模糊匹配，最多返回 10 条结果
 #[tauri::command]
-pub async fn search_games(app: tauri::AppHandle, keyword: String) -> Result<Value, String> {
+pub async fn search_games(app: tauri::AppHandle, keyword: String) -> Result<Value, ToolError> {
     Ok(wrap_response(|| do_search_games(&app, &keyword)).await)
 }
 
-async fn do_search_games(app: &tauri::AppHandle, keyword: &str) -> Result<Value, String> {
+async fn do_search_games(app: &tauri::AppHandle, keyword: &str) -> Result<Value, ToolError> {
     // 转义单引号（关键词由用户输入）
     let safe_keyword = escape_sql_like(keyword);
     let sql = format!(
@@ -546,11 +574,11 @@ async fn do_search_games(app: &tauri::AppHandle, keyword: &str) -> Result<Value,
 ///   提供其平台 model 与制作组织 brand，用于补充平台与发行商字段
 /// - sequels: 类型为 sequel 的续作（本作品为原作 game_object，续作为 game_subject）的游戏名列表
 #[tauri::command]
-pub async fn query_work_detail(app: tauri::AppHandle, work_id: u64) -> Result<Value, String> {
+pub async fn query_work_detail(app: tauri::AppHandle, work_id: u64) -> Result<Value, ToolError> {
     Ok(wrap_response(|| do_query_work_detail(&app, work_id)).await)
 }
 
-async fn do_query_work_detail(app: &tauri::AppHandle, work_id: u64) -> Result<Value, String> {
+async fn do_query_work_detail(app: &tauri::AppHandle, work_id: u64) -> Result<Value, ToolError> {
     // 作品自身信息：gamename/sellday/model/brand（brandlist JOIN 取制作组织名）
     // 额外取 shoukai(官网URL)/dlsite_id/dlsite_domain/twitter 用于外部链接章节
     let own_sql = format!(
@@ -564,7 +592,11 @@ async fn do_query_work_detail(app: &tauri::AppHandle, work_id: u64) -> Result<Va
     let (columns, rows) = parse_result_table(&html)?;
 
     if rows.is_empty() {
-        return Err(format!("未找到作品 id={work_id} 的信息"));
+        return Err(ToolError::new(
+            "ero_work_not_found",
+            [("work_id", json!(work_id))],
+            format!("未找到作品 id={work_id} 的信息"),
+        ));
     }
 
     let col_idx = build_col_idx(&columns);
@@ -638,7 +670,7 @@ async fn do_query_work_detail(app: &tauri::AppHandle, work_id: u64) -> Result<Va
                 _ => {}
             }
         }
-        Ok::<(Vec<Value>, Vec<String>), String>((transplants, sequels))
+        Ok::<(Vec<Value>, Vec<String>), ToolError>((transplants, sequels))
     }
     .await;
 
@@ -691,7 +723,7 @@ async fn do_query_work_detail(app: &tauri::AppHandle, work_id: u64) -> Result<Va
                 }))
             })
             .collect();
-        Ok::<Vec<Value>, String>(staff)
+        Ok::<Vec<Value>, ToolError>(staff)
     }
     .await;
     let staff = match staff {
@@ -720,7 +752,7 @@ async fn do_query_work_detail(app: &tauri::AppHandle, work_id: u64) -> Result<Va
 /// 获取批评空间普通页面 HTML（非 SQL 接口），复用连接配置与认证
 ///
 /// 与 `post_sql` 共用 `read_settings` 的 URL/认证/超时配置，但走 GET 请求直接获取页面。
-async fn fetch_page(app: &tauri::AppHandle, path: &str) -> Result<String, String> {
+async fn fetch_page(app: &tauri::AppHandle, path: &str) -> Result<String, ToolError> {
     let settings = read_settings(app)?;
     let url = format!(
         "{}/{}",
@@ -729,25 +761,36 @@ async fn fetch_page(app: &tauri::AppHandle, path: &str) -> Result<String, String
     );
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(settings.timeout))
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build()?;
     let mut req = client.get(&url);
     if let (Some(user), Some(pass)) = (&settings.username, &settings.password) {
         req = req.basic_auth(user, Some(pass.as_str()));
     }
     let resp = req.send().await.map_err(|e| {
         if e.is_timeout() {
-            format!("请求超时（{}秒）: {url}", settings.timeout)
+            ToolError::new(
+                "ero_timeout",
+                [("seconds", json!(settings.timeout))],
+                format!("请求超时（{}秒）: {url}", settings.timeout),
+            )
         } else {
-            format!("请求失败: {url}: {e}")
+            ToolError::new(
+                "ero_request_failed",
+                [("detail", json!(format!("{url}: {e}")))],
+                format!("请求失败: {url}: {e}"),
+            )
         }
     })?;
     let status = resp.status();
-    let text = resp.text().await.map_err(|e| e.to_string())?;
+    let text = resp.text().await?;
     if status.is_success() {
         Ok(text)
     } else {
-        Err(format!("HTTP {status}: {url}"))
+        Err(ToolError::new(
+            "ero_page_http_error",
+            [("status", json!(status.to_string())), ("url", json!(url))],
+            format!("HTTP {status}: {url}"),
+        ))
     }
 }
 
@@ -755,10 +798,10 @@ async fn fetch_page(app: &tauri::AppHandle, path: &str) -> Result<String, String
 ///
 /// 表格结构：每行含曲名(music id 链接)、分类、歌手。返回 `(music_id, song_name, singer)`。
 /// 分类不取（SQL 的 shubetu_detail_name 更精确，含角色名前缀如「レナED曲」）。
-fn parse_music_summary(html: &str) -> Result<Vec<(String, String, String)>, String> {
+fn parse_music_summary(html: &str) -> Result<Vec<(String, String, String)>, ToolError> {
     let document = scraper::Html::parse_document(html);
-    let container_sel =
-        scraper::Selector::parse("#music_summary_main").map_err(|e| format!("{e:?}"))?;
+    let container_sel = scraper::Selector::parse("#music_summary_main")
+        .map_err(|e| ToolError::raw(format!("{e:?}")))?;
     let tr_sel = scraper::Selector::parse("tr").unwrap();
     let td_sel = scraper::Selector::parse("td").unwrap();
     let a_sel = scraper::Selector::parse("a[href]").unwrap();
@@ -815,7 +858,11 @@ fn parse_music_detail(html: &str) -> (Vec<String>, Vec<String>, Vec<String>, Vec
     for container in document.select(&container_sel) {
         for th in container.select(&th_sel) {
             let Some(td) = th.next_sibling_element().and_then(|el| {
-                if el.value().name() == "td" { Some(el) } else { None }
+                if el.value().name() == "td" {
+                    Some(el)
+                } else {
+                    None
+                }
             }) else {
                 continue;
             };
@@ -881,11 +928,17 @@ fn extract_names_from_cell(td: scraper::ElementRef) -> Vec<String> {
 /// 本命令只负责获取 music id 对应的曲名与 per-song 创作者（作词/作曲/编曲/歌手）。
 /// 前端按曲名匹配 SQL 的分类信息。最大并发 3 个请求；单个失败时跳过该曲。
 #[tauri::command]
-pub async fn query_work_music_detail(app: tauri::AppHandle, work_id: u64) -> Result<Value, String> {
+pub async fn query_work_music_detail(
+    app: tauri::AppHandle,
+    work_id: u64,
+) -> Result<Value, ToolError> {
     Ok(wrap_response(|| do_query_work_music_detail(&app, work_id)).await)
 }
 
-async fn do_query_work_music_detail(app: &tauri::AppHandle, work_id: u64) -> Result<Value, String> {
+async fn do_query_work_music_detail(
+    app: &tauri::AppHandle,
+    work_id: u64,
+) -> Result<Value, ToolError> {
     // 1. 爬作品页 HTML，解析 #music_summary_main 拿 music id + 曲名 + 歌手
     let game_html = fetch_page(app, &format!("game.php?game={work_id}")).await?;
     let music_list = parse_music_summary(&game_html)?;

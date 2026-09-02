@@ -1,5 +1,6 @@
 mod bangumi;
 mod erogamescape;
+mod error;
 mod feishu;
 mod http;
 mod moegirl;
@@ -43,6 +44,14 @@ pub fn run() {
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
+
+            // 窗口标题跟随界面语言显示简繁变体，须在窗口显示前设置，避免启动时标题闪变；
+            // 繁体文案需与前端 src/i18n/zh-TW.ts 中的「萌百视研会条目工具」保持同步
+            let title = match settings::get_string(app.handle(), "uiLanguage").as_deref() {
+                Some("zh-TW") => "萌百視研會條目工具",
+                _ => "萌百视研会条目工具",
+            };
+            let _ = window.set_title(title);
 
             // 根据颜色主题设置窗口主题和 webview 背景色，减少闪屏
             // （仅 dark/light 生效；其他值或未设置时直接返回，不做处理）

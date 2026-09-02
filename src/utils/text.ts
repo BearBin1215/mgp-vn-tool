@@ -191,10 +191,6 @@ export const formatDateCN = (date: string | null): string => {
   return d.isValid() ? d.format('YYYY年M月D日') : date;
 };
 
-/** 将任意值格式化为可读的错误信息字符串 */
-export const formatError = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
-
 /**
  * 从条目 wikitext 源代码中提取游戏发行时间
  *

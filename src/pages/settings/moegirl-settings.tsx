@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, Button, Typography, Space, Select, Popover, Input, InputNumber } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useMoegirlStore } from '@/stores/moegirl-store';
 import { groupLabels } from '@/lib/moegirl-dict';
@@ -10,6 +11,7 @@ import SettingItem from './setting-item';
 
 /** 萌娘百科设置 */
 export default function MoegirlSettings() {
+  const { t } = useTranslation();
   const moegirlApiHost = useSettingsStore((s) => s.moegirlApiHost);
   const setMoegirlApiHost = useSettingsStore((s) => s.setMoegirlApiHost);
   const moegirlJumpHost = useSettingsStore((s) => s.moegirlJumpHost);
@@ -36,12 +38,12 @@ export default function MoegirlSettings() {
 
   return (
     <>
-      <Card title='萌娘百科' id='network-section'>
+      <Card title={t('萌娘百科')} id='network-section'>
         <div className='flex flex-col gap-4'>
           <SettingItem
-            label='登录账号'
-            description='用于请求萌娘百科API，建议使用机器人账号登录（如果有）'
-            help='目前而言，仅机器人等拥有API高限制的账号、或维护姬等拥有特定页面查看权限的账号有用，普通账号登录无影响'
+            label={t('登录账号')}
+            description={t('用于请求萌娘百科API，建议使用机器人账号登录（如果有）')}
+            help={t('目前而言，仅机器人等拥有API高限制的账号、或维护姬等拥有特定页面查看权限的账号有用，普通账号登录无影响')}
           >
             {moegirlUsername ? (
               <Space>
@@ -49,22 +51,22 @@ export default function MoegirlSettings() {
                 <Popover
                   content={
                     <div className='max-w-175'>
-                      {nickname && <div><b>用户名：</b>{moegirlUsername}</div>}
-                      <div><b>用户组：</b>{moegirlGroups.filter((g) => g !== '*').map((g) => groupLabels[g] || g).join('，') || '无'}</div>
-                      <div><b>权限：</b>{moegirlRights.join(', ') || '无'}</div>
+                      {nickname && <div><b>{t('用户名：')}</b>{moegirlUsername}</div>}
+                      <div><b>{t('用户组：')}</b>{moegirlGroups.filter((g) => g !== '*').map((g) => t(groupLabels[g] || g)).join('，') || t('无')}</div>
+                      <div><b>{t('权限：')}</b>{moegirlRights.join(', ') || t('无')}</div>
                     </div>
                   }
                   trigger='hover'
                 >
                   <InfoCircleOutlined className='cursor-pointer' />
                 </Popover>
-                <Button danger onClick={() => logoutMoegirl()}>退出</Button>
+                <Button danger onClick={() => logoutMoegirl()}>{t('退出')}</Button>
               </Space>
             ) : (
-              <Button type='primary' onClick={() => setLoginDialogOpen(true)}>登录</Button>
+              <Button type='primary' onClick={() => setLoginDialogOpen(true)}>{t('登录')}</Button>
             )}
           </SettingItem>
-          <SettingItem label='请求地址' description='请求萌娘百科 API 的域名'>
+          <SettingItem label={t('请求地址')} description={t('请求萌娘百科 API 的域名')}>
             <Select
               className='w-60!'
               value={moegirlApiHost}
@@ -75,19 +77,19 @@ export default function MoegirlSettings() {
               ]}
             />
           </SettingItem>
-          <SettingItem label='跳转地址' description='点击萌百链接时跳转的域名'>
+          <SettingItem label={t('跳转地址')} description={t('点击萌百链接时跳转的域名')}>
             <Select
               className='w-60!'
               value={moegirlJumpHost}
               onChange={(v) => setMoegirlJumpHost(v as MoegirlHost | 'same')}
               options={[
-                { value: 'same', label: '和请求地址一致' },
+                { value: 'same', label: t('和请求地址一致') },
                 { value: 'zh.moegirl.org.cn', label: 'zh.moegirl.org.cn' },
                 { value: 'mzh.moegirl.org.cn', label: 'mzh.moegirl.org.cn' },
               ]}
             />
           </SettingItem>
-          <SettingItem label='请求重试' description='请求失败时的重试次数和间隔'>
+          <SettingItem label={t('请求重试')} description={t('请求失败时的重试次数和间隔')}>
             <div className='flex gap-1'>
               <InputNumber
                 className='w-22!'
@@ -97,7 +99,7 @@ export default function MoegirlSettings() {
                 controls={false}
                 value={moegirlRetries}
                 onChange={(v) => v !== null && setMoegirlRetries(v)}
-                suffix='次'
+                suffix={t('次')}
               />
               <InputNumber
                 className='w-37!'
@@ -107,12 +109,12 @@ export default function MoegirlSettings() {
                 controls={false}
                 value={moegirlRetryDelay}
                 onChange={(v) => v !== null && setMoegirlRetryDelay(v)}
-                prefix='间隔'
+                prefix={t('间隔')}
                 suffix='ms'
               />
             </div>
           </SettingItem>
-          <SettingItem label='User-Agent' description='请求萌娘百科时使用的 User-Agent'>
+          <SettingItem label='User-Agent' description={t('请求萌娘百科时使用的 User-Agent')}>
             <Input
               className='w-60!'
               value={moegirlUserAgent}

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { Layout as AntLayout, Typography } from 'antd';
 import { flatRoutes } from '@/routes';
 
@@ -18,6 +19,7 @@ interface PageProps {
 
 export default function Page({ actions, subtitle, padding = true, className, children }: PageProps) {
   const location = useLocation();
+  const { t } = useTranslation();
   const label = flatRoutes.find((r) => r.path === location.pathname)?.label || '';
 
   return (
@@ -25,7 +27,7 @@ export default function Page({ actions, subtitle, padding = true, className, chi
       <AntLayout.Header
         className='flex items-center px-6! flex-none gap-4 border-b border-(--ant-color-border-secondary)'
       >
-        <span className='text-base font-semibold'>{label}</span>
+        <span className='text-base font-semibold'>{t(label)}</span>
         {subtitle && <Typography.Text type='secondary' className='text-xs'>{subtitle}</Typography.Text>}
         <span className='flex-1' />
         <div className='flex items-center gap-2'>{actions}</div>

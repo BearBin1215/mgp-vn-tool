@@ -14,7 +14,9 @@ use cookie_store::{CookieError, CookieStore};
 use keyring::Entry;
 use reqwest::header::{HeaderMap, HeaderValue, COOKIE, SET_COOKIE, USER_AGENT};
 use reqwest::Url;
+use serde_json::json;
 
+use crate::error::ToolError;
 use crate::settings;
 
 /// 系统凭据存储的 service 名称
@@ -193,7 +195,7 @@ pub async fn moegirl_request(
     method: String,
     params: HashMap<String, serde_json::Value>,
     user_agent: Option<String>,
-) -> Result<serde_json::Value, String> {
+) -> Result<serde_json::Value, ToolError> {
     // 读取重试配置
     let max_retries = settings::get_f64(&app, "moegirlRetries")
         .map(|v| v as u32)
@@ -204,11 +206,15 @@ pub async fn moegirl_request(
 
     // 校验请求域名是否在白名单内，避免域名设置被篡改后请求外发到非萌百站点
     if !ALLOWED_MOEGIRL_HOSTS.contains(&host.as_str()) {
-        return Err(format!("非法的萌百域名: {host}"));
+        return Err(ToolError::new(
+            "moegirl_invalid_host",
+            [("host", json!(host))],
+            format!("非法的萌百域名: {host}"),
+        ));
     }
 
     let url = Url::parse(&format!("https://{host}{API_PATH}"))
-        .map_err(|e| format!("萌百 API URL 构建失败: {e}"))?;
+        .map_err(|e| ToolError::raw(format!("萌百 API URL 构建失败: {e}")))?;
 
     // 构建请求头
     let mut headers = HeaderMap::new();
@@ -219,8 +225,7 @@ pub async fn moegirl_request(
     }
     let client = reqwest::Client::builder()
         .default_headers(headers)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build()?;
 
     // 将参数值转为字符串，数组用 | 拼接，并添加默认参数
     let mut string_params: HashMap<String, String> = HashMap::new();
@@ -267,7 +272,13 @@ pub async fn moegirl_request(
         let mut request = match method.to_uppercase().as_str() {
             "GET" => client.get(url.clone()).query(&string_params),
             "POST" => client.post(url.clone()).form(&string_params),
-            _ => return Err(format!("Unsupported method: {method}")),
+            _ => {
+                return Err(ToolError::new(
+                    "moegirl_unsupported_method",
+                    [("method", json!(method))],
+                    format!("Unsupported method: {method}"),
+                ));
+            }
         };
         if let Some(cookie_str) = cookie_header_for(&url) {
             if let Ok(value) = HeaderValue::from_str(&cookie_str) {
@@ -296,7 +307,7 @@ pub async fn moegirl_request(
         }
 
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| e.to_string())?;
+        let text = resp.text().await?;
 
         // HTTP 非 2xx 时重试
         if !status.is_success() {
@@ -310,8 +321,13 @@ pub async fn moegirl_request(
 
         persist_cookies();
 
-        let data: serde_json::Value =
-            serde_json::from_str(&text).map_err(|_| format!("非 JSON 响应: {text}"))?;
+        let data: serde_json::Value = serde_json::from_str(&text).map_err(|_| {
+            ToolError::new(
+                "moegirl_non_json_response",
+                [("detail", json!(text))],
+                format!("非 JSON 响应: {text}"),
+            )
+        })?;
 
         // 检查 API 级别错误（MediaWiki 即使 HTTP 200 也可能包含 error 字段）
         if let Some(error) = data.get("error") {
@@ -326,7 +342,11 @@ pub async fn moegirl_request(
             log::error!(
                 "萌娘百科 API 错误\n  URL: {url}\n  方法: {method}\n  错误码: {code}\n  信息: {info}"
             );
-            return Err(format!("萌娘百科 API 错误 [{code}]: {info}"));
+            return Err(ToolError::new(
+                "moegirl_api_error",
+                [("code", json!(code)), ("info", json!(info))],
+                format!("萌娘百科 API 错误 [{code}]: {info}"),
+            ));
         }
 
         return Ok(data);
@@ -335,7 +355,14 @@ pub async fn moegirl_request(
     log::error!(
         "萌娘百科请求失败（重试 {max_retries} 次后）\n  URL: {url}\n  方法: {method}\n  最后错误: {last_error}"
     );
-    Err(format!("请求失败（重试 {max_retries} 次后）: {last_error}"))
+    Err(ToolError::new(
+        "moegirl_request_failed",
+        [
+            ("retries", json!(max_retries)),
+            ("detail", json!(last_error)),
+        ],
+        format!("请求失败（重试 {max_retries} 次后）: {last_error}"),
+    ))
 }
 
 /// 清除内存和凭据存储中的 cookie，实现登出

@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import {
   Layout as AntLayout,
   Menu as AntMenu,
@@ -11,38 +12,40 @@ import { routes, type RouteConfig } from '@/routes';
 const topRoutes = routes.filter((r) => r.path !== '/' && (r.position ?? 'top') === 'top');
 const bottomRoutes = routes.filter((r) => r.path !== '/' && (r.position ?? 'bottom') === 'bottom');
 
-/** 将路由配置转为 antd Menu 的 items，二级菜单分组以 label 作为 key */
-function buildMenuItems(configs: RouteConfig[]): MenuProps['items'] {
+/** 将路由配置转为 antd Menu 的 items，二级菜单分组以原始 label 作为 key，展示文本经翻译转换 */
+function buildMenuItems(configs: RouteConfig[], t: (label: string) => string): MenuProps['items'] {
   return configs.map((r) => {
     if (r.children) {
       return {
-        key: r.label!,
+        key: r.label,
         icon: r.icon,
-        label: r.label,
-        children: buildMenuItems(r.children),
+        label: t(r.label),
+        children: buildMenuItems(r.children, t),
       };
     }
     return {
       key: r.path!,
       icon: r.icon,
-      label: r.label,
+      label: t(r.label),
     };
   });
 }
 
 /** 收集所有二级菜单分组的 key（用于默认展开） */
 function collectGroupKeys(configs: RouteConfig[]): string[] {
-  return configs.filter((r) => r.children).map((r) => r.label!);
+  return configs.filter((r) => r.children).map((r) => r.label);
 }
 
-const topItems = buildMenuItems(topRoutes);
-const bottomItems = buildMenuItems(bottomRoutes);
 const topOpenKeys = collectGroupKeys(topRoutes);
 
 /** 应用左侧菜单 */
 export default function LayoutMenu() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
+
+  const topItems = buildMenuItems(topRoutes, t);
+  const bottomItems = buildMenuItems(bottomRoutes, t);
 
   const handleClick: MenuProps['onClick'] = ({ key }) => {
     // 仅叶子菜单（路径）触发导航，分组标题不处理
@@ -71,7 +74,7 @@ export default function LayoutMenu() {
           `}
           onClick={() => navigate('/')}
         >
-          视研会条目工具
+          {t('视研会条目工具')}
         </AntLayout.Header>
       </div>
       <div className='flex-1 overflow-auto'>

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { uniq } from 'es-toolkit';
 import { Button, Input, Modal, Radio, Space, Tag, Tooltip, Typography } from 'antd';
 import { ClearOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { Article } from '@/stores/article-store';
 
 /** 预设分类，无论成员数量多少都参与展示排序 */
@@ -33,6 +34,7 @@ interface CategoryPanelProps {
 
 /** 分类筛选面板：高频分类标签、OR/AND 切换与「全部分类」弹窗 */
 export default function CategoryPanel({ articles, value, onChange }: CategoryPanelProps) {
+  const { t } = useTranslation();
   const { selected, mode } = value;
 
   // 「全部分类」弹窗状态，仅面板内部使用
@@ -88,20 +90,20 @@ export default function CategoryPanel({ articles, value, onChange }: CategoryPan
       <div className='flex items-start gap-6'>
         <div className='flex-1'>
           <div className='mb-2 flex items-center gap-2'>
-            <Typography.Text type='secondary'>按分类筛选</Typography.Text>
+            <Typography.Text type='secondary'>{t('按分类筛选')}</Typography.Text>
             {allCategories.length > displayCategories.length && (
               <Button
                 size='small'
                 type='link'
                 onClick={() => setModalOpen(true)}
               >
-                全部分类（{allCategories.length}）
+                {t('全部分类（{{count}}）', { count: allCategories.length })}
               </Button>
             )}
           </div>
           <div className='flex flex-wrap gap-2'>
             {displayCategories.length === 0 ? (
-              <Typography.Text type='secondary'>暂无分类数据</Typography.Text>
+              <Typography.Text type='secondary'>{t('暂无分类数据')}</Typography.Text>
             ) : (
               displayCategories.map((cat) => (
                 <Tag.CheckableTag
@@ -125,13 +127,13 @@ export default function CategoryPanel({ articles, value, onChange }: CategoryPan
             <Radio.Button value='or'>OR</Radio.Button>
             <Radio.Button value='and'>AND</Radio.Button>
           </Radio.Group>
-          <Tooltip title='清空'>
+          <Tooltip title={t('清空')}>
             <Button
               variant='outlined'
               icon={<ClearOutlined />}
               onClick={() => update([], 'or')}
             >
-              清空
+              {t('清空')}
             </Button>
           </Tooltip>
         </Space>
@@ -139,14 +141,14 @@ export default function CategoryPanel({ articles, value, onChange }: CategoryPan
 
       <Modal
         open={modalOpen}
-        title='全部分类'
+        title={t('全部分类')}
         footer={null}
         onCancel={closeModal}
         width={800}
       >
         <Input
           className='mb-3!'
-          placeholder='搜索分类'
+          placeholder={t('搜索分类')}
           allowClear
           value={search}
           onChange={(e) => setSearch(e.target.value)}
