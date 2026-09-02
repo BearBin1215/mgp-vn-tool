@@ -25,17 +25,29 @@ pnpm install
 # 启动开发服务器（同时启动前端和 Tauri）
 pnpm tauri dev
 
-# 前端类型检查
-pnpm tsc --noEmit
-
-# 后端检查
+# 后端静态检查
 cargo check
+
+# 后端代码静态分析
+cargo clippy
+
+# 后端测试
+cargo test
+
+# 前端类型检查
+pnpm typecheck
 
 # 前端 eslint 检查
 pnpm lint
 
 # 前端 eslint 检查并修复
 pnpm lint:fix
+
+# 前端单元测试（vitest）
+pnpm test
+
+# 前端聚合检查（typecheck + lint + test）
+pnpm check
 ```
 
 ## 项目结构
@@ -68,7 +80,6 @@ mgp-vn-tool/
 │   │   ├── about/              # 关于页面（首页）
 │   │   ├── settings/           # 设置页面
 │   │   ├── article-stats/      # 条目统计
-│   │   │   └── update-check-modal.tsx # 检查更新弹窗
 │   │   └── ...
 │   ├── stores/                 # Zustand 状态管理及对应持久化存储
 │   │   ├── settings-store.ts   # 应用设置
@@ -288,12 +299,6 @@ Props：
   - 添加持久化逻辑
 2. 在 `src/pages/settings/index.tsx` 中添加 UI
 
-## 故障排查
-
-- **类型错误**: 运行 `pnpm tsc --noEmit`
-- **ESLint 错误**: 执行 eslint 指令，能自动修复的用 `--fix` 参数自动修复，不能自动修复的进行提示
-- **Tauri 启动失败**: 检查 Rust 环境和依赖
-
 ## 萌娘百科相关
 
 萌娘百科基于 MediaWiki 系统，涉及部分用语如下：
@@ -311,3 +316,4 @@ Props：
 
 - 审查安全性时，批评空间镜像站账号密码、飞书统计表 App Secret 属于应用配置，按现有产品范围使用明文存储；飞书功能包含向统计表追加数据和设置样式，审查时应关注写入权限、错误信息是否泄露凭据，以及萌百请求中的 Cookie 是否泄露。现阶段不涉及提交内容到萌娘百科的功能
 - 批评空间 SQL 执行页只能用于读取，且本身有防注入，无需考虑安全风险
+- 如非后果极其严重，不考虑用户不规范使用导致预期外行为（比如手动修改设置文件）

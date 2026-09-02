@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import moegirl from '@/api/moegirl';
 import { DEFAULT_USER_AGENT, DEFAULT_FEISHU_APP_ID } from '@/utils/constants';
-import { type ErogamescapeUrl, type MoegirlHost } from '@/lib/types';
+import { isErogamescapeUrl, type ErogamescapeUrl, type MoegirlHost } from '@/lib/types';
 import { loadConfigStore } from '@/lib/config-store';
 import { changeUiLanguage, type UiLanguage } from '@/i18n';
 import { createLocalizedError } from '@/utils/error';
@@ -111,6 +111,19 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === 'nu
 /** 检查值是否为非空字符串。 */
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 
+/** 批评空间默认地址 */
+const DEFAULT_EROGAMESCAPE_URL: ErogamescapeUrl = 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki';
+
+/**
+ * 归一化批评空间地址
+ *
+ * 历史版本存储的地址可能带尾斜杠，裁剪后匹配白名单；无法匹配时回退默认值。
+ */
+const normalizeErogamescapeUrl = (value: string): ErogamescapeUrl => {
+  const trimmed = value.replace(/\/+$/, '') as ErogamescapeUrl;
+  return isErogamescapeUrl(trimmed) ? trimmed : DEFAULT_EROGAMESCAPE_URL;
+};
+
 /** 应用设置 store，持久化到 Tauri store */
 export const useSettingsStore = create<SettingsStore>((set) => ({
   colorMode: 'light',
@@ -154,7 +167,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     set({ codeFont: font });
   },
 
-  erogamescapeUrl: 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki',
+  erogamescapeUrl: DEFAULT_EROGAMESCAPE_URL,
   setErogamescapeHost: async (host) => {
     await persistSetting('erogamescapeUrl', host);
     set({ erogamescapeUrl: host });
@@ -302,7 +315,7 @@ export const initSettings = async () => {
     readSetting('codeFont', '', isNonEmptyString),
     readSetting('backgroundImage', '', isNonEmptyString),
     readSetting('backgroundImageTransparency', 90, isFiniteNumber),
-    readSetting<ErogamescapeUrl>('erogamescapeUrl', 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki', isNonEmptyString),
+    readSetting('erogamescapeUrl', DEFAULT_EROGAMESCAPE_URL, isNonEmptyString).then(normalizeErogamescapeUrl),
     readSetting('erogamescapeTimeout', 30, isFiniteNumber),
     readSetting('bangumiTimeout', 30, isFiniteNumber),
     readSetting('bangumiRetries', 2, isFiniteNumber),

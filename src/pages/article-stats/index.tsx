@@ -4,19 +4,11 @@ import {
   Table,
   Button,
   Tooltip,
-  Input,
-  Select,
-  DatePicker,
-  Typography,
-  Space,
-  Form,
-  Row,
-  Col,
   Tag,
-  Radio,
   Modal,
   Popover,
   App,
+  Form,
   type TableColumnsType,
 } from 'antd';
 import {
@@ -24,11 +16,9 @@ import {
   FilterOutlined,
   ReloadOutlined,
   TagsOutlined,
-  ClearOutlined,
-  UndoOutlined,
   EnterOutlined,
 } from '@ant-design/icons';
-import dayjs, { type Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import { uniq } from 'es-toolkit';
 import { useTranslation } from 'react-i18next';
 import Page from '@/components/page';
@@ -37,28 +27,12 @@ import { useArticleStore, initArticles, type Article } from '@/stores/article-st
 import { useSettingsStore } from '@/stores/settings-store';
 import { formatError } from '@/utils/error';
 import UpdateCheckModal from './update-check-modal';
+import FilterPanel, { filterInitialValues, type FilterValues } from './filter-panel';
+import CategoryPanel, { type CategorySelection } from './category-panel';
 import './index.css';
 
-const { RangePicker } = DatePicker;
-
-/** 预设分类 */
-const presetCategories = ['恋爱冒险游戏', '视觉小说', '冒险游戏'];
-
-interface FilterValues {
-  name: string;
-  brands: string[];
-  releaseDateRange: [Dayjs | null, Dayjs | null] | null;
-  creationDateRange: [Dayjs | null, Dayjs | null] | null;
-}
-
-const initialValues: FilterValues = {
-  name: '',
-  brands: [],
-  releaseDateRange: null,
-  creationDateRange: null,
-};
-
-type FilterPanel = 'filter' | 'category' | null;
+/** 当前展开的筛选面板 */
+type ActivePanel = 'filter' | 'category' | null;
 
 export default function ArticleStats() {
   const { message, modal } = App.useApp();
@@ -169,7 +143,7 @@ export default function ArticleStats() {
   const setArticlePageSize = useSettingsStore((s) => s.setArticlePageSize);
 
   // 显示的筛选区
-  const [activePanel, setActivePanel] = useState<FilterPanel>('filter');
+  const [activePanel, setActivePanel] = useState<ActivePanel>('filter');
 
   // ─── 表格容器高度（随窗口动态调整） ───
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -212,40 +186,15 @@ export default function ArticleStats() {
 
   // ─── 条件筛选 ───
   const [form] = Form.useForm<FilterValues>();
-  const [filterValues, setFilterValues] = useState<FilterValues>(initialValues);
+  const [filterValues, setFilterValues] = useState<FilterValues>(filterInitialValues);
 
   // ─── 分类筛选 ───
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [categoryMode, setCategoryMode] = useState<'and' | 'or'>('or');
-  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-  const [categorySearch, setCategorySearch] = useState('');
+  const [categorySelection, setCategorySelection] = useState<CategorySelection>({ selected: [], mode: 'or' });
 
   /** 制作组织集合，用于条件过滤选项 */
   const allBrands = useMemo(
     () => uniq(articles.map((a) => a.brand).filter(Boolean)).sort(),
     [articles],
-  );
-
-  /** 各分类成员数量 */
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const a of articles) {
-      for (const c of a.categories) {
-        counts.set(c, (counts.get(c) || 0) + 1);
-      }
-    }
-    return counts;
-  }, [articles]);
-
-  const allCategories = useMemo(() => {
-    return uniq([...presetCategories, ...articles.flatMap((a) => a.categories)])
-      .sort((a, b) => (categoryCounts.get(b) || 0) - (categoryCounts.get(a) || 0));
-  }, [articles, categoryCounts]);
-
-  /** 分类筛选仅展示成员超过5个的分类，最多展示30个，其余放入“全部分类”弹窗 */
-  const displayCategories = useMemo(
-    () => allCategories.filter((c) => (categoryCounts.get(c) || 0) > 5).slice(0, 30),
-    [allCategories, categoryCounts],
   );
 
   /** 筛选后的条目 */
@@ -267,6 +216,7 @@ export default function ArticleStats() {
       if (creationDateRange?.[1] && a.creationDate > creationDateRange[1].format('YYYY-MM-DD')) { return false; }
 
       // 分类筛选
+      const { selected: selectedCategories, mode: categoryMode } = categorySelection;
       if (selectedCategories.length > 0) {
         if (categoryMode === 'and') {
           if (!selectedCategories.every((c) => a.categories.includes(c))) { return false; }
@@ -277,7 +227,7 @@ export default function ArticleStats() {
 
       return true;
     });
-  }, [articles, filterValues, selectedCategories, categoryMode]);
+  }, [articles, filterValues, categorySelection]);
 
   /** 校验飞书配置，缺失时弹窗引导前往设置 */
   const ensureFeishuConfig = () => {
@@ -337,17 +287,13 @@ export default function ArticleStats() {
   };
 
   /** 切换筛选面板 */
-  const togglePanel = (panel: FilterPanel) => {
+  const togglePanel = (panel: ActivePanel) => {
     setActivePanel((prev) => (prev === panel ? null : panel));
-  };
-
-  const toggleCategory = (cat: string, checked: boolean) => {
-    setSelectedCategories((prev) => checked ? [...prev, cat] : prev.filter((c) => c !== cat));
   };
 
   const handleResetFilter = () => {
     form.resetFields();
-    setFilterValues(initialValues);
+    setFilterValues(filterInitialValues);
   };
 
   return (
@@ -395,136 +341,20 @@ export default function ArticleStats() {
       }
     >
       {activePanel === 'filter' && (
-        <div
-          className={`
-            p-4 pb-3 sticky top-0 z-10
-            bg-(--ant-color-bg-container)
-            border-b border-(--ant-color-border-secondary)
-          `}
-        >
-          <div className='flex items-start gap-4'>
-            <Form
-              form={form}
-              initialValues={initialValues}
-              onValuesChange={(_, allValues) => setFilterValues(allValues)}
-              layout='horizontal'
-              className='flex-1'
-            >
-              <Row gutter={24}>
-                <Col span={12}>
-                  <Form.Item name='name' label={t('作品名称')}>
-                    <Input placeholder={t('搜索原名或条目名')} />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name='brands' label={t('制作组织')}>
-                    <Select
-                      mode='multiple'
-                      placeholder={t('搜索或选择')}
-                      showSearch
-                      options={allBrands.map((brand) => ({
-                        value: brand,
-                        label: brand,
-                      }))}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={24}>
-                <Col span={12}>
-                  <Form.Item
-                    name='releaseDateRange'
-                    label={t('发行时间')}
-                    className='mb-2!'
-                  >
-                    <RangePicker className='w-full' />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name='creationDateRange'
-                    label={t('创建时间')}
-                    className='mb-2!'
-                  >
-                    <RangePicker className='w-full' />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Form>
-            <Tooltip title={t('重置')}>
-              <Button
-                variant='outlined'
-                icon={<UndoOutlined />}
-                onClick={handleResetFilter}
-              />
-            </Tooltip>
-          </div>
-        </div>
+        <FilterPanel
+          form={form}
+          allBrands={allBrands}
+          onValuesChange={setFilterValues}
+          onReset={handleResetFilter}
+        />
       )}
 
       {activePanel === 'category' && (
-        <div
-          className={`
-            filter-bar p-4 pb-3 sticky top-0 z-10
-            bg-(--ant-color-bg-container)
-            border-b border-(--ant-color-border-secondary)
-          `}
-        >
-          <div className='flex items-start gap-6'>
-            <div className='flex-1'>
-              <div className='mb-2 flex items-center gap-2'>
-                <Typography.Text type='secondary'>{t('按分类筛选')}</Typography.Text>
-                {allCategories.length > displayCategories.length && (
-                  <Button
-                    size='small'
-                    type='link'
-                    onClick={() => setCategoryModalOpen(true)}
-                  >
-                    {t('全部分类（{{count}}）', { count: allCategories.length })}
-                  </Button>
-                )}
-              </div>
-              <div className='flex flex-wrap gap-2'>
-                {displayCategories.length === 0 ? (
-                  <Typography.Text type='secondary'>{t('暂无分类数据')}</Typography.Text>
-                ) : (
-                  displayCategories.map((cat) => (
-                    <Tag.CheckableTag
-                      key={cat}
-                      checked={selectedCategories.includes(cat)}
-                      onChange={(checked) => toggleCategory(cat, checked)}
-                    >
-                      {cat}（{categoryCounts.get(cat) || 0}）
-                    </Tag.CheckableTag>
-                  ))
-                )}
-              </div>
-            </div>
-            <Space>
-              <Radio.Group
-                value={categoryMode}
-                onChange={(e) => setCategoryMode(e.target.value)}
-                optionType='button'
-                buttonStyle='solid'
-              >
-                <Radio.Button value='or'>OR</Radio.Button>
-                <Radio.Button value='and'>AND</Radio.Button>
-              </Radio.Group>
-              <Tooltip title={t('清空')}>
-                <Button
-                  variant='outlined'
-                  icon={<ClearOutlined />}
-                  onClick={() => {
-                    setSelectedCategories([]);
-                    setCategoryMode('or');
-                  }}
-                >
-                  {t('清空')}
-                </Button>
-              </Tooltip>
-            </Space>
-          </div>
-        </div>
+        <CategoryPanel
+          articles={articles}
+          value={categorySelection}
+          onChange={setCategorySelection}
+        />
       )}
 
       <div ref={tableContainerRef} className='flex-1! min-h-0 overflow-hidden flex flex-col p-3'>
@@ -565,35 +395,6 @@ export default function ArticleStats() {
             time: dayjs(updatedAt).format('YYYY年M月D日 HH:mm'),
             days: updateModalOpen,
           })}
-      </Modal>
-
-      <Modal
-        open={categoryModalOpen}
-        title={t('全部分类')}
-        footer={null}
-        onCancel={() => { setCategoryModalOpen(false); setCategorySearch(''); }}
-        width={800}
-      >
-        <Input
-          className='mb-3!'
-          placeholder={t('搜索分类')}
-          allowClear
-          value={categorySearch}
-          onChange={(e) => setCategorySearch(e.target.value)}
-        />
-        <div className='flex flex-wrap gap-2 max-h-96 overflow-auto'>
-          {allCategories
-            .filter((cat) => !categorySearch || cat.includes(categorySearch))
-            .map((cat) => (
-              <Tag.CheckableTag
-                key={cat}
-                checked={selectedCategories.includes(cat)}
-                onChange={(checked) => toggleCategory(cat, checked)}
-              >
-                {cat}（{categoryCounts.get(cat) || 0}）
-              </Tag.CheckableTag>
-            ))}
-        </div>
       </Modal>
 
       <UpdateCheckModal

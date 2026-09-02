@@ -15,9 +15,20 @@ import {
 import { CheckCircleOutlined, CloseCircleOutlined, ApiOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
+import { EROGAMESCAPE_URLS, type ErogamescapeUrl } from '@/lib/types';
 import { useSettingsStore } from '@/stores/settings-store';
 import { formatError, type ToolErrorShape } from '@/utils/error';
 import SettingItem from './setting-item';
+
+/** 各批评空间地址的显示标签，键与 ErogamescapeUrl 联合类型对齐，新增地址时编译器会提示补全；值为 i18n key，未收录时回退简体原文 */
+const URL_LABELS: Record<ErogamescapeUrl, string> = {
+  'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki': 'erogamescape.dyndns.org',
+  'https://erogamescape.org/~ap2/ero/toukei_kaiseki': 'erogamescape.org',
+  'https://ero.plumz.me': 'ero.plumz.me（镜像站）',
+};
+
+/** Select 的地址选项，从地址白名单生成保证无尾斜杠 */
+const urlOptions = EROGAMESCAPE_URLS.map((url) => ({ value: url, label: URL_LABELS[url] }));
 
 /** 批评空间设置 */
 export default function ErogamescapeSettings() {
@@ -41,6 +52,9 @@ export default function ErogamescapeSettings() {
   const [checking, setChecking] = useState(false);
 
   const currentResult = checkResults[erogamescapeUrl];
+
+  /** 地址选项，标签随界面语言翻译 */
+  const translatedUrlOptions = urlOptions.map((option) => ({ ...option, label: t(option.label) }));
 
   /** 检测批评空间连通性 */
   const testConnectivity = async () => {
@@ -94,11 +108,7 @@ export default function ErogamescapeSettings() {
                 className='grow'
                 value={erogamescapeUrl}
                 onChange={setErogamescapeHost}
-                options={[
-                  { value: 'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/', label: 'erogamescape.dyndns.org' },
-                  { value: 'https://erogamescape.org/~ap2/ero/toukei_kaiseki/', label: 'erogamescape.org' },
-                  { value: 'https://ero.plumz.me', label: t('ero.plumz.me（镜像站）') },
-                ]}
+                options={translatedUrlOptions}
               />
               <Tooltip title={t('检测连通性')}>
                 <Button

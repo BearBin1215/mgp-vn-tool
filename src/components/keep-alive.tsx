@@ -27,9 +27,9 @@ export default function KeepAlive({ routes }: KeepAliveProps) {
   const normalRoute = normalRoutes.find((r) => location.pathname === r.path);
 
   useEffect(() => {
-    if (!visited.has(location.pathname) && aliveRoutes.some((r) => location.pathname === r.path)) {
+    if (aliveRoutes.some((r) => location.pathname === r.path)) {
       // eslint-disable-next-line @eslint-react/set-state-in-effect
-      setVisited(new Set(visited).add(location.pathname));
+      setVisited((prev) => (prev.has(location.pathname) ? prev : new Set(prev).add(location.pathname)));
     }
   }, [location.pathname]);
 
