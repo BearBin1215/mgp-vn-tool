@@ -231,7 +231,7 @@ export const extractReleaseDate = (wikitext: string): string => {
 export const extractJa = (wikitext: string): string => {
   const patterns = [
     // 信息框参数：|原名 = （值可能带模板包裹，也可能直接是原名）
-    /^\s*\|\s*原名\s*=\s*(.+)/m,
+    /^\s*\|\s*原名\s*=[ \t]*(.+)/m,
     // 正文 lang-ja / lj 模板
     /\{\{\s*(?:lang-ja|lj)\s*\|\s*'*(.+?)'*\s*\}\}/,
   ];
