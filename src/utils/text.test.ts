@@ -259,6 +259,11 @@ describe('extractReleaseDate', () => {
     expect(extractReleaseDate(wikitext)).toBe('2016-09-30');
   });
 
+  it('匹配信息框中用于对齐位数的 {{0}} 占位', () => {
+    expect(extractReleaseDate('{{Infobox\n|发行时间 = 2016年{{0}}8月30日\n}}')).toBe('2016-08-30');
+    expect(extractReleaseDate('{{Infobox\n|发行时间 = 2016年12月{{0}}3日\n}}')).toBe('2016-12-03');
+  });
+
   it('信息框存在多个时取首个', () => {
     const wikitext = '{{Infobox\n|发行时间 = 2016年9月30日\n}}\n{{Infobox\n|发行时间 = 2026年9月2日\n}}';
     expect(extractReleaseDate(wikitext)).toBe('2016-09-30');
@@ -336,6 +341,12 @@ describe('extractBrand', () => {
 
   it('信息框中 br 之后的内容被截断', () => {
     expect(extractBrand('{{Infobox\n|开发 = UGUISU KAGURA<br>Entergram\n}}')).toBe('UGUISU KAGURA');
+    expect(extractBrand('{{Infobox\n|开发 = UGUISU KAGURA<br/>Entergram\n}}')).toBe('UGUISU KAGURA');
+    expect(extractBrand('{{Infobox\n|开发 = UGUISU KAGURA<br />Entergram\n}}')).toBe('UGUISU KAGURA');
+  });
+
+  it('序言中 br 之后跨行的内容不参与匹配', () => {
+    expect(extractBrand('由Purple software企划<br>\n由Entergram制作的游戏')).toBe('');
   });
 
   it('无信息框时匹配序言句式', () => {

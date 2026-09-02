@@ -103,8 +103,9 @@ async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), To
 
 /// 从 HTML 中解析 `#query_result_main` 内的结果表格，返回 (列名列表, 数据行列表)
 ///
-/// `#query_result_main` 容器内仅有一个结果表格。若未找到数据表格但容器内存在错误
-/// 提示（如 SQL 执行成本超限、语法错误），返回该提示文本作为错误，以便上层透传给前端。
+/// `#query_result_main` 容器内仅有一个结果表格。若未找到数据表格但容器内存在错误提示，
+/// 返回该提示文本作为错误，以便上层透传给前端。错误提示有两种呈现方式：
+/// 执行成本超限等是 `<p>` 包裹的文本，SQL 语法错误等是裸文本。
 fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), ToolError> {
     let document = scraper::Html::parse_document(html);
     let container_selector = scraper::Selector::parse("#query_result_main")
@@ -112,7 +113,6 @@ fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Too
     let tr_selector = scraper::Selector::parse("tr").unwrap();
     let th_selector = scraper::Selector::parse("th").unwrap();
     let td_selector = scraper::Selector::parse("td").unwrap();
-    let p_selector = scraper::Selector::parse("p").unwrap();
 
     let Some(container) = document.select(&container_selector).next() else {
         return Ok((vec![], vec![]));
@@ -144,14 +144,18 @@ fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Too
         return Ok((headers, data_rows));
     }
 
-    // 未找到有效数据表格时，检查容器内是否有错误提示。批评空间查询失败（如 SQL 执行
-    // 成本超限、语法错误）时会返回 <div id="query_result_main"><p>错误信息</p></div>
-    if let Some(p) = container.select(&p_selector).next() {
-        let msg = p.text().collect::<String>().trim().to_string();
-        if !msg.is_empty() {
-            // 上游错误提示为日文原文，不翻译，直接透传展示
-            return Err(ToolError::raw(msg));
-        }
+    // 未找到有效数据表格时，检查容器内是否有错误提示。查询失败时的实际返回：
+    // - 执行成本超限等：<div id="query_result_main"><p>错误信息</p></div>
+    // - SQL 语法错误等：<div id="query_result_main">错误信息</div>（裸文本，无 <p> 包裹）
+    // 容器内无表格时，全部文本（无论是否被 <p> 包裹）均视为错误提示；容器为空则返回空结果
+    let table_selector = scraper::Selector::parse("table").unwrap();
+    if container.select(&table_selector).next().is_some() {
+        return Ok((vec![], vec![]));
+    }
+    let msg = container.text().collect::<String>().trim().to_string();
+    if !msg.is_empty() {
+        // 上游错误提示为日文/英文原文，不翻译，直接透传展示
+        return Err(ToolError::raw(msg));
     }
 
     Ok((vec![], vec![]))
@@ -982,4 +986,240 @@ async fn do_query_work_music_detail(
         .into_iter()
         .flatten()
         .collect::<Vec<_>>()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_music_detail, parse_music_summary, parse_result_table};
+
+    /// 批评空间作品页 `#music_summary_main` 的真实 HTML 结构
+    const MUSIC_SUMMARY_HTML: &str = r#"
+<div id="music_summary_main">
+  <table>
+    <tbody>
+      <tr>
+        <th>曲名</th>
+        <th>カテゴリ</th>
+        <th>歌手</th>
+        <th>得点</th>
+        <th>データ数</th>
+      </tr>
+      <tr>
+        <td><a href="music.php?music=8659">こころに響く恋ほたる</a></td>
+        <td>OP</td>
+        <td><a href="creater.php?creater=4503">橋本みゆき</a><br /></td>
+        <td>96.5</td>
+        <td>221</td>
+      </tr>
+      <tr>
+        <td><a href="music.php?music=9553">繋がるココロ</a></td>
+        <td>ED</td>
+        <td><a href="creater.php?creater=17237">浅葉リオ</a><br /></td>
+        <td>94.7</td>
+        <td>119</td>
+      </tr>
+    </tbody>
+  </table>
+</div>"#;
+
+    /// 批评空间音乐详情页 `#creaters_information_table` 的真实 HTML 结构
+    const MUSIC_DETAIL_HTML: &str = r#"
+<table id="creaters_information_table">
+  <tbody>
+    <tr id="singers">
+      <th>歌</th>
+      <td><a href="creater.php?creater=13987">Ceui</a><br /></td>
+    </tr>
+    <tr id="lyricss">
+      <th>作詞</th>
+      <td><a href="creater.php?creater=13987">Ceui</a><br /></td>
+    </tr>
+    <tr id="compositions">
+      <th>作曲</th>
+      <td><a href="creater.php?creater=3160">小高光太郎</a><br /></td>
+    </tr>
+    <tr id="arrangement">
+      <th>編曲</th>
+      <td><a href="creater.php?creater=3160">小高光太郎</a><br /><a href="creater.php?creater=14989">スミイ酸(sumiisan)</a><br /></td>
+    </tr>
+  </tbody>
+</table>
+"#;
+
+    /// 列数与表头不一致的数据行应被过滤
+    #[test]
+    fn parse_result_table_filters_mismatched_rows() {
+        let html = r#"<div id="query_result_main"><table>
+<tr><th>gamename</th><th>median</th></tr>
+<tr><td>正常行</td><td>90</td></tr>
+<tr><td>多列行</td><td>80</td><td>多余</td></tr>
+</table></div>"#;
+        let (headers, rows) = parse_result_table(html).unwrap();
+        assert_eq!(headers, vec!["gamename", "median"]);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0][0], "正常行");
+    }
+
+    /// 真实响应：创作者参与作品查询（多行结果，LEFT JOIN 未命中的列为空单元格）
+    #[test]
+    fn parse_result_table_creator_works() {
+        // createrlist/shokushu/gamelist 三表 LEFT JOIN，14 列
+        let html = r#"<div id="query_result_main"><table>
+<tbody><tr><th>name</th><th>furigana</th><th>url</th><th>twitter_username</th><th>blog</th><th>blog_title</th><th>pixiv</th><th>shubetu</th><th>shubetu_detail</th><th>shubetu_detail_name</th><th>game_id</th><th>gamename</th><th>sellday</th><th>model</th></tr>
+<tr><td>澤田なつ</td><td>サワダナツ</td><td></td><td></td><td></td><td></td><td></td><td>5</td><td>2</td><td>槇喜屋 華澄</td><td>13870</td><td>With Ribbon</td><td>2011-02-25</td><td>PC</td></tr>
+<tr><td>澤田なつ</td><td>サワダナツ</td><td></td><td></td><td></td><td></td><td></td><td>5</td><td>1</td><td>天ヶ瀬 奈月</td><td>18941</td><td>カルマルカ＊サークル</td><td>2013-09-27</td><td>PC</td></tr>
+</tbody></table>
+</div>"#;
+        let (headers, rows) = parse_result_table(html).unwrap();
+        assert_eq!(headers.len(), 14);
+        // AS 别名保留在表头中
+        assert_eq!(headers[10], "game_id");
+        assert_eq!(rows.len(), 2);
+        // NULL 单元格渲染为空 td，解析结果为空字符串
+        let row = &rows[0];
+        assert_eq!(row[0], "澤田なつ");
+        assert_eq!(row[2], "");
+        assert_eq!(row[9], "槇喜屋 華澄");
+        assert_eq!(row[11], "With Ribbon");
+        assert_eq!(row[12], "2011-02-25");
+        assert_eq!(row[13], "PC");
+    }
+
+    /// 真实响应：作品名搜索（普通多行结果）
+    #[test]
+    fn parse_result_table_search_games() {
+        let html = r#"<div id="query_result_main"><table>
+<tbody><tr><th>id</th><th>gamename</th><th>sellday</th><th>brand</th></tr>
+<tr><td>14813</td><td>ましろ色シンフォニー *mutsu-no-hana</td><td>2011-06-30</td><td>COMFORT</td></tr>
+<tr><td>33109</td><td>ましろ色シンフォニー -Love is pure white- Remake for FHD</td><td>2023-06-23</td><td>ぱれっと</td></tr>
+</tbody></table>
+</div>"#;
+        let (headers, rows) = parse_result_table(html).unwrap();
+        assert_eq!(headers, vec!["id", "gamename", "sellday", "brand"]);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(
+            rows[1],
+            vec![
+                "33109",
+                "ましろ色シンフォニー -Love is pure white- Remake for FHD",
+                "2023-06-23",
+                "ぱれっと"
+            ]
+        );
+    }
+
+    /// 真实响应：作品详情（单行结果，含空值单元格）
+    #[test]
+    fn parse_result_table_work_detail() {
+        let html = r#"<div id="query_result_main"><table>
+<tbody><tr><th>gamename</th><th>sellday</th><th>model</th><th>shoukai</th><th>dlsite_id</th><th>dlsite_domain</th><th>twitter</th><th>brand</th></tr>
+<tr><td>WHITE ALBUM2 ～introductory chapter～</td><td>2010-03-26</td><td>PC</td><td>https://leaf.aquaplus.jp/product/wa2ic/</td><td></td><td></td><td></td><td>Leaf</td></tr>
+</tbody></table>
+</div>"#;
+        let (headers, rows) = parse_result_table(html).unwrap();
+        assert_eq!(headers.len(), 8);
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert_eq!(row[0], "WHITE ALBUM2 ～introductory chapter～");
+        // dlsite_id/dlsite_domain/twitter 为空单元格
+        assert_eq!(row[4], "");
+        assert_eq!(row[5], "");
+        assert_eq!(row[6], "");
+        assert_eq!(row[7], "Leaf");
+    }
+
+    /// 真实响应：查询无结果时容器完全为空，返回空结果
+    #[test]
+    fn parse_result_table_empty_result() {
+        let html = r#"<div id="query_result_main"></div>"#;
+        let (headers, rows) = parse_result_table(html).unwrap();
+        assert!(headers.is_empty());
+        assert!(rows.is_empty());
+    }
+
+    /// 真实响应：SQL 语法错误时容器内是裸文本（无 <p> 包裹），应透传为错误
+    #[test]
+    fn parse_result_table_syntax_error() {
+        let html = r#"<div id="query_result_main">ERROR:  syntax error at or near "WHERE"
+LINE 1: EXPLAIN SELECT FROM WHERE;
+ ^</div>"#;
+        let err = parse_result_table(html).unwrap_err();
+        assert!(err.detail.contains("syntax error at or near \"WHERE\""));
+    }
+
+    /// 真实响应：执行成本超限时容器内是 <p> 包裹的日文提示，应透传为错误
+    #[test]
+    fn parse_result_table_cost_exceeded_error() {
+        let html = r#"<div id="query_result_main"><p>SQLの実行コストが150000を超えています。実行するとサーバーに負荷がかかかるので、実行しませんでした。</p></div>"#;
+        let err = parse_result_table(html).unwrap_err();
+        assert_eq!(
+            err.detail,
+            "SQLの実行コストが150000を超えています。実行するとサーバーに負荷がかかかるので、実行しませんでした。"
+        );
+    }
+
+    /// 基于真实页面 HTML：解析曲名列表、music id 与歌手，跳过表头
+    #[test]
+    fn parse_music_summary_real_html() {
+        let result = parse_music_summary(MUSIC_SUMMARY_HTML).unwrap();
+        assert_eq!(
+            result,
+            vec![
+                (
+                    "8659".to_string(),
+                    "こころに響く恋ほたる".to_string(),
+                    "橋本みゆき".to_string(),
+                ),
+                (
+                    "9553".to_string(),
+                    "繋がるココロ".to_string(),
+                    "浅葉リオ".to_string(),
+                ),
+            ]
+        );
+    }
+
+    /// music id 取 `music=` 后且 `&` 之前的部分；首列无音乐链接的行跳过
+    #[test]
+    fn parse_music_summary_skips_invalid_rows() {
+        let html = r#"
+<div id="music_summary_main"><table>
+<tr><th>曲名</th><th>カテゴリ</th><th>歌手</th></tr>
+<tr><td><a href="music.php?music=123&sort=1">曲A</a></td><td>OP</td><td>歌手A</td></tr>
+<tr><td>无链接的行</td><td>ED</td><td>歌手B</td></tr>
+<tr><td><a href="creater.php?creater=1">非音乐链接</a></td><td>挿入歌</td><td>歌手C</td></tr>
+</table></div>"#;
+        let result = parse_music_summary(html).unwrap();
+        assert_eq!(
+            result,
+            vec![("123".to_string(), "曲A".to_string(), "歌手A".to_string(),)]
+        );
+    }
+
+    /// 基于真实页面 HTML：按 th 标签分类创作者，多 `<a>` 拆分为多个名字
+    #[test]
+    fn parse_music_detail_real_html() {
+        let (singer, lyricist, composer, arranger) = parse_music_detail(MUSIC_DETAIL_HTML);
+        assert_eq!(singer, vec!["Ceui"]);
+        assert_eq!(lyricist, vec!["Ceui"]);
+        assert_eq!(composer, vec!["小高光太郎"]);
+        assert_eq!(arranger, vec!["小高光太郎", "スミイ酸(sumiisan)"]);
+    }
+
+    /// 单元格无 `<a>` 标签时按 `<br>` 拆分纯文本；简体标签等价；未知标签忽略
+    #[test]
+    fn parse_music_detail_plain_text_cell() {
+        let html = r#"
+<table id="creaters_information_table">
+<tr><th>歌</th><td>歌手A<br>歌手B</td></tr>
+<tr><th>作词</th><td>词曲家</td></tr>
+<tr><th>编曲</th><td>编曲家1<br><br>编曲家2</td></tr>
+<tr><th>ジャンル</th><td>应被忽略</td></tr>
+</table>"#;
+        let (singer, lyricist, composer, arranger) = parse_music_detail(html);
+        assert_eq!(singer, vec!["歌手A", "歌手B"]);
+        assert_eq!(lyricist, vec!["词曲家"]);
+        assert!(composer.is_empty());
+        assert_eq!(arranger, vec!["编曲家1", "编曲家2"]);
+    }
 }

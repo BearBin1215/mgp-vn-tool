@@ -194,7 +194,7 @@ export const formatDateCN = (date: string | null): string => {
 /**
  * 从条目 wikitext 源代码中提取游戏发行时间
  *
- * 优先取信息框中的 `|发行时间 = ...` 参数（页面存在多个 Infobox 时取首个，即本篇），
+ * 优先取信息框中的 `|发行时间 = ...` 参数，页面存在多个 Infobox 时取首个，
  * 未命中时兜底匹配正文的「于XXXX年X月X日发行/发售」句式。关键字兼容繁简
  * （发行/發行、发售/發售、于/於），「年/月/日」繁简同形无需区分。
  * @param wikitext 页面源代码
@@ -202,7 +202,8 @@ export const formatDateCN = (date: string | null): string => {
  */
 export const extractReleaseDate = (wikitext: string): string => {
   const patterns = [
-    /^\s*\|\s*发行时间\s*=\s*(\d{4})年(\d{1,2})月(\d{1,2})日/m,
+    // 参数值可能含用于对齐位数的 {{0}} 占位模板（如「2016年{{0}}8月30日」）
+    /^\s*\|\s*发行时间\s*=\s*(\d{4})年(?:\{\{0\}\})?(\d{1,2})月(?:\{\{0\}\})?(\d{1,2})日/m,
     /[于於](\d{4})年(\d{1,2})月(\d{1,2})日(?:发行|發行|发售|發售)/,
   ];
   for (const pattern of patterns) {
@@ -249,7 +250,8 @@ export const extractJa = (wikitext: string): string => {
  */
 const normalizeBrandText = (text: string): string => text
   .replace(/\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g, '$1')
-  .replace(/<br\s*\/?>(.*)$/i, '')
+  // s 标志使 . 跨行匹配，确保 br 之后多行内容也被截断
+  .replace(/<br\s*\/?>.*$/is, '')
   .trim();
 
 /**
