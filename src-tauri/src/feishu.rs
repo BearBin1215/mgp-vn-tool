@@ -198,7 +198,7 @@ async fn feishu_append_rows_inner(
     let updated_range = data["data"]["updates"]["updatedRange"].as_str();
     let mut style_warnings = Vec::new();
     if let Some(range) = updated_range {
-        if let Err(e) = set_new_row_style_inner(token, range, &client).await {
+        if let Err(e) = set_new_row_style_inner(token, range, client).await {
             log::warn!("飞书新增行样式设置失败（数据已写入）\n  {e}");
             style_warnings.push(e);
         }
