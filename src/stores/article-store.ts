@@ -61,8 +61,10 @@ interface ArticleStore {
   checking: boolean;
   /** 从飞书表格获取条目数据并存储 */
   fetchFeishuTable: (appId: string, appSecret: string) => Promise<void>;
-  /** 从萌百获取分类和重定向数据 */
-  fetchPageData: () => Promise<void>;
+  /** 从萌百获取分类和重定向数据；传入标题时仅增量更新对应条目 */
+  fetchPageData: (titles?: string[]) => Promise<void>;
+  /** 为缺少分类数据的条目增量获取页面数据 */
+  fetchMissingPageData: () => Promise<void>;
   /** 检查更新：同步表格后经萌百增量检测候选条目，返回候选数量 */
   checkUpdates: (appId: string, appSecret: string) => Promise<number>;
   /** 清空检查更新的候选条目 */
@@ -358,7 +360,19 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     set({ loading: true });
     try {
       const rows = await feishu.fetchSheet(appId, appSecret);
-      const articles = rows.filter((row) => row[0]).map(parseRow);
+      // 按标题缓存既有分类与重定向数据，重拉表格时复用
+      const pageDataCache = new Map(get().articles.map((a) => [a.title, a]));
+      const articles = rows.filter((row) => row[0]).map((row) => {
+        const parsed = parseRow(row);
+        const cached = pageDataCache.get(parsed.title);
+        if (!cached) { return parsed; }
+        return {
+          ...parsed,
+          categories: cached.categories,
+          ...(cached.redirect ? { redirect: cached.redirect } : {}),
+          ...(cached.redirects?.length ? { redirects: cached.redirects } : {}),
+        };
+      });
       const updatedAt = dayjs().format('YYYY-MM-DD HH:mm');
 
       // 更新存储
@@ -374,21 +388,28 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     }
   },
 
-  /** 从萌百获取分类和重定向数据 */
-  fetchPageData: async () => {
+  /** 从萌百获取分类和重定向数据；传入标题时仅增量更新对应条目 */
+  fetchPageData: async (titles) => {
     const { articles } = get();
-    if (articles.length === 0) { return; }
+    const titleSet = titles ? new Set(titles) : undefined;
+    // 增量模式下只请求传入的标题，全量模式下请求全部条目
+    const targets = titleSet ? articles.filter((a) => titleSet.has(a.title)) : articles;
+    if (targets.length === 0) { return; }
     set({ loading: true });
     try {
-      const titles = articles.map((a) => a.title);
-      const { categories: categoryMap, redirects: redirectMap, pageRedirects } = await fetchPageData(titles);
+      const {
+        categories: categoryMap,
+        redirects: redirectMap, pageRedirects,
+      } = await fetchPageData(targets.map((a) => a.title));
       const updated = articles.map((a) => {
+        // 增量模式下不改动本次未请求的条目
+        if (titleSet && !titleSet.has(a.title)) { return a; }
         const apiCats = categoryMap.get(a.title) || [];
         const redirect = redirectMap.get(a.title);
         const redirects = pageRedirects.get(a.title);
         return {
           ...a,
-          categories: [...new Set([...a.categories, ...apiCats])],
+          categories: apiCats,
           ...(redirect ? { redirect } : {}),
           ...(redirects && redirects.length > 0 ? { redirects } : {}),
         };
@@ -406,12 +427,23 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     }
   },
 
+  /** 为缺少分类数据的条目增量获取页面数据，以分类为空作为缺失依据 */
+  fetchMissingPageData: async () => {
+    const missing = get().articles
+      .filter((a) => a.categories.length === 0)
+      .map((a) => a.title);
+    if (missing.length === 0) { return; }
+    await get().fetchPageData(missing);
+  },
+
   /** 检查更新：同步表格后经萌百增量检测候选条目，返回候选数量 */
   checkUpdates: async (appId, appSecret) => {
     set({ checking: true, candidates: [] });
     try {
       // 先全量重拉表格，保证增量起点与去重依据均为最新数据
       await get().fetchFeishuTable(appId, appSecret);
+      // 增量补齐表格新增条目的页面数据
+      await get().fetchMissingPageData();
       const { articles } = get();
       // 以表格 E 列（条目创建时间）的最大值作为增量起点
       const latestCreationDate = articles.reduce(
