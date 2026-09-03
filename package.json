@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
-    "bump": "tsx scripts/bump-version.ts"
+    "bump": "tsx scripts/bump-version.ts",
+    "check-version": "tsx scripts/check-version.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
@@ -53,6 +54,7 @@
     "eslint": "^10.9.1",
     "eslint-plugin-import-x": "^4.17.1",
     "semver": "^7.8.5",
+    "smol-toml": "^1.8.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
     "typescript": "~6.0.3",

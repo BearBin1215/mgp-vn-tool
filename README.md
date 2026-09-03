@@ -16,13 +16,15 @@
 
 ## 下载
 
-前往 [GitHub Releases](https://github.com/BearBin1215/mgp-vn-tool/releases) 下载对应平台的安装包：
+前往 [GitHub Releases](https://github.com/BearBin1215/mgp-vn-tool/releases) 下载对应平台的安装包或可执行文件：
 
 | 平台 | 安装包格式 |
 |------|-----------|
 | Windows | `.exe` |
 | macOS | `.dmg` / `.app` |
 | Linux | `.deb` / `.rpm` / `.AppImage` |
+
+> Windows 平台提供免安装的可执行文件（`mgp-vn-tool_<版本号>_x64.exe`），下载后可直接运行。
 
 > 本工程使用 [Tauri v2](https://tauri.app/zh-cn/) 构建，理论上支持 Windows、macOS 和 Linux。但由于本人仅在 Windows 上开发，其他环境的表现可能不一致，出现其他系统专属 BUG 不保证修复。
 
