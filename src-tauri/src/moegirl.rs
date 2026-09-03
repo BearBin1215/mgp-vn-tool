@@ -1,19 +1,20 @@
 //! 萌百相关方法
 //!
-//! cookie 经系统凭据存储（keyring）持久化，跨请求共享于全局 `OnceLock` 中；
-//! 响应失败时按设置的重试次数与间隔重试。cookie 变更标记为 dirty，在下次成功
-//! 响应后批量写回磁盘，避免每次请求都触发 I/O。
+//! cookie 经系统凭据存储（keyring）持久化，跨请求共享于全局 `CookieStoreMutex` 中；
+//! 请求的发送与 Set-Cookie 的接收由 reqwest 的 cookie_provider 自动处理。
+//! 关键 Cookie 变更通过比对检测，仅在变化时写回磁盘，避免每次请求都触发 I/O；
+//! 启动时以加载结果初始化比对基准，keyring 读取失败时不会用空数据覆盖已存凭据。
 //!
 //! 萌百各子站点（mzh./zh.）共用同一套 cookie 作为登录凭据
 use std::collections::HashMap;
 use std::io::Cursor;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use cookie_store::{CookieError, CookieStore};
+use cookie_store::CookieStore;
 use keyring::Entry;
-use reqwest::header::{HeaderMap, HeaderValue, COOKIE, SET_COOKIE, USER_AGENT};
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use reqwest::Url;
+use reqwest_cookie_store::CookieStoreMutex;
 use serde_json::json;
 
 use crate::error::ToolError;
@@ -60,28 +61,39 @@ fn load_cookie_store_json(text: &str) -> CookieStore {
     }
     // 兼容本次引入 cookie_store 后产生的完整 JSON；下一次写入时会自动压缩为关键 Cookie。
     if let Ok(store) = cookie_store::serde::json::load(Cursor::new(text.as_bytes())) {
-        COOKIES_DIRTY.store(true, Ordering::SeqCst);
         return store;
     }
     // 旧版自定义对象数组缺少完整过期信息，无法安全迁移。
     log::warn!("凭据存储中的 Cookie 数据格式过旧或已损坏，已忽略");
-    COOKIES_DIRTY.store(true, Ordering::SeqCst);
     store
 }
 
 /// CookieStore 跨请求共享，会话 Cookie 仅保留在内存中
-static COOKIE_STORE: OnceLock<Arc<Mutex<CookieStore>>> = OnceLock::new();
+static COOKIE_STORE: OnceLock<Arc<CookieStoreMutex>> = OnceLock::new();
 
-/// 标记 cookie 列表是否有未持久化的变更，避免每次请求成功都写磁盘
-static COOKIES_DIRTY: AtomicBool = AtomicBool::new(false);
+/// 已持久化 Cookie 的序列化基准（启动时加载的快照或上次成功写入的结果），
+/// 用于检测是否需要重新写入
+static LAST_PERSISTED: Mutex<Option<String>> = Mutex::new(None);
 
-fn cookie_store() -> &'static Arc<Mutex<CookieStore>> {
-    COOKIE_STORE.get_or_init(|| Arc::new(Mutex::new(load_cookie_store())))
+/// 初始化全局 CookieStore
+///
+/// 启动时将加载到的 Cookie 快照记为持久化基准：keyring 读取失败（其中内容未知）时
+/// 基准为空列表，后续未登录的成功请求不会把空 Cookie 覆盖写入凭据存储
+fn cookie_store() -> &'static Arc<CookieStoreMutex> {
+    COOKIE_STORE.get_or_init(|| {
+        let store = load_cookie_store();
+        if let Ok(snapshot) = serialize_persistent_cookies(&store) {
+            *LAST_PERSISTED.lock().expect("持久化状态锁中毒") = Some(snapshot);
+        }
+        Arc::new(CookieStoreMutex::new(store))
+    })
 }
 
 /// 将关键登录 Cookie 序列化为适合 keyring 限制的紧凑 JSON
+///
+/// 结果排序以保证序列化稳定，便于与上次写入内容比对检测变更。
 fn serialize_persistent_cookies(store: &CookieStore) -> Result<String, serde_json::Error> {
-    let headers: Vec<String> = store
+    let mut headers: Vec<String> = store
         .iter_unexpired()
         .filter(|cookie| cookie.is_persistent() && PERSISTENT_COOKIE_NAMES.contains(&cookie.name()))
         .map(|cookie| {
@@ -89,12 +101,33 @@ fn serialize_persistent_cookies(store: &CookieStore) -> Result<String, serde_jso
             raw.to_string()
         })
         .collect();
+    headers.sort();
     serde_json::to_string(&headers)
 }
 
-/// 将未过期的持久化 Cookie 写入系统凭据存储
-fn persist_cookies() {
-    if !COOKIES_DIRTY.load(Ordering::SeqCst) {
+/// 将关键登录 Cookie 写入系统凭据存储，内容与基准一致时跳过
+///
+/// `force` 为 true 时跳过基准比对，用于登出等必须覆盖凭据存储的场景
+fn persist_cookies(force: bool) {
+    let json = {
+        let store = cookie_store()
+            .lock()
+            .expect("Cookie 锁中毒，数据可能不一致");
+        match serialize_persistent_cookies(&store) {
+            Ok(json) => json,
+            Err(e) => {
+                log::warn!("Cookie 序列化失败: {e}");
+                return;
+            }
+        }
+    };
+    if !force
+        && LAST_PERSISTED
+            .lock()
+            .expect("持久化状态锁中毒")
+            .as_deref()
+            == Some(json.as_str())
+    {
         return;
     }
     let entry = match Entry::new(KEYRING_SERVICE, COOKIE_ENTRY) {
@@ -104,55 +137,12 @@ fn persist_cookies() {
             return;
         }
     };
-    let store = cookie_store()
-        .lock()
-        .expect("Cookie 锁中毒，数据可能不一致");
-    let json = match serialize_persistent_cookies(&store) {
-        Ok(json) => json,
-        Err(e) => {
-            log::warn!("Cookie 序列化失败: {e}");
-            return;
-        }
-    };
+    // 写失败时不更新 LAST_PERSISTED，下次成功响应后会重新尝试写入
     match entry.set_password(&json) {
         Ok(()) => {
-            // 持有 Cookie 锁时写入，避免成功写入后又错误清除并发更新的 dirty 标记。
-            COOKIES_DIRTY.store(false, Ordering::SeqCst);
+            *LAST_PERSISTED.lock().expect("持久化状态锁中毒") = Some(json);
         }
         Err(e) => log::warn!("Cookie 持久化失败: {e}"),
-    }
-}
-
-/// 获取指定 URL 应携带的 Cookie 请求头
-fn cookie_header_for(url: &Url) -> Option<String> {
-    let host = url.host_str()?;
-    if url.scheme() != "https" || !ALLOWED_MOEGIRL_HOSTS.contains(&host) {
-        return None;
-    }
-    let store = cookie_store()
-        .lock()
-        .expect("Cookie 锁中毒，数据可能不一致");
-    let parts: Vec<String> = store
-        .get_request_values(url)
-        .map(|(name, value)| format!("{name}={value}"))
-        .collect();
-    if parts.is_empty() {
-        None
-    } else {
-        Some(parts.join("; "))
-    }
-}
-
-/// 将响应中的 Set-Cookie 交给 CookieStore 按 RFC 规则处理
-fn store_set_cookie(header: &str, url: &Url) {
-    let mut store = cookie_store()
-        .lock()
-        .expect("Cookie 锁中毒，数据可能不一致");
-    match store.parse(header, url) {
-        Ok(_) => COOKIES_DIRTY.store(true, Ordering::SeqCst),
-        // 删除不存在的过期 Cookie 是合法的无状态变更，无需记录警告。
-        Err(CookieError::Expired) => {}
-        Err(e) => log::warn!("无法存储萌百 Cookie: {e}"),
     }
 }
 
@@ -225,6 +215,7 @@ pub async fn moegirl_request(
     }
     let client = reqwest::Client::builder()
         .default_headers(headers)
+        .cookie_provider(Arc::clone(cookie_store()))
         .build()?;
 
     // 将参数值转为字符串，数组用 | 拼接，并添加默认参数
@@ -269,7 +260,7 @@ pub async fn moegirl_request(
             tokio::time::sleep(std::time::Duration::from_millis(retry_delay)).await;
         }
 
-        let mut request = match method.to_uppercase().as_str() {
+        let request = match method.to_uppercase().as_str() {
             "GET" => client.get(url.clone()).query(&string_params),
             "POST" => client.post(url.clone()).form(&string_params),
             _ => {
@@ -280,11 +271,6 @@ pub async fn moegirl_request(
                 ));
             }
         };
-        if let Some(cookie_str) = cookie_header_for(&url) {
-            if let Ok(value) = HeaderValue::from_str(&cookie_str) {
-                request = request.header(COOKIE, value);
-            }
-        }
         let resp = request.send().await;
 
         let resp = match resp {
@@ -299,13 +285,6 @@ pub async fn moegirl_request(
             }
         };
 
-        // 处理响应中的 Set-Cookie
-        for value in resp.headers().get_all(SET_COOKIE).iter() {
-            if let Ok(set_cookie) = value.to_str() {
-                store_set_cookie(set_cookie, &url);
-            }
-        }
-
         let status = resp.status();
         let text = resp.text().await?;
 
@@ -319,7 +298,7 @@ pub async fn moegirl_request(
             continue;
         }
 
-        persist_cookies();
+        persist_cookies(false);
 
         let data: serde_json::Value = serde_json::from_str(&text).map_err(|_| {
             ToolError::new(
@@ -372,9 +351,8 @@ pub fn moegirl_logout() {
         .lock()
         .expect("Cookie 锁中毒，数据可能不一致")
         .clear();
-    // 标记变更并立即持久化空 cookie 列表，覆盖凭据存储中的旧数据
-    COOKIES_DIRTY.store(true, Ordering::SeqCst);
-    persist_cookies();
+    // 登出是用户显式操作，强制写入空 cookie 列表，覆盖凭据存储中的旧数据
+    persist_cookies(true);
 }
 
 #[cfg(test)]

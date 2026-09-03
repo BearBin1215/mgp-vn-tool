@@ -176,7 +176,7 @@ export default function ArticleStats() {
         setUpdateModalOpen(true);
         return;
       }
-      const diffDays = Math.floor((Date.now() - new Date(latestUpdatedAt).getTime()) / 86400000);
+      const diffDays = dayjs().diff(dayjs(latestUpdatedAt, 'YYYY-MM-DD HH:mm'), 'day');
       if (diffDays >= 15) { // 距上次更新时间超过15天，提醒是否更新
         useArticleStore.setState({ hasShownUpdateReminder: true });
         setUpdateModalOpen(diffDays);

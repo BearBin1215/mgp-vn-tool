@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { groupBy, uniq } from 'es-toolkit';
+import { groupBy, uniq, uniqBy } from 'es-toolkit';
 import type { CreatorWorksResult, GameConnection, GameRecord } from '@/api/erogamescape';
 import type { PageInfo } from '@/api/moegirl';
 import { PENDING_SELL_DATE } from '@/utils/constants';
@@ -146,16 +146,9 @@ export function buildActingWikitext(
           bold: c.shubetuDetail === '1' && idx === 0,
         }));
       });
-      const seen = new Set<string>();
       /** 出演的角色中是否有站内链接是消歧义页 */
       let hasDisambiguation = false;
-      const charParts = allChars.filter((c) => {
-        if (seen.has(c.name)) {
-          return false;
-        }
-        seen.add(c.name);
-        return true;
-      }).map((c) => {
+      const charParts = uniqBy(allChars, (c) => c.name).map((c) => {
         if (!pageInfoMap) {
           const displayName = wrapLj(c.name);
           return c.bold ? `'''${displayName}'''` : displayName;

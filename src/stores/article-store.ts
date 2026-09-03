@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import dayjs from 'dayjs';
+import { chunk } from 'es-toolkit';
 import feishu from '@/api/feishu';
 import moegirl, { fetchPageInfo, getMoegirlQueryBatchSize } from '@/api/moegirl';
 import { ApiParams } from '@/lib/types';
@@ -128,9 +129,7 @@ const fetchPageData = async (titles: string[]): Promise<FetchPageDataResult> => 
   const pageRedirects = new Map<string, string[]>();
   const batchSize = getMoegirlQueryBatchSize();
 
-  for (let i = 0; i < titles.length; i += batchSize) {
-    const batch = titles.slice(i, i + batchSize);
-
+  for (const batch of chunk(titles, batchSize)) {
     let continueParams: ApiParams = {};
     let hasMore = true;
     do {
@@ -325,8 +324,7 @@ const fetchPageWikitexts = async (titles: string[]): Promise<Map<string, string>
   const result = new Map<string, string>();
   const batchSize = getMoegirlQueryBatchSize();
 
-  for (let i = 0; i < titles.length; i += batchSize) {
-    const batch = titles.slice(i, i + batchSize);
+  for (const batch of chunk(titles, batchSize)) {
     const res = await moegirl.post({
       action: 'query',
       prop: 'revisions',

@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 import 'dayjs/locale/zh-cn';
 import { initSettings, useSettingsStore } from '@/stores/settings-store';
 import { initArticles } from '@/stores/article-store';
@@ -8,6 +9,7 @@ import { initMoegirlData } from '@/stores/moegirl-store';
 import { initI18n } from '@/i18n';
 import App from './App';
 
+dayjs.extend(customParseFormat);
 dayjs.locale('zh-cn');
 
 document.addEventListener('keydown', (e) => {

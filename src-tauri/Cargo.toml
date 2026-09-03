@@ -12,23 +12,24 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+chrono = { version = "0.4", default-features = false }
 cookie_store = { version = "0.22", default-features = false, features = ["serde_json"] }
+futures-util = "0.3"
+keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native-sync-persistent"] }
+log = "0.4"
+reqwest = { version = "0.13", features = ["json", "query", "form", "cookies"] }
+reqwest_cookie_store = "0.10"
+scraper = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tauri = { version = "2", features = ["protocol-asset"] }
-tauri-plugin-opener = "2"
-tauri-plugin-store = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-log = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-reqwest = { version = "0.13", features = ["json", "query", "form"] }
-scraper = "0.22"
-futures-util = "0.3"
-chrono = { version = "0.4", default-features = false }
-log = "0.4"
+tauri-plugin-opener = "2"
+tauri-plugin-store = "2"
 tokio = { version = "1", features = ["time"] }
 urlencoding = "2"
-keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native-sync-persistent"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-window-state = "2"

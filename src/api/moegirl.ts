@@ -1,3 +1,4 @@
+import { chunk } from 'es-toolkit';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useMoegirlStore } from '@/stores/moegirl-store';
@@ -170,8 +171,7 @@ export const fetchPageInfo = async (titles: string[]): Promise<Map<string, PageI
   const redirectMap = new Map<string, string>();
   const batchSize = getMoegirlQueryBatchSize();
 
-  for (let i = 0; i < titles.length; i += batchSize) {
-    const batch = titles.slice(i, i + batchSize);
+  for (const batch of chunk(titles, batchSize)) {
     let continueParams: Record<string, string> = {};
     let hasMore = true;
 
