@@ -1,0 +1,27 @@
+# 统一使用 LF 换行符（与 .editorconfig 保持一致）
+* text=auto eol=lf
+
+# Windows 脚本需要 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制文件不做换行符转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+
+# 锁文件标记为自动生成，不计入 GitHub 语言统计
+pnpm-lock.yaml linguist-generated=true
+src-tauri/Cargo.lock linguist-generated=true
+
+# 语言统计归属
+*.rs linguist-language=Rust
