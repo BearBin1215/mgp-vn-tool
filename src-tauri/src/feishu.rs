@@ -196,6 +196,10 @@ async fn feishu_append_rows_inner(
     // 数据已写入；样式失败不回滚数据，但通过返回值通知前端。
     // 飞书 v2 values_append 的成功响应中，实际写入范围位于 data.updates.updatedRange
     let updated_range = data["data"]["updates"]["updatedRange"].as_str();
+    log::info!(
+        "飞书统计表追加成功（{row_count} 行，写入范围: {}）",
+        updated_range.unwrap_or("未知")
+    );
     let mut style_warnings = Vec::new();
     if let Some(range) = updated_range {
         if let Err(e) = set_new_row_style_inner(token, range, client).await {

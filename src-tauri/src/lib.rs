@@ -18,6 +18,10 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(tauri_plugin_log::log::LevelFilter::Info)
+                // 单文件超过 500 KB 时轮转
+                .max_file_size(500_000)
+                // 保留最近 3 个带日期的归档
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())

@@ -111,8 +111,12 @@ pub async fn search_bangumi_persons(
             "career": ["producer"]
         }
     });
-    let resp: BangumiSearchPersonResponse =
-        post_bangumi_api(&client, &settings, &url, &body).await?;
+    let resp: BangumiSearchPersonResponse = post_bangumi_api(&client, &settings, &url, &body)
+        .await
+        .map_err(|e| {
+            log::error!("Bangumi 人物搜索失败（keyword {keyword}）: {e}");
+            e
+        })?;
     Ok(resp.data)
 }
 
@@ -219,6 +223,15 @@ async fn fetch_bangumi_request<T: DeserializeOwned>(
         }
 
         if attempt + 1 < attempts {
+            // 中间失败记 warn，便于排查“查询慢是重试拖的”；最终失败由调用方记 error。
+            // 能走到重试说明本轮必有错误（成功已 return、4xx 已 break），last_error 恒有值
+            if let Some(e) = &last_error {
+                log::warn!(
+                    "Bangumi 请求失败（第 {}/{} 次尝试，稍后重试）\n  URL: {url}\n  {e}",
+                    attempt + 1,
+                    attempts
+                );
+            }
             tokio::time::sleep(Duration::from_millis(request_settings.retry_delay_ms)).await;
         }
     }

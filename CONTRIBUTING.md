@@ -103,6 +103,8 @@ cargo test
 pnpm check
 ```
 
+如果使用 AI 辅助开发，应在完成修改后用新会话让 AI 至少进行一轮代码审查，最好多代理交叉验证。
+
 ### TypeScript / React
 
 - 严格遵循 [eslint 规则](/eslint.config.ts)，提交前执行`pnpm lint`或在开发时安装eslint插件（用VS Code打开本仓库时会自动推荐安装）
