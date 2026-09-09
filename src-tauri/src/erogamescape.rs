@@ -861,13 +861,10 @@ fn parse_music_detail(html: &str) -> (Vec<String>, Vec<String>, Vec<String>, Vec
     // 仅在创作者信息表内遍历：th:first-child 即类型标签，其后首个 td 为名称
     for container in document.select(&container_sel) {
         for th in container.select(&th_sel) {
-            let Some(td) = th.next_sibling_element().and_then(|el| {
-                if el.value().name() == "td" {
-                    Some(el)
-                } else {
-                    None
-                }
-            }) else {
+            let Some(td) = th
+                .next_sibling_element()
+                .filter(|el| el.value().name() == "td")
+            else {
                 continue;
             };
             let value = extract_names_from_cell(td);

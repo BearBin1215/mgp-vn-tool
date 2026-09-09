@@ -31,7 +31,7 @@ dist-ssr
 
 # AI 编程工具相关
 .opencode/
-.codex/
+.codex-review/
 .claude/
 .reasonix/
 .codegraph/

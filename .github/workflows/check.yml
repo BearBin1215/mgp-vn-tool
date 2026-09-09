@@ -1,0 +1,59 @@
+name: '检查'
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  frontend-check:
+    name: 前端检查
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: 安装 node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: 'pnpm'
+
+      - name: 安装依赖
+        run: pnpm install
+
+      - name: 前端聚合检查
+        run: pnpm check
+
+  rust-check:
+    name: 后端检查
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: 安装 Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存编译产物
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 静态检查
+        run: cargo clippy
+
+      - name: 测试
+        run: cargo test

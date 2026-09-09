@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { chunk } from 'es-toolkit';
 import feishu from '@/api/feishu';
 import moegirl, { fetchPageInfo, getMoegirlQueryBatchSize } from '@/api/moegirl';
-import { ApiParams } from '@/lib/types';
+import type { ApiParams } from '@/lib/types';
 import { createLocalizedError } from '@/utils/error';
 import { extractBrand, extractJa, extractReleaseDate } from '@/utils/text';
 import { loadConfigStore } from '@/lib/config-store';
