@@ -30,7 +30,11 @@ fn format_feishu_error(
     msg: &str,
     permission_hint: &str,
 ) -> ToolError {
-    let detail = format!("{msg}（HTTP {status}，错误码 {code:?}）");
+    // 上游未返回错误码时省略该段，避免把 Option 的 Debug 形式（如 Some(10014)）透传给前端
+    let detail = match code {
+        Some(c) => format!("{msg}（HTTP {status}，错误码 {c}）"),
+        None => format!("{msg}（HTTP {status}）"),
+    };
     let params = [
         ("operation", json!(operation)),
         ("detail", json!(detail)),
