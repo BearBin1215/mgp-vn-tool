@@ -3,6 +3,7 @@ mod erogamescape;
 mod error;
 mod feishu;
 mod http;
+mod locale;
 mod moegirl;
 mod settings;
 mod vndb;
@@ -30,6 +31,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             settings::config_file_path_command,
+            locale::detect_ui_language_command,
             moegirl::moegirl_request,
             moegirl::moegirl_check_login,
             moegirl::moegirl_logout,
@@ -50,9 +52,12 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
 
             // 窗口标题跟随界面语言显示简繁变体，须在窗口显示前设置，避免启动时标题闪变；
-            // 繁体文案需与前端 src/i18n/zh-TW.ts 中的「萌百视研会条目工具」保持同步
-            let title = match settings::get_string(app.handle(), "uiLanguage").as_deref() {
-                Some("zh-TW") => "萌百視研會條目工具",
+            // 用户尚未保存过界面语言（首次启动）时按系统语言推断，与前端取到的值一致；
+            // 繁体文案需与前端 src/i18n/zh-TW.ts、zh-HK.ts 中的「萌百视研会条目工具」保持同步
+            let ui_language = settings::get_string(app.handle(), "uiLanguage")
+                .unwrap_or_else(|| locale::detect_ui_language().to_string());
+            let title = match ui_language.as_str() {
+                "zh-TW" | "zh-HK" => "萌百視研會條目工具",
                 _ => "萌百视研会条目工具",
             };
             let _ = window.set_title(title);

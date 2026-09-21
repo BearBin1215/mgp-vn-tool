@@ -4,7 +4,7 @@ import moegirl from '@/api/moegirl';
 import { DEFAULT_USER_AGENT, DEFAULT_FEISHU_APP_ID } from '@/utils/constants';
 import { isErogamescapeUrl, type ErogamescapeUrl, type MoegirlHost } from '@/lib/types';
 import { loadConfigStore } from '@/lib/config-store';
-import { changeUiLanguage, type UiLanguage } from '@/i18n';
+import { changeUiLanguage, detectSystemUiLanguage, isUiLanguage, type UiLanguage } from '@/i18n';
 import { createLocalizedError } from '@/utils/error';
 import { useMoegirlStore } from './moegirl-store';
 
@@ -104,6 +104,23 @@ const persistSetting = async (key: string, value: unknown): Promise<void> => {
   const store = await storePromise;
   await store.set(key, value);
   await store.save();
+};
+
+/**
+ * 读取界面语言
+ *
+ * 已保存过则尊重用户选择；从未保存过（如首次启动）时向后端查询系统语言，并立即写入持久化存储，
+ * 使下次启动的窗口标题等依赖持久化语言的逻辑无需再次探测。
+ */
+const readUiLanguage = async (): Promise<UiLanguage> => {
+  const store = await storePromise;
+  const saved = await store.get<unknown>('uiLanguage');
+  if (isUiLanguage(saved)) {
+    return saved;
+  }
+  const detected = await detectSystemUiLanguage();
+  await persistSetting('uiLanguage', detected);
+  return detected;
 };
 
 /** 检查值是否为有限数字。 */
@@ -310,7 +327,7 @@ export const initSettings = async () => {
     moegirlRetryDelay,
   ] = await Promise.all([
     readSetting<ColorMode>('colorMode', 'light', (v): v is ColorMode => v === 'light' || v === 'dark'),
-    readSetting<UiLanguage>('uiLanguage', 'zh-CN', (v): v is UiLanguage => v === 'zh-CN' || v === 'zh-TW' || v === 'zh-HK'),
+    readUiLanguage(),
     readSetting('uiFont', '', isNonEmptyString),
     readSetting('codeFont', '', isNonEmptyString),
     readSetting('backgroundImage', '', isNonEmptyString),

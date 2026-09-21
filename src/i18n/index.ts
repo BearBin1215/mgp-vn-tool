@@ -1,4 +1,5 @@
 import i18next from 'i18next';
+import { invoke } from '@tauri-apps/api/core';
 import { initReactI18next } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import zhHK from './zh-HK';
@@ -12,6 +13,30 @@ const APP_TITLE_KEY = '萌百视研会条目工具';
 
 /** i18next 是否已完成初始化 */
 let initialized = false;
+
+/**
+ * 判断值是否为受支持的界面语言
+ * @param value 待判断的值
+ */
+export function isUiLanguage(value: unknown): value is UiLanguage {
+  return value === 'zh-CN' || value === 'zh-TW' || value === 'zh-HK';
+}
+
+/**
+ * 依据系统语言推断初始界面语言
+ *
+ * 由后端读取系统区域设置并映射为受支持的界面语言（映射规则见 src-tauri/src/locale.rs），
+ * 调用失败或返回值不在支持范围内时回退简体。
+ */
+export async function detectSystemUiLanguage(): Promise<UiLanguage> {
+  try {
+    const lang = await invoke<string>('detect_ui_language_command');
+    return isUiLanguage(lang) ? lang : 'zh-CN';
+  } catch (error) {
+    console.error('探测系统语言失败:', error);
+    return 'zh-CN';
+  }
+}
 
 /**
  * 将原生窗口标题同步为当前界面语言的文案
