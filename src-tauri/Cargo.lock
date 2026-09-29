@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "mgp-vn-tool"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "chrono",
  "cookie_store",
