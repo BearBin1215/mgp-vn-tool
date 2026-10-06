@@ -114,6 +114,9 @@ importers:
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
+      types-mediawiki-response:
+        specifier: ^1.1.0
+        version: 1.1.0
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -2100,6 +2103,10 @@ packages:
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
     engines: {node: '>= 0.8.0'}
+
+  types-mediawiki-response@1.1.0:
+    resolution: {integrity: sha512-0S/Lj7h6VyBCTT90w274gsGySdgF9IiIQRp7uf7RxsN7teoduKKNH+e8fzVxvkUTqvn/m4T8lBA40z0LrRp6gA==}
+    engines: {node: '>=20'}
 
   typescript-eslint@8.70.1:
     resolution: {integrity: sha512-AcWG7KDjZ2THNXsgwttMaGmzVi0VFRlFYfqFHYQRbDpF3owuYbuiL8c7UUrd2k8s3PoSfIQrWfrGXfcElrWLYA==}
@@ -4157,6 +4164,8 @@ snapshots:
   type-check@0.4.0:
     dependencies:
       prelude-ls: 1.2.1
+
+  types-mediawiki-response@1.1.0: {}
 
   typescript-eslint@8.70.1(eslint@10.11.0(jiti@2.7.0))(typescript@6.0.3):
     dependencies:

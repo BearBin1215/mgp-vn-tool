@@ -5,10 +5,11 @@
 
 use std::time::Duration;
 
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use serde_json::json;
 
 use crate::error::ToolError;
+use crate::settings;
 
 /// Galgame 条目统计表的 spreadsheet_token
 const SPREADSHEET_TOKEN: &str = "shtcnTQQ5n5HkdGwiiYEtE1FHZ9";
@@ -18,6 +19,37 @@ const SHEET_ID: &str = "0rCQAp";
 
 /// 飞书请求超时时间（秒）
 const REQUEST_TIMEOUT_SECS: u64 = 30;
+
+/// 飞书统计表应用默认 App ID，与前端 `constants.ts` 的 `DEFAULT_FEISHU_APP_ID` 保持一致
+const DEFAULT_APP_ID: &str = "cli_a4586356dbfa100c";
+
+/// 从 Tauri Store 读取飞书应用凭证
+///
+/// App ID 缺失时回退默认值（与前端设置页行为一致）；App Secret 缺失属于配置错误，
+/// 返回带错误码的结构化错误，由前端按错误码翻译展示。
+fn read_feishu_credentials(app: &tauri::AppHandle) -> Result<(String, String), ToolError> {
+    let store = settings::store(app)?;
+
+    let app_id = store
+        .get("feishuStatsTableAppId")
+        .and_then(|v| v.as_str().map(String::from))
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DEFAULT_APP_ID.to_string());
+
+    let app_secret = store
+        .get("feishuStatsTableAppSecret")
+        .and_then(|v| v.as_str().map(String::from))
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            ToolError::new(
+                "feishu_credentials_missing",
+                [],
+                "未配置飞书统计表 App Secret，请先在设置页面填写",
+            )
+        })?;
+
+    Ok((app_id, app_secret))
+}
 
 /// 按 HTTP 状态分类飞书请求错误，保留服务端返回的业务错误信息。
 ///
@@ -89,30 +121,48 @@ pub struct FeishuAppendRow {
     pub creation_date: String,
 }
 
+/// 统计表读取结果的一行业务字段。物理列布局和日期解析由后端统一处理。
+#[derive(serde::Serialize)]
+pub struct FeishuSheetRow {
+    /// 日文原名
+    pub original_name: String,
+    /// 条目名（原行该列为空时已回退为原名）
+    pub title: String,
+    /// 制作组织
+    pub brand: String,
+    /// 发行时间，格式 YYYY-MM-DD
+    pub release_date: String,
+    /// 创建时间，格式 YYYY-MM-DD
+    pub creation_date: String,
+}
+
 /// 获取飞书表格内容（自动获取 token 并请求表格）
+///
+/// 返回已解析为业务字段的结构化行：过滤原名为空的行、条目名回退原名、
+/// 日期由 Excel 序列号转为 YYYY-MM-DD，前端无需感知物理列布局。
 #[tauri::command]
 pub async fn feishu_fetch_sheet(
-    app_id: String,
-    app_secret: String,
-) -> Result<Vec<Vec<String>>, ToolError> {
+    app: tauri::AppHandle,
+) -> Result<Vec<FeishuSheetRow>, ToolError> {
+    let (app_id, app_secret) = read_feishu_credentials(&app)?;
     let client = crate::http::build_client(Duration::from_secs(REQUEST_TIMEOUT_SECS))?;
     let token = feishu_get_token_inner(&app_id, &app_secret, &client).await?;
     // 读取范围 A2:E 跳过表头
-    feishu_get_sheet_inner(&token, SPREADSHEET_TOKEN, SHEET_ID, "!A2:E", &client).await
+    let values = feishu_get_sheet_inner(&token, SPREADSHEET_TOKEN, SHEET_ID, "!A2:E", &client).await?;
+    Ok(parse_sheet_rows(values))
 }
 
 /// 向统计表末尾追加行数据（自动获取 token 并写入）
 ///
 /// rows 为按创建时间升序排列的业务字段；后端负责组装 A-F 六列值。
+/// 已有数据行数在写入前实时读取统计。
 /// 日期字段使用 Excel 序列号，公式字段由后端包装为飞书公式对象。
 /// 追加成功后会对新增行设置日期、边框和对齐样式。
 /// 样式设置失败不会回滚已经写入的数据，调用方可根据返回的警告提示用户。
 /// 注意飞书 formatter 仅支持 yyyy/MM/dd 等有限枚举，不支持中文「年/月/日」字面量。
 #[tauri::command]
 pub async fn feishu_append_rows(
-    app_id: String,
-    app_secret: String,
-    existing_row_count: usize,
+    app: tauri::AppHandle,
     rows: Vec<FeishuAppendRow>,
 ) -> Result<FeishuAppendResult, ToolError> {
     if rows.is_empty() {
@@ -121,9 +171,61 @@ pub async fn feishu_append_rows(
             style_warnings: Vec::new(),
         });
     }
+    let (app_id, app_secret) = read_feishu_credentials(&app)?;
     let client = crate::http::build_client(Duration::from_secs(REQUEST_TIMEOUT_SECS))?;
     let token = feishu_get_token_inner(&app_id, &app_secret, &client).await?;
+    // 统计表可能被多人并发追加，行数须在写入前实时统计，否则序号公式行号会错位
+    let existing_row_count = feishu_count_data_rows(&token, &client).await?;
     feishu_append_rows_inner(&token, existing_row_count, rows, &client).await
+}
+
+/// 统计统计表当前的数据行数（A 列非空的行，不含表头）
+///
+/// 新增行序号公式的行号由该值推算；统计表可能被多人并发追加，
+/// 因此必须在写入前实时读取，行号错位后已写入的公式无法自动纠正。
+async fn feishu_count_data_rows(
+    token: &str,
+    client: &reqwest::Client,
+) -> Result<usize, ToolError> {
+    let rows = feishu_get_sheet_inner(token, SPREADSHEET_TOKEN, SHEET_ID, "!A2:A", client).await?;
+    Ok(rows
+        .iter()
+        .filter(|row| row.first().is_some_and(|cell| !cell.trim().is_empty()))
+        .count())
+}
+
+/// 将原始表格行解析为业务字段行
+///
+/// 列布局：A 原名、B 条目名、C 制作组织、D 发行时间、E 创建时间。
+/// 原名为空的行（历史遗留空行）直接过滤；条目名为空时回退使用原名；
+/// 日期列的 Excel 序列号统一转为 YYYY-MM-DD，无法解析的值原样保留。
+fn parse_sheet_rows(rows: Vec<Vec<String>>) -> Vec<FeishuSheetRow> {
+    rows.into_iter()
+        .filter_map(|row| {
+            let cell = |index: usize| {
+                row.get(index)
+                    .map(String::as_str)
+                    .unwrap_or("")
+                    .trim()
+                    .to_string()
+            };
+            let original_name = cell(0);
+            if original_name.is_empty() {
+                return None;
+            }
+            let title = {
+                let raw = cell(1);
+                if raw.is_empty() { original_name.clone() } else { raw }
+            };
+            Some(FeishuSheetRow {
+                brand: cell(2),
+                release_date: excel_serial_to_date_string(&cell(3)),
+                creation_date: excel_serial_to_date_string(&cell(4)),
+                original_name,
+                title,
+            })
+        })
+        .collect()
 }
 
 /// 追加行数据到统计表工作表末尾
@@ -237,6 +339,24 @@ fn date_to_excel_value(date: &str) -> serde_json::Value {
     };
     let epoch = NaiveDate::from_ymd_opt(1899, 12, 30).expect("固定的 Excel 日期基准必须有效");
     serde_json::Value::Number((parsed - epoch).num_days().into())
+}
+
+/// 将 Excel 序列号（字符串形式）转为 YYYY-MM-DD，是 `date_to_excel_value` 的逆变换。
+/// 空值、非数值或非正数原样返回，带时间的小数部分截断到所在日。
+fn excel_serial_to_date_string(value: &str) -> String {
+    let Ok(serial) = value.parse::<f64>() else {
+        return value.to_string();
+    };
+    if !serial.is_finite() || serial <= 0.0 {
+        return value.to_string();
+    }
+    // 与写入侧使用同一 Excel 日期基准（1899-12-30）
+    let epoch = NaiveDate::from_ymd_opt(1899, 12, 30).expect("固定的 Excel 日期基准必须有效");
+    epoch
+        .checked_add_signed(chrono::Duration::days(serial.trunc() as i64))
+        // chrono 未启用 alloc feature，无法用其 format 方法，手动拼接 YYYY-MM-DD
+        .map(|d| format!("{:04}-{:02}-{:02}", d.year(), d.month(), d.day()))
+        .unwrap_or_else(|| value.to_string())
 }
 
 /// 根据追加接口返回的实际写入范围（形如 `0rCQAp!A869:F870`），
@@ -486,4 +606,65 @@ async fn feishu_get_sheet_inner(
         .collect();
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Excel 序列号与 YYYY-MM-DD 互为逆变换
+    #[test]
+    fn excel_date_round_trip() {
+        for date in ["2024-02-29", "1999-12-31", "2026-10-06"] {
+            let serial = date_to_excel_value(date);
+            // 序列号为数值型 JSON 值，转成字符串后再做逆变换
+            assert_eq!(excel_serial_to_date_string(&serial.to_string()), date);
+        }
+    }
+
+    /// 无法解析的值和非正数原样返回
+    #[test]
+    fn excel_serial_keeps_unparseable_values() {
+        for value in ["", "abc", "0", "-1"] {
+            assert_eq!(excel_serial_to_date_string(value), value);
+        }
+    }
+
+    /// 带时间的小数序列号截断到所在日
+    #[test]
+    fn excel_serial_truncates_time_part() {
+        assert_eq!(excel_serial_to_date_string("45123.75"), "2023-07-16");
+    }
+
+    /// 解析业务字段行：空行过滤、条目名回退、日期转换、短行补空
+    #[test]
+    fn parse_sheet_rows_maps_business_fields() {
+        let rows = vec![
+            vec![
+                " 架空の森 ".to_string(),
+                String::new(),
+                "Brand".to_string(),
+                "45123".to_string(),
+                "45000".to_string(),
+            ],
+            vec![String::new(); 5],
+            vec!["短行".to_string()],
+        ];
+        let parsed = parse_sheet_rows(rows);
+        assert_eq!(parsed.len(), 2);
+
+        assert_eq!(parsed[0].original_name, "架空の森");
+        // 条目名为空时回退为原名
+        assert_eq!(parsed[0].title, "架空の森");
+        assert_eq!(parsed[0].brand, "Brand");
+        assert_eq!(parsed[0].release_date, "2023-07-16");
+        assert_eq!(parsed[0].creation_date, "2023-03-15");
+
+        // 缺失列补空字符串
+        assert_eq!(parsed[1].original_name, "短行");
+        assert_eq!(parsed[1].title, "短行");
+        assert_eq!(parsed[1].brand, "");
+        assert_eq!(parsed[1].release_date, "");
+        assert_eq!(parsed[1].creation_date, "");
+    }
 }

@@ -248,7 +248,7 @@ export default function ArticleStats() {
   const handleCheckUpdates = () => {
     if (!ensureFeishuConfig()) { return; }
     setUpdateCheckOpen(true);
-    useArticleStore.getState().checkUpdates(feishuStatsTableAppId, feishuStatsTableAppSecret)
+    useArticleStore.getState().checkUpdates()
       .then((count) => {
         if (count > 0) {
           message.success(t('检测到 {{count}} 个候选条目，请完善后提交', { count }));
@@ -266,7 +266,7 @@ export default function ArticleStats() {
   /** 候选提交成功后刷新统计数据 */
   const handleUpdateSubmitted = async () => {
     try {
-      await useArticleStore.getState().fetchFeishuTable(feishuStatsTableAppId, feishuStatsTableAppSecret);
+      await useArticleStore.getState().fetchFeishuTable();
       await useArticleStore.getState().fetchPageData();
     } catch (err) {
       message.error(formatError(err), 5);
@@ -277,7 +277,7 @@ export default function ArticleStats() {
   const handleRefresh = async () => {
     if (!ensureFeishuConfig()) { return; }
     try {
-      await useArticleStore.getState().fetchFeishuTable(feishuStatsTableAppId, feishuStatsTableAppSecret);
+      await useArticleStore.getState().fetchFeishuTable();
       message.success(t('获取条目列表成功，正在获取分类和重定向信息…'));
       await useArticleStore.getState().fetchPageData();
       message.success(t('数据更新成功'));

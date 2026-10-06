@@ -16,7 +16,6 @@ import { useTranslation } from 'react-i18next';
 import feishu, { type FeishuAppendRow } from '@/api/feishu';
 import MoegirlLink from '@/components/moegirl-link';
 import { useArticleStore, type UpdateCandidate } from '@/stores/article-store';
-import { useSettingsStore } from '@/stores/settings-store';
 import { formatError } from '@/utils/error';
 
 interface UpdateCheckModalProps {
@@ -40,8 +39,6 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
   const candidates = useArticleStore((s) => s.candidates);
   const checking = useArticleStore((s) => s.checking);
   const clearCandidates = useArticleStore((s) => s.clearCandidates);
-  const feishuStatsTableAppId = useSettingsStore((s) => s.feishuStatsTableAppId);
-  const feishuStatsTableAppSecret = useSettingsStore((s) => s.feishuStatsTableAppSecret);
 
   // ─── 编辑与勾选状态 ───
   /** 行编辑覆盖层：标题 -> 字段补丁，展示行由此合并生成 */
@@ -91,7 +88,6 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
     }
     setSubmitting(true);
     try {
-      const { articles } = useArticleStore.getState();
       const sorted = [...chosen].sort((a, b) => a.creationDate.localeCompare(b.creationDate));
       const appendRows: FeishuAppendRow[] = sorted.map((row) => ({
         original_name: row.ja.trim(),
@@ -100,12 +96,8 @@ export default function UpdateCheckModal({ open, onClose, onSubmitted }: UpdateC
         release_date: row.releaseDate,
         creation_date: row.creationDate,
       }));
-      const appendResult = await feishu.appendRows(
-        feishuStatsTableAppId,
-        feishuStatsTableAppSecret,
-        articles.length,
-        appendRows,
-      );
+      // 凭证与已有行数均由后端自行获取
+      const appendResult = await feishu.appendRows(appendRows);
       if (appendResult.style_warnings.length > 0) {
         message.warning(
           t('已追加 {{count}} 条数据，但样式设置失败，请检查线上表格。{{warning}}', {

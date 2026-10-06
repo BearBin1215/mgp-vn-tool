@@ -74,6 +74,7 @@ mgp-vn-tool/
 │   │   └── ...
 │   ├── lib/                    # 工具库
 │   │   ├── types.ts            # 共享类型定义
+│   │   ├── mediawiki-moegirl.d.ts # MediaWiki 类型包的萌百定制字段增广
 │   │   ├── config-store.ts     # 配置存储
 │   │   └── ...
 │   ├── utils/                  # 纯工具函数
@@ -209,8 +210,8 @@ export const routes: RouteConfig[] = [
 
 前端通过 Tauri `invoke()` 调用 Rust 命令。不同 API 的响应处理方式不同：
 
-- **萌娘百科**：Rust 后端转发请求，前端直接使用 MediaWiki API 返回的 JSON，无需额外处理
-- **飞书**：Rust 后端统一获取 token，负责统计表读取、业务字段转 A-F 表格数据、追加行和新增行样式设置；前端通过 API 封装调用，并接收结构化的实际写入范围和样式警告
+- **萌娘百科**：Rust 后端转发请求，前端直接使用 MediaWiki API 返回的 JSON。响应类型使用 `types-mediawiki-response` 包提供类型，萌百定制字段通过 `src/lib/mediawiki-moegirl.d.ts` 声明合并增广
+- **飞书**：Rust 后端统一获取 token，负责统计表读取（返回已解析物理列和日期的结构化行）、业务字段转 A-F 表格数据、追加行（已有行数由后端实时统计）、新增行样式设置；飞书 App ID / App Secret 由后端直接从设置存储读取，前端调用时不传凭据
 - **批评空间**：Rust 后端解析 HTML 返回结构化数据，前端通过 `unwrap()` 解包响应：
 
 ```typescript

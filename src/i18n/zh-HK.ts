@@ -276,6 +276,7 @@ const zhHK: Record<string, string> = {
   "error.ero_timeout": "請求超時（{{seconds}}秒）",
   "error.ero_unknown_failure": "批評空間請求失敗",
   "error.ero_work_not_found": "未找到作品 id={{work_id}} 的資訊",
+  "error.feishu_credentials_missing": "未配置飛書統計表 App Secret，請先在設定頁面填寫",
   "error.feishu_error": "{{operation}}失敗：{{detail}}",
   "error.feishu_forbidden": "{{operation}}失敗：飛書權限不足：{{hint}}。{{detail}}",
   "error.feishu_missing_updated_range": "追加成功，但飛書回應缺少實際寫入範圍，無法設定新增行樣式",

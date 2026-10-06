@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import dayjs from 'dayjs';
 import { chunk } from 'es-toolkit';
+import type { ApiLogEvent, ApiQueryResponse, QueryPage } from 'types-mediawiki-response';
 import feishu from '@/api/feishu';
 import moegirl, { fetchPageInfo, getMoegirlQueryBatchSize } from '@/api/moegirl';
 import type { ApiParams } from '@/lib/types';
@@ -60,49 +61,19 @@ interface ArticleStore {
   /** 是否正在检查更新 */
   checking: boolean;
   /** 从飞书表格获取条目数据并存储 */
-  fetchFeishuTable: (appId: string, appSecret: string) => Promise<void>;
+  fetchFeishuTable: () => Promise<void>;
   /** 从萌百获取分类和重定向数据；传入标题时仅增量更新对应条目 */
   fetchPageData: (titles?: string[]) => Promise<void>;
   /** 为缺少分类数据的条目增量获取页面数据 */
   fetchMissingPageData: () => Promise<void>;
   /** 检查更新：同步表格后经萌百增量检测候选条目，返回候选数量 */
-  checkUpdates: (appId: string, appSecret: string) => Promise<number>;
+  checkUpdates: () => Promise<number>;
   /** 清空检查更新的候选条目 */
   clearCandidates: () => void;
 }
 
 /** Tauri store 实例（路径由后端统一解析到用户配置目录） */
 const storePromise = loadConfigStore('articles.json');
-
-/** 将 Excel 序列日期转为 YYYY-MM-DD 字符串 */
-const excelDateToString = (value: string): string => {
-  const num = Number(value);
-  if (!Number.isFinite(num) || num <= 0) { return value; }
-  const d = dayjs((num - 25569) * 86400000);
-  return d.isValid() ? d.format('YYYY-MM-DD') : value;
-};
-
-/** 从飞书表格行数据解析为 Article（分类待后续填充） */
-const parseRow = (row: string[]): Article => {
-  const ja = (row[0] || '').trim();
-  const title = (row[1] || '').trim() || ja;
-  return {
-    ja,
-    title,
-    brand: (row[2] || '').trim(),
-    categories: [],
-    releaseDate: excelDateToString((row[3] || '').trim()),
-    creationDate: excelDateToString((row[4] || '').trim()),
-  };
-};
-
-interface PageData {
-  title: string;
-  /** 页面所属分类 */
-  categories?: { title: string }[];
-  /** 页面重定向 */
-  redirects?: { title: string }[];
-}
 
 /** 过滤掉每个条目都有的 Category:日本游戏作品、Category:XXXX作品、Category:PAGENAME */
 const isExcludedCategory = (category: string, articleTitle: string): boolean => {
@@ -148,25 +119,27 @@ const fetchPageData = async (titles: string[]): Promise<FetchPageDataResult> => 
         ...continueParams,
       };
 
-      const res = await moegirl.post(params);
-      const query = (res as { query?: { pages?: PageData[]; redirects?: { from: string; to: string }[] } }).query || {};
-      const pages = query.pages || [];
-      const batchRedirects = query.redirects || [];
+      const res = await moegirl.post(params) as ApiQueryResponse;
+      const pages = (res.query?.pages ?? []) as QueryPage<'redirects' | 'categories'>[];
+      const batchRedirects = res.query?.redirects ?? [];
 
       for (const r of batchRedirects) {
-        redirects.set(r.from, r.to);
+        if (r.from && r.to) { redirects.set(r.from, r.to); }
       }
 
       for (const page of pages) {
+        // 按标题查询返回的页面必带 title，异常缺失时无法建立映射，跳过
+        if (page.title === undefined) { continue; }
+        const { title } = page;
         // 处理分类
         if (page.categories) {
           const cats = page.categories
             .map((c) => c.title.replace(/^Category:/, ''))
-            .filter((c) => !isExcludedCategory(c, page.title));
-          categories.set(page.title, cats);
+            .filter((c) => !isExcludedCategory(c, title));
+          categories.set(title, cats);
           // 将分类也赋给被重定向的原始标题
           for (const [from, to] of redirects) {
-            if (to === page.title) {
+            if (to === title) {
               categories.set(from, cats);
             }
           }
@@ -174,11 +147,11 @@ const fetchPageData = async (titles: string[]): Promise<FetchPageDataResult> => 
 
         // 处理重指向该页面的重定向
         if (page.redirects) {
-          const redirectTitles = page.redirects.map((r) => r.title);
-          pageRedirects.set(page.title, redirectTitles);
+          const redirectTitles = page.redirects.map((r) => r.title).filter((t) => t !== undefined);
+          pageRedirects.set(title, redirectTitles);
           // 将重定向也复制给被重定向的原始标题
           for (const [from, to] of redirects) {
-            if (to === page.title && !pageRedirects.has(from)) {
+            if (to === title && !pageRedirects.has(from)) {
               pageRedirects.set(from, redirectTitles);
             }
           }
@@ -186,7 +159,7 @@ const fetchPageData = async (titles: string[]): Promise<FetchPageDataResult> => 
       }
 
       // 处理 continue，可能同时有 clcontinue 和 rdcontinue
-      const cont = (res as { continue?: Record<string, string> }).continue;
+      const cont = res.continue;
       if (cont && (cont.clcontinue || cont.rdcontinue || cont.continue)) {
         continueParams = {};
         if (cont.clcontinue) { continueParams.clcontinue = cont.clcontinue; }
@@ -201,14 +174,13 @@ const fetchPageData = async (titles: string[]): Promise<FetchPageDataResult> => 
   return { categories, redirects, pageRedirects };
 };
 
-/** logevents 接口的单条日志 */
-interface LogEvent {
-  /** 日志 ID，用于同一秒内事件排序 */
-  logid?: number;
+/**
+ * logevents 接口的单条日志，基于包类型并按请求的 leprop=ids|title|timestamp|details
+ * 收窄：title 与 timestamp 必有，params（leprop=details）按萌百 move 日志结构标注
+ */
+type LogEvent = ApiLogEvent & {
   /** 页面标题 */
   title: string;
-  /** 日志类型 */
-  type?: string;
   /** 时间戳（ISO 8601） */
   timestamp: string;
   /** 日志详情（move 类型时含移动目标） */
@@ -220,23 +192,7 @@ interface LogEvent {
     /** 是否未保留重定向 */
     suppressredirect?: boolean;
   };
-}
-
-/** logevents 接口的响应结构 */
-interface LogEventsResponse {
-  query?: { logevents?: LogEvent[] };
-  continue?: Record<string, string>;
-}
-
-/** prop=revisions 内容查询的响应结构 */
-interface RevisionContentResponse {
-  query?: {
-    pages?: Array<{
-      title: string;
-      revisions?: Array<{ slots?: { main?: { content?: string } } }>;
-    }>;
-  };
-}
+};
 
 /**
  * 抓取指定时间段内主命名空间的全部指定类型日志事件
@@ -269,10 +225,10 @@ const fetchLogEvents = async (
       ...continueParams,
     };
 
-    const res = await moegirl.post(params);
-    events.push(...(((res as LogEventsResponse).query?.logevents) || []));
+    const res = await moegirl.post(params) as ApiQueryResponse;
+    events.push(...((res.query?.logevents ?? []) as LogEvent[]));
 
-    const cont = (res as LogEventsResponse).continue;
+    const cont = res.continue;
     if (cont && (cont.lecontinue || cont.continue)) {
       continueParams = {};
       if (cont.lecontinue) { continueParams.lecontinue = cont.lecontinue; }
@@ -333,11 +289,11 @@ const fetchPageWikitexts = async (titles: string[]): Promise<Map<string, string>
       rvprop: ['content'],
       rvslots: 'main',
       titles: batch,
-    });
-    const pages = ((res as RevisionContentResponse).query?.pages) || [];
+    }) as ApiQueryResponse;
+    const pages = (res.query?.pages ?? []) as QueryPage<'revisions'>[];
     for (const page of pages) {
       const content = page.revisions?.[0]?.slots?.main?.content;
-      if (content) {
+      if (content && page.title !== undefined) {
         result.set(page.title, content);
       }
     }
@@ -356,14 +312,21 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   checking: false,
 
   /** 从飞书表格获取条目数据 */
-  fetchFeishuTable: async (appId, appSecret) => {
+  fetchFeishuTable: async () => {
     set({ loading: true });
     try {
-      const rows = await feishu.fetchSheet(appId, appSecret);
+      const rows = await feishu.fetchSheet();
       // 按标题缓存既有分类与重定向数据，重拉表格时复用
       const pageDataCache = new Map(get().articles.map((a) => [a.title, a]));
-      const articles = rows.filter((row) => row[0]).map((row) => {
-        const parsed = parseRow(row);
+      const articles = rows.map((row) => {
+        const parsed: Article = {
+          ja: row.original_name,
+          title: row.title,
+          brand: row.brand,
+          categories: [],
+          releaseDate: row.release_date,
+          creationDate: row.creation_date,
+        };
         const cached = pageDataCache.get(parsed.title);
         if (!cached) { return parsed; }
         return {
@@ -437,11 +400,11 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   },
 
   /** 检查更新：同步表格后经萌百增量检测候选条目，返回候选数量 */
-  checkUpdates: async (appId, appSecret) => {
+  checkUpdates: async () => {
     set({ checking: true, candidates: [] });
     try {
       // 先全量重拉表格，保证增量起点与去重依据均为最新数据
-      await get().fetchFeishuTable(appId, appSecret);
+      await get().fetchFeishuTable();
       // 增量补齐表格新增条目的页面数据
       await get().fetchMissingPageData();
       const { articles } = get();

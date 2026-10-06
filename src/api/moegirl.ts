@@ -1,15 +1,10 @@
 import { chunk } from 'es-toolkit';
 import { invoke } from '@tauri-apps/api/core';
+import type { ApiQueryResponse, QueryPage } from 'types-mediawiki-response';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useMoegirlStore } from '@/stores/moegirl-store';
 import { createLocalizedError, isToolError } from '@/utils/error';
 import type { ApiParams } from '@/lib/types';
-
-interface TokenQueryResponse {
-  query?: {
-    tokens?: Record<string, string>;
-  };
-}
 
 /** getUserRights 返回的当前用户信息 */
 export interface UserInfo {
@@ -21,18 +16,6 @@ export interface UserInfo {
   displayname: string | null;
   /** 昵称标签（未设置时为 null） */
   displaytag: string | null;
-}
-
-/** list=users 接口的响应结构 */
-interface UsersQueryResponse {
-  query?: {
-    users?: Array<{
-      groups?: string[];
-      rights?: string[];
-      displayname?: string | null;
-      displaytag?: string | null;
-    }>;
-  };
 }
 
 /** 本次会话中使用过的 token，减少重复获取 */
@@ -63,10 +46,10 @@ const clearInvalidLogin = async (error: unknown): Promise<void> => {
 const request = async (
   method: 'GET' | 'POST',
   params: ApiParams,
-): Promise<Record<string, unknown>> => {
+): Promise<unknown> => {
   const { moegirlApiHost: host, moegirlUserAgent: userAgent } = useSettingsStore.getState();
   try {
-    return await invoke<Record<string, unknown>>('moegirl_request', {
+    return await invoke<unknown>('moegirl_request', {
       host,
       method,
       params,
@@ -98,9 +81,8 @@ const moegirl = {
         action: 'query',
         meta: 'tokens',
         type: tokenType,
-      });
-      const tokens = (res as TokenQueryResponse).query?.tokens;
-      const token = tokens?.[`${tokenType}token`];
+      }) as ApiQueryResponse;
+      const token = res.query?.tokens?.[`${tokenType}token`];
       if (!token) {
         throw createLocalizedError(
           'moegirl_token_missing',
@@ -118,7 +100,7 @@ const moegirl = {
   },
 
   /** 先获取 token，再携带 token 发起 POST 请求 */
-  async postWithToken(tokenType: string, params: ApiParams): Promise<Record<string, unknown>> {
+  async postWithToken(tokenType: string, params: ApiParams): Promise<unknown> {
     const token = await moegirl.getToken(tokenType);
     const tokenField = tokenType === 'login' ? 'logintoken' : 'token';
     return moegirl.post({ ...params, [tokenField]: token });
@@ -137,8 +119,8 @@ const moegirl = {
       list: 'users',
       ususers: username,
       usprop: ['groups', 'rights'],
-    });
-    const user = (res as UsersQueryResponse).query?.users?.[0];
+    }) as ApiQueryResponse;
+    const user = res.query?.users?.[0];
     return {
       groups: user?.groups || [],
       rights: user?.rights || [],
@@ -187,19 +169,23 @@ export const fetchPageInfo = async (titles: string[]): Promise<Map<string, PageI
         ...continueParams,
       };
 
-      const res = await moegirl.post(params);
-      const query = (res as { query?: { pages?: Array<{ pageid?: number; title: string; missing?: boolean; categories?: Array<{ title: string }> }> } }).query || {};
-      const pages = query.pages || [];
+      const res = await moegirl.post(params) as ApiQueryResponse;
+      const pages = (res.query?.pages ?? []) as QueryPage<'categories'>[];
 
       // 收集顶层 converted 和 redirects
-      const topRedirects = (res as { query?: { redirects?: Array<{ from: string; to: string }> } }).query?.redirects || [];
-      const topConverted = (res as { query?: { converted?: Array<{ from: string; to: string }> } }).query?.converted || [];
-      for (const r of topRedirects) { redirectMap.set(r.from, r.to); }
-      for (const c of topConverted) { convertedMap.set(c.from, c.to); }
+      const topRedirects = res.query?.redirects ?? [];
+      const topConverted = res.query?.converted ?? [];
+      for (const r of topRedirects) {
+        if (r.from && r.to) { redirectMap.set(r.from, r.to); }
+      }
+      for (const c of topConverted) {
+        if (c.from && c.to) { convertedMap.set(c.from, c.to); }
+      }
 
       for (const page of pages) {
-        const isMissing = (page as { missing?: boolean }).missing === true;
-        const hasPageId = 'pageid' in page && !isMissing;
+        // 按标题查询返回的页面必带 title，异常缺失时无法建立映射，跳过
+        if (page.title === undefined) { continue; }
+        const isMissing = page.missing === true;
         const categoryNames = (page.categories || []).map((c) => c.title.replace(/^Category:/, ''));
         const isDisambiguation = categoryNames.includes('消歧义页');
 
@@ -215,7 +201,7 @@ export const fetchPageInfo = async (titles: string[]): Promise<Map<string, PageI
         }
 
         const info: PageInfo = {
-          pageId: hasPageId ? (page as { pageid: number }).pageid : null,
+          pageId: page.pageid !== undefined && !isMissing ? page.pageid : null,
           title: page.title,
           isDisambiguation,
           categories: categoryNames,
@@ -237,7 +223,7 @@ export const fetchPageInfo = async (titles: string[]): Promise<Map<string, PageI
         result.set(page.title, info);
       }
 
-      const cont = (res as { continue?: Record<string, string> }).continue;
+      const cont = res.continue;
       if (cont && (cont.clcontinue || cont.continue)) {
         continueParams = {};
         if (cont.clcontinue) { continueParams.clcontinue = cont.clcontinue; }
