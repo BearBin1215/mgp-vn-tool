@@ -20,35 +20,18 @@
 ## 常用命令
 
 ```bash
-# 安装依赖
-pnpm install
+pnpm install # 安装依赖
+pnpm tauri dev # 启动开发服务器（同时启动前端和 Tauri）
 
-# 启动开发服务器（同时启动前端和 Tauri）
-pnpm tauri dev
+cargo check  # 后端静态检查
+cargo clippy # 后端代码静态分析
+cargo test   # 后端测试
 
-# 后端静态检查
-cargo check
-
-# 后端代码静态分析
-cargo clippy
-
-# 后端测试
-cargo test
-
-# 前端类型检查
-pnpm typecheck
-
-# 前端 eslint 检查
-pnpm lint
-
-# 前端 eslint 检查并修复
-pnpm lint:fix
-
-# 前端单元测试（vitest）
-pnpm test
-
-# 前端聚合检查（typecheck + lint + test）
-pnpm check
+pnpm typecheck # 前端类型检查
+pnpm lint      # 前端 eslint 检查
+pnpm lint:fix  # 前端 eslint 检查并修复
+pnpm test      # 前端单元测试（vitest）
+pnpm check     # 前端聚合检查（typecheck + lint + test）
 ```
 
 ## 项目结构
@@ -137,10 +120,8 @@ mgp-vn-tool/
 
 ### React
 
-- 遵循`eslint.config.ts`内的ESLint规则（禁用冗余Fragment、组件单行最多2参数等）
 - 遵循React提倡的**保持组件纯粹**原则，每个组件都必须是纯函数
 - 组件内变量、函数、hooks定义按功能归类分组排序
-- 组件命名和导出使用 `export default function ComponentName()`
 - 组件使用PascalCase命名法，hooks以`use`开头
 - 共享组件放在 `src/components/` 目录，仅单页面使用的组件和对应页面的入口`index.tsx`放在同一目录
 - 共享组件props要求使用 `interface` 定义，除 className、disabled 等通用参数外每个参数都要有对应的 jsdoc 注释
@@ -171,22 +152,11 @@ function Component() {
 
 ### 简繁变体
 
-- 本工程通过 `react-i18next` 实现简繁支持，采用 natural key 模式直接将简中文本作为键值，其他变体缺失时显示简中
-- 前端在 UI 组件中使用`const { t } = useTranslation();`和`t('默认简体')`，然后在`src/i18n/zh-TW.ts`（台湾繁体）或`src/i18n/zh-HK.ts`（香港繁体）中写繁体文本
-- 前后端通信显示文本如错误信息、接口响应时，后端返回编码、前端查表实现多语言支持
+- 本工程通过 `react-i18next` 实现简繁支持，采用 natural key 模式直接将简中文本作为键值，其他变体缺失时显示简中。
+- 前端在 UI 组件中使用`const { t } = useTranslation();`和`t('默认简体')`，然后在`src/i18n/zh-TW.ts`（台湾繁体）或`src/i18n/zh-HK.ts`（香港繁体）中写繁体文本。
+- 前后端通信显示文本如错误信息、接口响应时，后端返回编码、前端查表实现多语言支持。
 
 ## 架构模式
-
-### 状态管理
-
-使用 Zustand 进行状态管理，设置持久化存储在 Tauri Store：
-
-```typescript
-// stores/settings-store.ts
-export const useSettingsStore = create<SettingsStore>((set) => ({
-  // 状态和更新方法
-}));
-```
 
 ### 路由与菜单
 
@@ -212,31 +182,11 @@ export const routes: RouteConfig[] = [
 
 - **萌娘百科**：Rust 后端转发请求，前端直接使用 MediaWiki API 返回的 JSON。响应类型使用 `types-mediawiki-response` 包提供类型，萌百定制字段通过 `src/lib/mediawiki-moegirl.d.ts` 声明合并增广
 - **飞书**：Rust 后端统一获取 token，负责统计表读取（返回已解析物理列和日期的结构化行）、业务字段转 A-F 表格数据、追加行（已有行数由后端实时统计）、新增行样式设置；飞书 App ID / App Secret 由后端直接从设置存储读取，前端调用时不传凭据
-- **批评空间**：Rust 后端解析 HTML 返回结构化数据，前端通过 `unwrap()` 解包响应：
-
-```typescript
-// src/api/erogamescape.ts
-interface ErogamescapeResponse<T> {
-  statusCode: string;
-  result: 'success' | 'fail';
-  response: T;
-}
-
-export function unwrap<T>(res: ErogamescapeResponse<T>): T {
-  if (res.result === 'fail') {
-    throw new Error(String(res.response || '请求失败'));
-  }
-  return res.response;
-}
-
-export async function queryCreatorWorks(creatorId: number): Promise<QueryResult> {
-  const res = await invoke<ErogamescapeResponse<QueryResult>>('query_creator_works', { creatorId });
-  return unwrap(res);
-}
-```
+- **批评空间**：Rust 后端解析 HTML 返回结构化数据，前端通过 `src/api/erogamescape.ts` 提供的 `unwrap()` 方法解包响应。
 
 详细文档：
 - 批评空间：[docs/erogamescape_api.md](docs/erogamescape_api.md)
+- 飞书：[docs/feishu_api.md](docs/feishu_api.md)
 - 萌娘百科：[docs/moegirl_api.md](docs/moegirl_api.md)
 
 ### 持久化存储模式
@@ -268,29 +218,6 @@ await store.save();
 1. 在 `src/pages/` 下创建新目录和 `index.tsx`
 2. 在 `src/routes.tsx` 中添加路由配置（包含 label、icon、position）
 3. 使用 `Page` 组件作为页面外壳
-
-### Page 组件
-
-所有页面必须使用 `Page` 组件包裹，它提供统一的页顶和内容区：
-
-```tsx
-import Page from "@/components/page";
-
-export default function MyPage() {
-  return (
-    <Page actions={<Button color="inherit">操作</Button>}>
-      页面内容
-    </Page>
-  );
-}
-```
-
-Props：
-- `actions`：页顶右侧的操作按钮区域（可选）
-- `subtitle`：页顶标题旁的副标题（可选）
-- `padding`：内容区内边距开关，默认 `true`；需要 sticky 筛选栏等自定义布局时设为 `false`
-- `className`：内容区自定义 className（可选）
-- `children`：页面内容
 
 ## 添加新设置项
 

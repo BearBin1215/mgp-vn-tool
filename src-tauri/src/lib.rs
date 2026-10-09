@@ -33,6 +33,7 @@ pub fn run() {
             settings::config_file_path_command,
             locale::detect_ui_language_command,
             moegirl::moegirl_request,
+            moegirl::moegirl_login,
             moegirl::moegirl_check_login,
             moegirl::moegirl_logout,
             feishu::feishu_fetch_sheet,

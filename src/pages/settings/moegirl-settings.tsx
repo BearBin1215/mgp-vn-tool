@@ -22,6 +22,8 @@ export default function MoegirlSettings() {
   const setMoegirlRetries = useSettingsStore((s) => s.setMoegirlRetries);
   const moegirlRetryDelay = useSettingsStore((s) => s.moegirlRetryDelay);
   const setMoegirlRetryDelay = useSettingsStore((s) => s.setMoegirlRetryDelay);
+  const moegirlTimeout = useSettingsStore((s) => s.moegirlTimeout);
+  const setMoegirlTimeout = useSettingsStore((s) => s.setMoegirlTimeout);
   const moegirlUsername = useSettingsStore((s) => s.moegirlUsername);
   const moegirlGroups = useMoegirlStore((s) => s.groups);
   const moegirlRights = useMoegirlStore((s) => s.rights);
@@ -87,6 +89,17 @@ export default function MoegirlSettings() {
                 { value: 'zh.moegirl.org.cn', label: 'zh.moegirl.org.cn' },
                 { value: 'mzh.moegirl.org.cn', label: 'mzh.moegirl.org.cn' },
               ]}
+            />
+          </SettingItem>
+          <SettingItem label={t('请求超时')} description={t('单个请求的超时时长')}>
+            <InputNumber
+              className='w-60!'
+              min={5}
+              max={300}
+              precision={0}
+              value={moegirlTimeout}
+              onChange={(v) => v !== null && setMoegirlTimeout(v)}
+              suffix='s'
             />
           </SettingItem>
           <SettingItem label={t('请求重试')} description={t('请求失败时的重试次数和间隔')}>

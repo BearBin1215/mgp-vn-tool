@@ -5,7 +5,6 @@ import { DEFAULT_USER_AGENT, DEFAULT_FEISHU_APP_ID } from '@/utils/constants';
 import { isErogamescapeUrl, type ErogamescapeUrl, type MoegirlHost } from '@/lib/types';
 import { loadConfigStore } from '@/lib/config-store';
 import { changeUiLanguage, detectSystemUiLanguage, isUiLanguage, type UiLanguage } from '@/i18n';
-import { createLocalizedError } from '@/utils/error';
 import { useMoegirlStore } from './moegirl-store';
 
 export type ColorMode = 'light' | 'dark';
@@ -68,6 +67,9 @@ interface SettingsStore {
   /** 萌娘百科请求重试间隔（毫秒） */
   moegirlRetryDelay: number;
   setMoegirlRetryDelay: (ms: number) => void;
+  /** 萌娘百科请求超时时长（秒） */
+  moegirlTimeout: number;
+  setMoegirlTimeout: (seconds: number) => void;
   /** 萌娘百科登录用户名（未登录为空） */
   moegirlUsername: string;
   /** 登录萌娘百科 */
@@ -253,31 +255,16 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     set({ moegirlRetryDelay: ms });
   },
 
+  moegirlTimeout: 30,
+  setMoegirlTimeout: async (seconds) => {
+    await persistSetting('moegirlTimeout', seconds);
+    set({ moegirlTimeout: seconds });
+  },
+
   loginMoegirl: async (username, password) => {
-    const loginRes = await moegirl.postWithToken('login', {
-      action: 'clientlogin',
-      loginreturnurl: 'https://mzh.moegirl.org.cn/api.php',
-      username,
-      password,
-      rememberMe: '1',
-    });
-
-    const res = loginRes as Record<string, unknown>;
-    const clientlogin = res?.clientlogin as { status?: string; username?: string; message?: string } | undefined;
-    const error = res?.error as { info?: string } | undefined;
-
-    if (clientlogin?.status === 'PASS') {
-      const name = clientlogin.username || username;
-      set({ moegirlUsername: name });
-      void useMoegirlStore.getState().fetchUserInfo();
-    } else {
-      const detail = error?.info || clientlogin?.message;
-      if (detail) {
-        // MediaWiki 返回的原始错误不做简繁转换，避免改变服务端语义
-        throw new Error(detail);
-      }
-      throw createLocalizedError('moegirl_login_failed', '登录失败');
-    }
+    const name = await moegirl.login(username, password);
+    set({ moegirlUsername: name });
+    void useMoegirlStore.getState().fetchUserInfo();
   },
 
   logoutMoegirl: async () => {
@@ -325,6 +312,7 @@ export const initSettings = async () => {
     moegirlUserAgent,
     moegirlRetries,
     moegirlRetryDelay,
+    moegirlTimeout,
   ] = await Promise.all([
     readSetting<ColorMode>('colorMode', 'light', (v): v is ColorMode => v === 'light' || v === 'dark'),
     readUiLanguage(),
@@ -345,6 +333,7 @@ export const initSettings = async () => {
     readSetting('moegirlUserAgent', DEFAULT_USER_AGENT, isNonEmptyString),
     readSetting('moegirlRetries', 1, isFiniteNumber),
     readSetting('moegirlRetryDelay', 1000, isFiniteNumber),
+    readSetting('moegirlTimeout', 30, isFiniteNumber),
   ]);
   const [erogamescapeUsername, erogamescapePassword, moegirlUsername] = await Promise.all([
     store.get<string>('erogamescapeUsername').then((v) => v || ''),
@@ -374,5 +363,6 @@ export const initSettings = async () => {
     moegirlUserAgent,
     moegirlRetries,
     moegirlRetryDelay,
+    moegirlTimeout,
   });
 };

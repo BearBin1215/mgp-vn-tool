@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ApiQueryResponse, QueryPage } from 'types-mediawiki-response';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useMoegirlStore } from '@/stores/moegirl-store';
-import { createLocalizedError, isToolError } from '@/utils/error';
+import { isToolError } from '@/utils/error';
 import type { ApiParams } from '@/lib/types';
 
 /** getUserRights 返回的当前用户信息 */
@@ -18,9 +18,6 @@ export interface UserInfo {
   displaytag: string | null;
 }
 
-/** 本次会话中使用过的 token，减少重复获取 */
-const tokenCache = new Map<string, string>();
-
 /** 根据当前用户权限返回 MediaWiki 标题查询的单批上限。 */
 export const getMoegirlQueryBatchSize = (): number =>
   useMoegirlStore.getState().rights.includes('apihighlimits') ? 500 : 50;
@@ -34,7 +31,6 @@ const clearInvalidLogin = async (error: unknown): Promise<void> => {
   if (!notLoggedIn) {
     return;
   }
-  tokenCache.clear();
   useSettingsStore.setState({ moegirlUsername: '' });
   await Promise.allSettled([
     invoke<void>('moegirl_logout'),
@@ -47,14 +43,8 @@ const request = async (
   method: 'GET' | 'POST',
   params: ApiParams,
 ): Promise<unknown> => {
-  const { moegirlApiHost: host, moegirlUserAgent: userAgent } = useSettingsStore.getState();
   try {
-    return await invoke<unknown>('moegirl_request', {
-      host,
-      method,
-      params,
-      userAgent,
-    });
+    return await invoke<unknown>('moegirl_request', { method, params });
   } catch (e) {
     await clearInvalidLogin(e);
     throw e;
@@ -70,40 +60,9 @@ const moegirl = {
     return request('POST', params);
   },
 
-  /** 获取指定类型的 token，优先使用缓存 */
-  async getToken(tokenType: string): Promise<string> {
-    const cached = tokenCache.get(tokenType);
-    if (cached) {
-      return cached;
-    }
-    try {
-      const res = await moegirl.post({
-        action: 'query',
-        meta: 'tokens',
-        type: tokenType,
-      }) as ApiQueryResponse;
-      const token = res.query?.tokens?.[`${tokenType}token`];
-      if (!token) {
-        throw createLocalizedError(
-          'moegirl_token_missing',
-          `获取 ${tokenType} Token 失败`,
-          { token_type: tokenType },
-        );
-      }
-      tokenCache.set(tokenType, token);
-      return token;
-    } catch (e) {
-      // 失败时清缓存，避免后续复用可能无效的 token（如权限变更）
-      tokenCache.delete(tokenType);
-      throw e;
-    }
-  },
-
-  /** 先获取 token，再携带 token 发起 POST 请求 */
-  async postWithToken(tokenType: string, params: ApiParams): Promise<unknown> {
-    const token = await moegirl.getToken(tokenType);
-    const tokenField = tokenType === 'login' ? 'logintoken' : 'token';
-    return moegirl.post({ ...params, [tokenField]: token });
+  /** 登录萌百，成功时返回用户名 */
+  login(username: string, password: string): Promise<string> {
+    return invoke<string>('moegirl_login', { username, password });
   },
 
   /** 检查登录状态 */
@@ -129,9 +88,8 @@ const moegirl = {
     };
   },
 
-  /** 退出登录，清空 token 缓存 */
+  /** 退出登录 */
   logout(): Promise<void> {
-    tokenCache.clear();
     return invoke<void>('moegirl_logout');
   },
 };
