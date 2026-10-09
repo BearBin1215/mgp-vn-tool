@@ -57,7 +57,7 @@ mgp-vn-tool/
 │   │   └── ...
 │   ├── lib/                    # 工具库
 │   │   ├── types.ts            # 共享类型定义
-│   │   ├── mediawiki-moegirl.d.ts # MediaWiki 类型包的萌百定制字段增广
+│   │   ├── moegirl-response.d.ts # MediaWiki 类型包的萌百定制字段增广
 │   │   ├── config-store.ts     # 配置存储
 │   │   └── ...
 │   ├── utils/                  # 纯工具函数
@@ -79,6 +79,7 @@ mgp-vn-tool/
 │   │   ├── lib.rs              # Tauri 配置和 Rust API 命令
 │   │   ├── error.rs            # 前端可识别的结构化错误（错误码 + 插值参数 + 简体原文）
 │   │   ├── feishu.rs           # 飞书统计表读写与样式设置
+│   │   ├── moegirl_query.rs    # 萌百批量查询命令（分批、continue 分页）
 │   │   ├── http.rs             # 网络请求模块
 │   │   ├── settings.rs         # 统一从 Tauri Store 读取 settings.json
 │   │   ├── main.rs             # 入口
@@ -180,7 +181,7 @@ export const routes: RouteConfig[] = [
 
 前端通过 Tauri `invoke()` 调用 Rust 命令。不同 API 的响应处理方式不同：
 
-- **萌娘百科**：Rust 后端转发请求，前端直接使用 MediaWiki API 返回的 JSON。响应类型使用 `types-mediawiki-response` 包提供类型，萌百定制字段通过 `src/lib/mediawiki-moegirl.d.ts` 声明合并增广
+- **萌娘百科**：单次查询经 Rust 后端 `moegirl_request` 转发，前端直接使用 MediaWiki API 返回的 JSON，响应类型使用 `types-mediawiki-response` 包提供类型，萌百定制字段通过 `src/lib/moegirl-response.d.ts` 声明合并增广；批量查询（页面信息、分类重定向、日志、源代码）由 `moegirl_query_*` 命令在后端完成分批与 continue 分页，返回结构化数据
 - **飞书**：Rust 后端统一获取 token，负责统计表读取（返回已解析物理列和日期的结构化行）、业务字段转 A-F 表格数据、追加行（已有行数由后端实时统计）、新增行样式设置；飞书 App ID / App Secret 由后端直接从设置存储读取，前端调用时不传凭据
 - **批评空间**：Rust 后端解析 HTML 返回结构化数据，前端通过 `src/api/erogamescape.ts` 提供的 `unwrap()` 方法解包响应。
 

@@ -180,26 +180,34 @@ pub fn moegirl_check_login() -> Option<String> {
     login_username(&store)
 }
 
-/// 把 (键, 值) 列表转为请求参数 map，供萌百 API 内部调用构造参数
-fn json_params(list: &[(&str, serde_json::Value)]) -> HashMap<String, serde_json::Value> {
+/// 把 (键, 值) 列表转为请求参数 map，萌百各命令构造参数时使用
+pub(crate) fn json_params(list: &[(&str, serde_json::Value)]) -> HashMap<String, serde_json::Value> {
     list.iter()
         .map(|(k, v)| ((*k).to_string(), v.clone()))
         .collect()
 }
 
-/// 发送一次萌百 API 请求，自动携带 cookie 并补全默认参数，支持失败重试
-///
-/// User-Agent 缺失或为空时回退到 [`crate::http`] 的统一标识。
-async fn send_request(
+/// 萌百请求的执行上下文：同一批量查询内复用 client 与 URL，避免逐请求重建
+pub(crate) struct MoegirlRequestContext {
+    client: reqwest::Client,
+    url: Url,
+    /// 失败重试次数
+    max_retries: u32,
+    /// 重试间隔（毫秒）
+    retry_delay_ms: u64,
+    /// 请求超时（秒）
+    timeout_secs: u64,
+}
+
+/// 构建萌百请求上下文：从设置存储读取域名、User-Agent、超时与重试配置并校验域名白名单；
+/// User-Agent 缺失或为空时回退到 [`crate::http`] 的统一标识
+pub(crate) fn build_request_context(
     app: &tauri::AppHandle,
-    method: &str,
-    params: &HashMap<String, serde_json::Value>,
-) -> Result<serde_json::Value, ToolError> {
-    // 读取重试配置
+) -> Result<MoegirlRequestContext, ToolError> {
     let max_retries = settings::get_f64(app, "moegirlRetries")
         .map(|v| v as u32)
         .unwrap_or(1);
-    let retry_delay = settings::get_f64(app, "moegirlRetryDelay")
+    let retry_delay_ms = settings::get_f64(app, "moegirlRetryDelay")
         .map(|v| v as u64)
         .unwrap_or(1000);
     // 批量查询单批最多 500 标题，超时上限较其他数据源放宽
@@ -208,7 +216,7 @@ async fn send_request(
         .map(|v| v.clamp(5.0, 300.0) as u64)
         .unwrap_or(30);
 
-    // 读取请求域名并校验白名单，避免域名设置被篡改后请求外发到非萌百站点
+    // 校验域名白名单，避免域名设置被篡改后请求外发到非萌百站点
     let host = settings::get_string(app, "moegirlApiHost")
         .unwrap_or_else(|| DEFAULT_MOEGIRL_HOST.to_string());
     if !ALLOWED_MOEGIRL_HOSTS.contains(&host.as_str()) {
@@ -218,7 +226,6 @@ async fn send_request(
             format!("非法的萌百域名: {host}"),
         ));
     }
-
     let url = Url::parse(&format!("https://{host}{API_PATH}"))
         .map_err(|e| ToolError::raw(format!("萌百 API URL 构建失败: {e}")))?;
 
@@ -235,6 +242,26 @@ async fn send_request(
         .cookie_provider(Arc::clone(cookie_store()))
         .timeout(std::time::Duration::from_secs(timeout_secs))
         .build()?;
+
+    Ok(MoegirlRequestContext {
+        client,
+        url,
+        max_retries,
+        retry_delay_ms,
+        timeout_secs,
+    })
+}
+
+/// 以给定上下文发送一次萌百 API 请求，自动携带 cookie、补全默认参数并按配置重试
+pub(crate) async fn send_with_context(
+    ctx: &MoegirlRequestContext,
+    method: &str,
+    params: &HashMap<String, serde_json::Value>,
+) -> Result<serde_json::Value, ToolError> {
+    let max_retries = ctx.max_retries;
+    let retry_delay = ctx.retry_delay_ms;
+    let timeout_secs = ctx.timeout_secs;
+    let url = &ctx.url;
 
     // 将参数值转为字符串，数组用 | 拼接，并添加默认参数
     let mut string_params: HashMap<String, String> = HashMap::new();
@@ -281,8 +308,8 @@ async fn send_request(
         }
 
         let request = match method.to_uppercase().as_str() {
-            "GET" => client.get(url.clone()).query(&string_params),
-            "POST" => client.post(url.clone()).form(&string_params),
+            "GET" => ctx.client.get(url.clone()).query(&string_params),
+            "POST" => ctx.client.post(url.clone()).form(&string_params),
             _ => {
                 return Err(ToolError::new(
                     "moegirl_unsupported_method",
@@ -394,7 +421,8 @@ pub async fn moegirl_request(
     method: String,
     params: HashMap<String, serde_json::Value>,
 ) -> Result<serde_json::Value, ToolError> {
-    send_request(&app, &method, &params).await
+    let ctx = build_request_context(&app)?;
+    send_with_context(&ctx, &method, &params).await
 }
 
 /// 登录萌娘百科：获取登录 token 并提交 clientlogin，成功时返回用户名
@@ -407,8 +435,9 @@ pub async fn moegirl_login(
     password: String,
 ) -> Result<String, ToolError> {
     // login token 为一次性凭据，随登录请求消耗，无需缓存
-    let token_res = send_request(
-        &app,
+    let ctx = build_request_context(&app)?;
+    let token_res = send_with_context(
+        &ctx,
         "POST",
         &json_params(&[
             ("action", json!("query")),
@@ -428,8 +457,8 @@ pub async fn moegirl_login(
             )
         })?;
 
-    let login_res = send_request(
-        &app,
+    let login_res = send_with_context(
+        &ctx,
         "POST",
         &json_params(&[
             ("action", json!("clientlogin")),
@@ -442,7 +471,7 @@ pub async fn moegirl_login(
     )
     .await;
 
-    // 登录失败可能以顶层 error 字段返回（send_request 已转为 moegirl_api_error），也可能在 clientlogin 对象内
+    // 登录失败可能以顶层 error 字段返回（此时请求层已转为 moegirl_api_error），也可能在 clientlogin 对象内
     let data = match login_res {
         Ok(data) => data,
         Err(e) if e.code == "moegirl_api_error" => {

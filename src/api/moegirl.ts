@@ -1,6 +1,5 @@
-import { chunk } from 'es-toolkit';
 import { invoke } from '@tauri-apps/api/core';
-import type { ApiQueryResponse, QueryPage } from 'types-mediawiki-response';
+import type { ApiQueryResponse } from 'types-mediawiki-response';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useMoegirlStore } from '@/stores/moegirl-store';
 import { isToolError } from '@/utils/error';
@@ -17,10 +16,6 @@ export interface UserInfo {
   /** 昵称标签（未设置时为 null） */
   displaytag: string | null;
 }
-
-/** 根据当前用户权限返回 MediaWiki 标题查询的单批上限。 */
-export const getMoegirlQueryBatchSize = (): number =>
-  useMoegirlStore.getState().rights.includes('apihighlimits') ? 500 : 50;
 
 /** 服务端明确表示未登录时，清理本地凭据和用户信息缓存 */
 const clearInvalidLogin = async (error: unknown): Promise<void> => {
@@ -39,12 +34,9 @@ const clearInvalidLogin = async (error: unknown): Promise<void> => {
 };
 
 /** 调用萌百后端命令，并在服务端明确判定未登录时同步清理本地状态 */
-const request = async (
-  method: 'GET' | 'POST',
-  params: ApiParams,
-): Promise<unknown> => {
+const command = async <T>(cmd: string, args: Record<string, unknown>): Promise<T> => {
   try {
-    return await invoke<unknown>('moegirl_request', { method, params });
+    return await invoke<T>(cmd, args);
   } catch (e) {
     await clearInvalidLogin(e);
     throw e;
@@ -52,17 +44,13 @@ const request = async (
 };
 
 const moegirl = {
-  get(params: ApiParams) {
-    return request('GET', params);
-  },
-
   post(params: ApiParams) {
-    return request('POST', params);
+    return command<unknown>('moegirl_request', { method: 'POST', params });
   },
 
   /** 登录萌百，成功时返回用户名 */
   login(username: string, password: string): Promise<string> {
-    return invoke<string>('moegirl_login', { username, password });
+    return command<string>('moegirl_login', { username, password });
   },
 
   /** 检查登录状态 */
@@ -104,95 +92,68 @@ export interface PageInfo {
   redirectTo?: string;
 }
 
-/** 批量查询页面信息，返回标题到 PageInfo 的映射 */
+/**
+ * 批量查询页面信息，返回标题到页面信息的映射
+ *
+ * 键包括规范标题与命中该页面的繁简转换、重定向原始查询标题。
+ */
 export const fetchPageInfo = async (titles: string[]): Promise<Map<string, PageInfo>> => {
-  const result = new Map<string, PageInfo>();
-  const convertedMap = new Map<string, string>();
-  const redirectMap = new Map<string, string>();
-  const batchSize = getMoegirlQueryBatchSize();
+  const res = await command<Record<string, PageInfo>>('moegirl_query_page_info', { titles });
+  return new Map(Object.entries(res));
+};
 
-  for (const batch of chunk(titles, batchSize)) {
-    let continueParams: Record<string, string> = {};
-    let hasMore = true;
+/** 页面分类与重定向数据 */
+export interface PageDataEntry {
+  /** 页面分类（已过滤日本游戏作品、XXX作品、PAGENAME 等冗余分类） */
+  categories: string[];
+  /** 该标题为重定向时的目标标题 */
+  redirectTo?: string;
+  /** 指向该页面的重定向标题列表 */
+  pageRedirects: string[];
+}
 
-    do {
-      const params = {
-        action: 'query',
-        prop: ['info', 'categories'],
-        titles: batch,
-        redirects: '1',
-        converttitles: '1',
-        clshow: '!hidden',
-        cllimit: 'max',
-        ...continueParams,
-      };
+/** 批量查询页面分类与重定向数据，返回标题（含重定向原始标题）到数据的映射 */
+export const queryPageData = async (titles: string[]): Promise<Map<string, PageDataEntry>> => {
+  const res = await command<Record<string, PageDataEntry>>('moegirl_query_page_data', { titles });
+  return new Map(Object.entries(res));
+};
 
-      const res = await moegirl.post(params) as ApiQueryResponse;
-      const pages = (res.query?.pages ?? []) as QueryPage<'categories'>[];
+/** logevents 单条日志 */
+export interface LogEvent {
+  /** 日志 id，用于同时间戳事件的排序 */
+  logid?: number;
+  /** 页面标题 */
+  title: string;
+  /** 时间戳（ISO 8601） */
+  timestamp: string;
+  /** 日志详情（move 类型时含移动目标） */
+  params?: {
+    /** 目标命名空间 */
+    targetNs?: number;
+    /** 移动目标标题 */
+    targetTitle?: string;
+  };
+}
 
-      // 收集顶层 converted 和 redirects
-      const topRedirects = res.query?.redirects ?? [];
-      const topConverted = res.query?.converted ?? [];
-      for (const r of topRedirects) {
-        if (r.from && r.to) { redirectMap.set(r.from, r.to); }
-      }
-      for (const c of topConverted) {
-        if (c.from && c.to) { convertedMap.set(c.from, c.to); }
-      }
+/**
+ * 抓取时间段内主命名空间的全部指定类型日志
+ *
+ * logevents 从新到旧枚举，与直觉方向相反：
+ * @param eventType 日志类型（create/move）
+ * @param startIso 较早的时间下界（含）
+ * @param endIso 较晚的时间上界（含）
+ */
+export const queryLogEvents = (
+  eventType: string,
+  startIso: string,
+  endIso: string,
+): Promise<LogEvent[]> =>
+  command<LogEvent[]>('moegirl_query_log_events', { eventType, startIso, endIso });
 
-      for (const page of pages) {
-        // 按标题查询返回的页面必带 title，异常缺失时无法建立映射，跳过
-        if (page.title === undefined) { continue; }
-        const isMissing = page.missing === true;
-        const categoryNames = (page.categories || []).map((c) => c.title.replace(/^Category:/, ''));
-        const isDisambiguation = categoryNames.includes('消歧义页');
-
-        // 通过 converted/redirect 反向查找原始标题
-        let originalTitle: string | undefined;
-        for (const [from, to] of convertedMap) {
-          if (to === page.title) { originalTitle = from; break; }
-        }
-        if (!originalTitle) {
-          for (const [from, to] of redirectMap) {
-            if (to === page.title) { originalTitle = from; break; }
-          }
-        }
-
-        const info: PageInfo = {
-          pageId: page.pageid !== undefined && !isMissing ? page.pageid : null,
-          title: page.title,
-          isDisambiguation,
-          categories: categoryNames,
-        };
-
-        if (originalTitle && originalTitle !== page.title) {
-          // 查找哪个 batch 中的原始查询标题匹配
-          for (const t of batch) {
-            if (convertedMap.get(t) === page.title || redirectMap.get(t) === page.title) {
-              if (convertedMap.has(t)) { info.convertedFrom = t; }
-              if (redirectMap.has(t)) { info.redirectTo = t; }
-              result.set(t, info);
-            }
-          }
-          // 也存原始标题
-          result.set(originalTitle, info);
-        }
-
-        result.set(page.title, info);
-      }
-
-      const cont = res.continue;
-      if (cont && (cont.clcontinue || cont.continue)) {
-        continueParams = {};
-        if (cont.clcontinue) { continueParams.clcontinue = cont.clcontinue; }
-        if (cont.continue) { continueParams.continue = cont.continue; }
-      } else {
-        hasMore = false;
-      }
-    } while (hasMore);
-  }
-
-  return result;
+/** 批量获取页面 wikitext 源代码，返回标题到源代码的映射（缺失或已删除的页面不在结果中） */
+export const queryPageWikitexts = async (titles: string[]): Promise<Map<string, string>> => {
+  const res = await command<Record<string, string>>('moegirl_query_page_wikitexts', { titles });
+  return new Map(Object.entries(res));
 };
 
 export default moegirl;

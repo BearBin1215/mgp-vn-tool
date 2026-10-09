@@ -2,6 +2,7 @@
 
 - [持久化设置项](#持久化设置项)
 - [请求方式](#请求方式)
+- [批量查询命令](#批量查询命令)
 - [自动添加的参数](#自动添加的参数)
 - [请求示例](#请求示例)
 - [continue 分页机制](#continue-分页机制)
@@ -30,7 +31,6 @@
 
 通过 `src/api/moegirl.ts` 中封装的方法调用；请求域名、User-Agent、重试等配置由后端从设置存储读取，前端只传方法和参数：
 
-- `get(params)`：GET 请求
 - `post(params)`：POST 请求
 - `login(username, password)`：登录萌百，成功返回用户名；clientlogin 流程与登录 token 的获取均在后端完成，密码不驻留前端
 - `checkLogin()`：检查本地关键 SSO Cookie 是否齐全且未过期
@@ -38,6 +38,17 @@
 - `logout()`：退出登录，清空 cookie
 
 涉及较多数据的请求（如批量查询分类）使用 POST 而非 GET，以避免出现 413（请求体过大）错误。
+
+## 批量查询命令
+
+以下命令在后端完成分批（按 `apihighlimits` 权限单批 500/50 标题，每次调用实时自查）、continue 分页与重定向/繁简转换映射，批次间串行请求；前端单次 invoke 即获得整个查询结果，封装于 `src/api/moegirl.ts`：
+
+- `moegirl_query_page_info(titles)` → `fetchPageInfo`：批量查询页面信息，返回标题（含繁简转换、重定向原始标题）到 `PageInfo`（pageId、isDisambiguation、categories、convertedFrom、redirectTo）的映射
+- `moegirl_query_page_data(titles)` → `queryPageData`：批量查询页面分类与重定向，返回标题到 `PageDataEntry`（categories、redirectTo、pageRedirects）的映射；categories 已过滤日本游戏作品、`XX作品`、与条目名相同的 PAGENAME 等冗余分类
+- `moegirl_query_log_events(eventType, startIso, endIso)` → `queryLogEvents`：抓取时间段内主命名空间指定类型日志（logevents 从新到旧枚举，startIso 为较早下界、endIso 为较晚上界）
+- `moegirl_query_page_wikitexts(titles)` → `queryPageWikitexts`：批量获取页面源代码，返回标题到源代码的映射（缺失或已删除的页面不在结果中）
+
+命令内部复用同一请求上下文（client、超时与重试配置），响应解析失败时报 `moegirl_parse_failed` 错误。
 
 ## 自动添加的参数
 

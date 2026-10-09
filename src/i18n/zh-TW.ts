@@ -289,6 +289,7 @@ const zhTW: Record<string, string> = {
   "error.moegirl_invalid_host": "非法的萌百域名: {{host}}",
   "error.moegirl_login_failed": "登入失敗",
   "error.moegirl_non_json_response": "非 JSON 回應: {{detail}}",
+  "error.moegirl_parse_failed": "萌百回應解析失敗: {{detail}}",
   "error.moegirl_request_failed": "請求失敗（重試 {{retries}} 次後）: {{detail}}",
   "error.moegirl_timeout": "請求逾時（{{seconds}}秒）",
   "error.moegirl_token_missing": "獲取 {{token_type}} Token 失敗",

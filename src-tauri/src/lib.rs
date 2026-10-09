@@ -5,6 +5,7 @@ mod feishu;
 mod http;
 mod locale;
 mod moegirl;
+mod moegirl_query;
 mod settings;
 mod vndb;
 
@@ -36,6 +37,10 @@ pub fn run() {
             moegirl::moegirl_login,
             moegirl::moegirl_check_login,
             moegirl::moegirl_logout,
+            moegirl_query::moegirl_query_page_info,
+            moegirl_query::moegirl_query_page_data,
+            moegirl_query::moegirl_query_log_events,
+            moegirl_query::moegirl_query_page_wikitexts,
             feishu::feishu_fetch_sheet,
             feishu::feishu_append_rows,
             erogamescape::check_connectivity,

@@ -1,10 +1,7 @@
 import { create } from 'zustand';
 import dayjs from 'dayjs';
-import { chunk } from 'es-toolkit';
-import type { ApiLogEvent, ApiQueryResponse, QueryPage } from 'types-mediawiki-response';
 import feishu from '@/api/feishu';
-import moegirl, { fetchPageInfo, getMoegirlQueryBatchSize } from '@/api/moegirl';
-import type { ApiParams } from '@/lib/types';
+import { fetchPageInfo, queryPageData, queryLogEvents, queryPageWikitexts, type LogEvent } from '@/api/moegirl';
 import { createLocalizedError } from '@/utils/error';
 import { extractBrand, extractJa, extractReleaseDate } from '@/utils/text';
 import { loadConfigStore } from '@/lib/config-store';
@@ -86,161 +83,6 @@ const isExcludedCategory = (category: string, articleTitle: string): boolean => 
 /** 候选条目必须命中的游戏类型分类 */
 const TARGET_CATEGORIES = ['视觉小说', '恋爱冒险游戏', '冒险游戏', '文字冒险游戏'];
 
-interface FetchPageDataResult {
-  categories: Map<string, string[]>;
-  redirects: Map<string, string>;
-  pageRedirects: Map<string, string[]>;
-}
-
-/** 从萌娘百科批量获取条目分类和重定向，串行请求以避免多并发出错 */
-const fetchPageData = async (titles: string[]): Promise<FetchPageDataResult> => {
-  /** 分类映射：标题 -> 分类 */
-  const categories = new Map<string, string[]>();
-  /** 重定向映射：原始标题 -> 重定向后的标题 */
-  const redirects = new Map<string, string>();
-  /** 页面重定向映射：标题 -> 指向该页面的重定向标题列表 */
-  const pageRedirects = new Map<string, string[]>();
-  const batchSize = getMoegirlQueryBatchSize();
-
-  for (const batch of chunk(titles, batchSize)) {
-    let continueParams: ApiParams = {};
-    let hasMore = true;
-    do {
-      const params: ApiParams = {
-        action: 'query',
-        format: 'json',
-        prop: ['redirects', 'categories'],
-        titles: batch,
-        redirects: '1',
-        rdprop: 'title',
-        rdlimit: 'max',
-        cllimit: 'max',
-        clshow: '!hidden',
-        ...continueParams,
-      };
-
-      const res = await moegirl.post(params) as ApiQueryResponse;
-      const pages = (res.query?.pages ?? []) as QueryPage<'redirects' | 'categories'>[];
-      const batchRedirects = res.query?.redirects ?? [];
-
-      for (const r of batchRedirects) {
-        if (r.from && r.to) { redirects.set(r.from, r.to); }
-      }
-
-      for (const page of pages) {
-        // 按标题查询返回的页面必带 title，异常缺失时无法建立映射，跳过
-        if (page.title === undefined) { continue; }
-        const { title } = page;
-        // 处理分类
-        if (page.categories) {
-          const cats = page.categories
-            .map((c) => c.title.replace(/^Category:/, ''))
-            .filter((c) => !isExcludedCategory(c, title));
-          categories.set(title, cats);
-          // 将分类也赋给被重定向的原始标题
-          for (const [from, to] of redirects) {
-            if (to === title) {
-              categories.set(from, cats);
-            }
-          }
-        }
-
-        // 处理重指向该页面的重定向
-        if (page.redirects) {
-          const redirectTitles = page.redirects.map((r) => r.title).filter((t) => t !== undefined);
-          pageRedirects.set(title, redirectTitles);
-          // 将重定向也复制给被重定向的原始标题
-          for (const [from, to] of redirects) {
-            if (to === title && !pageRedirects.has(from)) {
-              pageRedirects.set(from, redirectTitles);
-            }
-          }
-        }
-      }
-
-      // 处理 continue，可能同时有 clcontinue 和 rdcontinue
-      const cont = res.continue;
-      if (cont && (cont.clcontinue || cont.rdcontinue || cont.continue)) {
-        continueParams = {};
-        if (cont.clcontinue) { continueParams.clcontinue = cont.clcontinue; }
-        if (cont.rdcontinue) { continueParams.rdcontinue = cont.rdcontinue; }
-        if (cont.continue) { continueParams.continue = cont.continue; }
-      } else {
-        hasMore = false;
-      }
-    } while (hasMore);
-  }
-
-  return { categories, redirects, pageRedirects };
-};
-
-/**
- * logevents 接口的单条日志，基于包类型并按请求的 leprop=ids|title|timestamp|details
- * 收窄：title 与 timestamp 必有，params（leprop=details）按萌百 move 日志结构标注
- */
-type LogEvent = ApiLogEvent & {
-  /** 页面标题 */
-  title: string;
-  /** 时间戳（ISO 8601） */
-  timestamp: string;
-  /** 日志详情（move 类型时含移动目标） */
-  params?: {
-    /** 目标命名空间 */
-    target_ns?: number;
-    /** 移动目标标题 */
-    target_title?: string;
-    /** 是否未保留重定向 */
-    suppressredirect?: boolean;
-  };
-};
-
-/**
- * 抓取指定时间段内主命名空间的全部指定类型日志事件
- *
- * logevents 默认从新到旧枚举，因此传参为 lestart=较晚终点、leend=较早起点，
- * 与直觉方向相反，调用时注意
- * @param eventType 日志类型（create/move）
- * @param startISO 较早的时间下界（含）
- * @param endISO 较晚的时间上界（含）
- */
-const fetchLogEvents = async (
-  eventType: string,
-  startISO: string,
-  endISO: string,
-): Promise<LogEvent[]> => {
-  const events: LogEvent[] = [];
-  let continueParams: ApiParams = {};
-  let hasMore = true;
-
-  do {
-    const params: ApiParams = {
-      action: 'query',
-      list: 'logevents',
-      letype: eventType,
-      lenamespace: 0,
-      lestart: endISO,
-      leend: startISO,
-      leprop: ['ids', 'title', 'timestamp', 'details'],
-      lelimit: 'max',
-      ...continueParams,
-    };
-
-    const res = await moegirl.post(params) as ApiQueryResponse;
-    events.push(...((res.query?.logevents ?? []) as LogEvent[]));
-
-    const cont = res.continue;
-    if (cont && (cont.lecontinue || cont.continue)) {
-      continueParams = {};
-      if (cont.lecontinue) { continueParams.lecontinue = cont.lecontinue; }
-      if (cont.continue) { continueParams.continue = cont.continue; }
-    } else {
-      hasMore = false;
-    }
-  } while (hasMore);
-
-  return events;
-};
-
 /**
  * 将创建事件的标题沿其发生之后的移动事件收敛为当前标题。
  * 只应用创建时间之后的移动，避免旧标题被重建后误套用历史移动映射。
@@ -261,45 +103,16 @@ const resolveMovedTitle = (
         && event.logid !== undefined
         && createdEvent.logid !== undefined
         && event.logid > createdEvent.logid);
-    if (!isAfterCreation || event.title !== current || !event.params?.target_title) {
+    if (!isAfterCreation || event.title !== current || !event.params?.targetTitle) {
       continue;
     }
     if (seen.has(current)) {
       break;
     }
     seen.add(current);
-    current = event.params.target_title;
+    current = event.params.targetTitle;
   }
   return current;
-};
-
-/**
- * 批量获取页面 wikitext 源代码，串行请求以避免多并发出错
- * @param titles 页面标题列表
- * @returns 标题到源代码的映射（缺失或已删除的页面不在结果中）
- */
-const fetchPageWikitexts = async (titles: string[]): Promise<Map<string, string>> => {
-  const result = new Map<string, string>();
-  const batchSize = getMoegirlQueryBatchSize();
-
-  for (const batch of chunk(titles, batchSize)) {
-    const res = await moegirl.post({
-      action: 'query',
-      prop: 'revisions',
-      rvprop: ['content'],
-      rvslots: 'main',
-      titles: batch,
-    }) as ApiQueryResponse;
-    const pages = (res.query?.pages ?? []) as QueryPage<'revisions'>[];
-    for (const page of pages) {
-      const content = page.revisions?.[0]?.slots?.main?.content;
-      if (content && page.title !== undefined) {
-        result.set(page.title, content);
-      }
-    }
-  }
-
-  return result;
 };
 
 /** 条目统计 store，持久化到 Tauri store */
@@ -360,21 +173,16 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     if (targets.length === 0) { return; }
     set({ loading: true });
     try {
-      const {
-        categories: categoryMap,
-        redirects: redirectMap, pageRedirects,
-      } = await fetchPageData(targets.map((a) => a.title));
+      const pageData = await queryPageData(targets.map((a) => a.title));
       const updated = articles.map((a) => {
         // 增量模式下不改动本次未请求的条目
         if (titleSet && !titleSet.has(a.title)) { return a; }
-        const apiCats = categoryMap.get(a.title) || [];
-        const redirect = redirectMap.get(a.title);
-        const redirects = pageRedirects.get(a.title);
+        const data = pageData.get(a.title);
         return {
           ...a,
-          categories: apiCats,
-          ...(redirect ? { redirect } : {}),
-          ...(redirects && redirects.length > 0 ? { redirects } : {}),
+          categories: data?.categories ?? [],
+          ...(data?.redirectTo ? { redirect: data.redirectTo } : {}),
+          ...(data?.pageRedirects.length ? { redirects: data.pageRedirects } : {}),
         };
       });
 
@@ -425,12 +233,12 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       const endISO = new Date().toISOString();
 
       // create 与 move 分两次抓取（letype 为单值参数），串行请求避免多并发出错
-      const createdEvents = await fetchLogEvents('create', startISO, endISO);
-      const moveEvents = await fetchLogEvents('move', startISO, endISO);
+      const createdEvents = await queryLogEvents('create', startISO, endISO);
+      const moveEvents = await queryLogEvents('move', startISO, endISO);
 
       // 按时间升序处理移动，解析创建事件时只应用其后的移动。
       const sortedMoveEvents = moveEvents
-        .filter((event) => Boolean(event.params?.target_title) && event.params?.target_ns === 0)
+        .filter((event) => Boolean(event.params?.targetTitle) && event.params?.targetNs === 0)
         .sort((a, b) => a.timestamp.localeCompare(b.timestamp)
           || (a.logid ?? 0) - (b.logid ?? 0));
 
@@ -483,7 +291,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
 
       // 从条目源代码中预填发行时间、原名与制作组织
       if (candidates.length > 0) {
-        const wikitexts = await fetchPageWikitexts(candidates.map((c) => c.title));
+        const wikitexts = await queryPageWikitexts(candidates.map((c) => c.title));
         for (const candidate of candidates) {
           const wikitext = wikitexts.get(candidate.title) ?? '';
           candidate.releaseDate = extractReleaseDate(wikitext);
