@@ -7,6 +7,8 @@
 - 面向中文用户，若无另外要求，对话、注释及输出文档都使用中文
 - 在实现具体功能中如果遇到多个可选方案，可让用户选择
 
+本文档是面向 AI 的开发指南。代码规范、实现细节等内容见[CONTRIBUTING.md](CONTRIBUTING.md)，各个站点 API 或其爬虫封装见 `docs/` 目录，本文档仅包含其未覆盖内容。
+
 ## 技术栈
 
 - **后端**: Rust 2021 (Tauri v2)
@@ -34,6 +36,15 @@ pnpm test      # 前端单元测试（vitest）
 pnpm check     # 前端聚合检查（typecheck + lint + test）
 ```
 
+## 行为准则
+
+- **不遵循最小修改原则，积极重构**：
+  - 修改模块时将其作为一个整体进行修改，不要只纯粹打补丁。
+  - 涉及多模块变更时，综合考虑全局，不要为了少修改而拒绝更优方案。
+- **多权衡，多质疑**：
+  - 除非要求明确，否则不将现有实现视为绝对正确，发现更优方案时让用户决定。
+  - 不死守文档，实践中发现错误时修改，告知用户。
+
 ## 项目结构
 
 仅列出总体结构和代表性文件
@@ -48,9 +59,6 @@ mgp-vn-tool/
 │   ├── assets/                 # 静态资源
 │   ├── icons/                  # 图标组件目录
 │   ├── i18n/                   # 多语言（基于 react-i18next 的简繁支持）
-│   │   ├── index.ts            # i18next 初始化与界面语言切换
-│   │   ├── zh-TW.ts            # 台湾繁体文案映射
-│   │   └── zh-HK.ts            # 香港繁体文案映射
 │   ├── components/             # 共享组件
 │   │   ├── layout/             # 布局组件（Layout + Menu）
 │   │   ├── page.tsx            # 页面外壳组件
@@ -62,14 +70,7 @@ mgp-vn-tool/
 │   │   └── ...
 │   ├── utils/                  # 纯工具函数
 │   ├── pages/                  # 页面组件
-│   │   ├── about/              # 关于页面（首页）
-│   │   ├── settings/           # 设置页面
-│   │   ├── article-stats/      # 条目统计
-│   │   └── ...
 │   ├── stores/                 # Zustand 状态管理及对应持久化存储
-│   │   ├── settings-store.ts   # 应用设置
-│   │   ├── moegirl-store.ts    # 萌百数据（用户组等）
-│   │   └── article-store.ts    # 条目统计数据
 │   ├── App.tsx                 # 根组件
 │   ├── App.css                 # 全局样式
 │   ├── routes.tsx              # 路由、菜单配置
@@ -96,66 +97,10 @@ mgp-vn-tool/
 │   ├── bangumi_api.md          # Bangumi API 说明
 │   └── feishu_api.md           # 飞书统计表 API 说明
 ├── CONTRIBUTING.md             # 协作指南
-├── package.json                # 前端依赖
-├── eslint.config.ts            # eslint 配置
-└── vite.config.ts              # Vite 配置
+└── ...
 ```
 
-等结构变动后，将对应内容回血到此处。
-
-## 编码规范
-
-### 注释
-
-- 前后端代码涉及复杂逻辑均要添加注释
-- 中文优先、人类可读，不要在一句注释里同时混入大量英文和代码片段
-- 注释面向读者而非过去，不要添加`之前是……现在改为……`等对比性注释，除非原代码需要重点提醒后来开发者不要使用
-
-### TypeScript
-
-- 遵循`eslint.config.ts`内的ESLint规则（2空格缩进、分号结尾、优先单引号等）
-- 每个函数开头都需要用jsdoc说明作用，utils内的复杂工具函数需要给每个参数添加对应的`@param`
-- 禁止未使用的变量和参数（`_` 前缀可忽略）
-- 工具函数优先检查 `es-toolkit` 或现有依赖是否提供；简单逻辑优先使用原生 API，避免为使用工具库而增加间接性
-- 积极引入现有成熟库，避免重复造轮子
-
-### React
-
-- 遵循React提倡的**保持组件纯粹**原则，每个组件都必须是纯函数
-- 组件内变量、函数、hooks定义按功能归类分组排序
-- 组件使用PascalCase命名法，hooks以`use`开头
-- 共享组件放在 `src/components/` 目录，仅单页面使用的组件和对应页面的入口`index.tsx`放在同一目录
-- 共享组件props要求使用 `interface` 定义，除 className、disabled 等通用参数外每个参数都要有对应的 jsdoc 注释
-- 需要flex布局时，静态布局使用 div + tailwindcss（`<div className='flex'></div>`），仅在需要动态参数时使用antd的`Flex`组件
-
-antd 的 `message`、`notification`、`modal` 静态方法使用 `App` 组件提供的实例以消费上下文：
-```tsx
-import { App } from 'antd';
-
-function Component() {
-  const { message } = App.useApp();
-  message.success('操作成功');
-}
-```
-
-### 样式
-
-- 优先使用 Tailwind CSS 编写样式
-- 兼容不同颜色主题，编写样式时尽可能使用Ant Design提供的CSS变量（`cssVar` 已启用）
-- 使用CSS原生嵌套
-
-### Rust
-
-- 使用 4 空格缩进
-- 遵循 Rust 标准风格
-- 每个函数开头需有文档注释
-- 积极引入现有成熟 crate，避免重复造轮子
-
-### 简繁变体
-
-- 本工程通过 `react-i18next` 实现简繁支持，采用 natural key 模式直接将简中文本作为键值，其他变体缺失时显示简中。
-- 前端在 UI 组件中使用`const { t } = useTranslation();`和`t('默认简体')`，然后在`src/i18n/zh-TW.ts`（台湾繁体）或`src/i18n/zh-HK.ts`（香港繁体）中写繁体文本。
-- 前后端通信显示文本如错误信息、接口响应时，后端返回编码、前端查表实现多语言支持。
+等结构变动后，将对应内容回写到此处。
 
 ## 架构模式
 

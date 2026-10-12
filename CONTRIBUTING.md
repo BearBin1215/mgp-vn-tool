@@ -7,15 +7,15 @@
 - [构建并发布](#构建并发布)
 - [代码规范](#代码规范)
   - [检查](#检查)
+  - [注释](#注释)
   - [TypeScript / React](#typescript--react)
   - [样式](#样式)
+  - [Rust](#rust)
 - [简繁支持](#简繁支持)
 - [持久化存储](#持久化存储)
   - [与 Zustand 集成](#与-zustand-集成)
   - [存储文件](#存储文件)
 - [前后端通信](#前后端通信)
-  - [批评空间](#批评空间)
-  - [萌娘百科 API](#萌娘百科-api)
 - [提交规范](#提交规范)
 - [其他](#其他)
 
@@ -57,7 +57,7 @@ pnpm tauri dev
 
 发版步骤如下：
 
-1. 用脚本统一修改版本号（会修改 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`，并通过 Cargo 同步 `src-tauri/Cargo.lock`）。支持显式版本号或自增关键字：
+1. 用脚本统一修改版本号，支持显式版本号或自增关键字：
    ```bash
    pnpm bump <version>   # 显式指定，如 pnpm bump 1.2.3
    pnpm bump <keyword>   # 基于当前版本自增：major / minor / patch
@@ -78,7 +78,6 @@ pnpm tauri build
 ```
 构建成功后，可在 `src-tauri/target/release` 目录下找到可执行文件。
 
-
 ## 代码规范
 
 ### 检查
@@ -86,6 +85,7 @@ pnpm tauri build
 提交代码前，应当通过如下指令检查无错误：
 
 在src-tauri目录内执行：
+
 ```bash
 # 后端静态检查
 cargo check
@@ -98,20 +98,40 @@ cargo test
 ```
 
 在根目录执行：
+
 ```bash
 # 前端检查
 pnpm check
 ```
 
-如果使用 AI 辅助开发，应在完成修改后用新会话让 AI 至少进行一轮代码审查，最好多代理交叉验证。
+### 注释
+
+- 前后端代码涉及复杂逻辑均要添加注释。
+- 注释中文优先、人类可读，不要在一句注释里同时混入大量英文和代码片段。
+- 注释面向读者而非过去，不要添加`之前是……现在改为……`等对比性注释，除非原代码需要重点提醒后来开发者不要使用。
 
 ### TypeScript / React
 
-- 严格遵循 [eslint 规则](/eslint.config.ts)，提交前执行`pnpm lint`或在开发时安装eslint插件（用VS Code打开本仓库时会自动推荐安装）
-- 每个函数开头都需要用 jsdoc 说明作用
-- 共享组件放在 `src/components/` 目录，仅单页面使用的组件和对应页面的入口`index.tsx`放在同一目录
-- 共享组件props要求使用 `interface` 定义，除 className、disabled 等通用参数外每个参数都要有对应的 jsdoc 注释
-- 需要flex布局时，静态布局使用 div + tailwindcss（`<div className='flex'></div>`），仅在需要动态参数时使用antd的`Flex`组件
+- 每个函数开头都需要用 jsdoc 说明作用，utils 内的复杂工具函数需要给每个参数添加对应的`@param`。
+- 工具函数优先检查 `es-toolkit` 或现有依赖是否提供；简单逻辑优先使用原生 API，避免为使用工具库而增加间接性。
+- 积极引入现有成熟库，避免重复造轮子。
+- 遵循React提倡的**保持组件纯粹**原则，每个组件都必须是纯函数。
+- 组件内变量、函数、hooks定义按功能归类分组排序。
+- 组件使用大驼峰命名法，hooks以`use`开头。
+- 共享组件放在 `src/components/` 目录，仅单页面使用的组件和对应页面的入口`index.tsx`放在同一目录。
+- 共享组件props要求使用 `interface` 定义，除 className、disabled 等通用参数外每个参数都要有对应的 jsdoc 注释。
+- 需要flex布局时，静态布局使用 div + tailwindcss（`<div className='flex'></div>`），仅在需要动态参数时使用antd的`Flex`组件。
+
+antd 的 `message`、`notification`、`modal` 静态方法使用 `App` 组件提供的实例以消费上下文：
+
+```tsx
+import { App } from 'antd';
+
+function Component() {
+  const { message } = App.useApp();
+  message.success('操作成功');
+}
+```
 
 ### 样式
 
@@ -158,6 +178,12 @@ function App() {
 - `--ant-color-border`：边框色
 - `--ant-color-border-secondary`：次级边框色
 
+### Rust
+
+- 使用 4 空格缩进，遵循 Rust 标准风格
+- 每个函数开头需有文档注释
+- 积极引入现有成熟 crate，避免重复造轮子
+
 
 ## 简繁支持
 
@@ -187,6 +213,7 @@ function MyComponent() {
 
 - 已禁用 `keySeparator` 和 `nsSeparator`，避免原文中的冒号、点号被误解析为分隔符
 - 不要在业务代码里自行做简繁转换或手写语言映射表
+- 前后端通信显示文本如错误信息、接口响应时，由后端返回编码、前端查表实现多语言支持
 - 语言选项名称（如「简体中文」「繁體中文（臺灣）」「繁體中文（香港）」）按各自语言展示，不参与转换
 - 代码注释、提交信息、文档统一使用简体中文，只有面向用户的界面文案才需要转换
 
@@ -238,25 +265,14 @@ const setValue = async (value: Type) => {
 
 ## 前后端通信
 
-### 批评空间
-
-详见 [docs/erogamescape_api.md](docs/erogamescape_api.md)。
-
-### 萌娘百科 API
-
-详见 [docs/moegirl_api.md](docs/moegirl_api.md)。
+- 批评空间 [docs/erogamescape_api.md](docs/erogamescape_api.md)。
+- 萌娘百科 API [docs/moegirl_api.md](docs/moegirl_api.md)。
 
 ## 提交规范
 
 本项目采用[约定式提交](https://www.conventionalcommits.org/zh-hans/)。
 
-示例：
-- `feat(cv-generator): 添加声优条目生成功能`
-- `fix(article-stats): 修复分类筛选逻辑错误`
-- `docs: 批评空间API示例修改`
-
 ## 其他
 
-- 考虑到语言普及程度~~以及我的技术水平~~，后端Rust主要处理一些网络请求、底层逻辑等，在数据组织等场景如果没有性能压力都应放在前端TypeScript。
-- 使用AI辅助编程时注意读取[AGENTS.md](AGENTS.md)，并且原则上AI生成的每一行代码都要人工审查。
+- 考虑到语言普及程度~~以及我的技术水平~~，后端Rust主要处理一些网络请求、底层逻辑等，在数据组织等场景如果没有性能压力都应放在前端。
 - 除非你的母语不是中文，不论注释还是提交，请使用中文！

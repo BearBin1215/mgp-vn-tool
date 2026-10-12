@@ -22,6 +22,19 @@
   samp {
     font-family: var(--ant-font-family-code);
   }
+
+  /* wikitext 高亮（Shiki 双主题）：只命中携带样式变量的 token span，无变量的内容保持继承 antd 文字色 */
+  .wikitext-highlight code span[style] {
+    color: var(--shiki-light, inherit);
+    font-weight: var(--shiki-light-font-weight, inherit);
+    font-style: var(--shiki-light-font-style, inherit);
+  }
+
+  .ant-app.dark-mode .wikitext-highlight code span[style] {
+    color: var(--shiki-dark, inherit);
+    font-weight: var(--shiki-dark-font-weight, inherit);
+    font-style: var(--shiki-dark-font-style, inherit);
+  }
 }
 
 html,

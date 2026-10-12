@@ -1,7 +1,8 @@
-import { memo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { Spin, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
 import CopyButton from '@/components/copy-button';
+import { getWikitextHighlighter, renderWikitext, type WikitextHighlighter } from '@/lib/wikitext-highlight';
 
 interface CodePanelProps {
   /** 生成的 wikitext */
@@ -19,10 +20,38 @@ interface CodePanelProps {
  *
  * 统一三个条目生成页的代码区结构：标题（生成结果 + 复制按钮）+ 代码区。
  * 加载时用半透明遮罩 + 居中 Spin 覆盖代码区，代码始终保持可见（而非被替换）。
+ *
+ * 代码区通过 Shiki 做 wikitext 语法高亮（双主题 CSS 变量，见
+ * `lib/wikitext-highlight`）。高亮器为异步加载的单例：就绪前面板降级为纯文本，
+ * 就绪后整段切换为高亮渲染；生成期间文本多次整体替换，重新高亮的开销可以忽略。
  */
 const CodePanel = memo(({ text, loading, loadingDescription, variant = 'inset' }: CodePanelProps) => {
   const standalone = variant === 'standalone';
   const { t } = useTranslation();
+
+  // wikitext 高亮器单例：就绪后触发一次重渲染，此后所有面板实例共享
+  const [highlighter, setHighlighter] = useState<WikitextHighlighter | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    getWikitextHighlighter()
+      .then((instance) => {
+        if (mounted) {
+          setHighlighter(instance);
+        }
+      })
+      // 加载失败时保持纯文本展示，高亮属于增强能力，不中断生成功能
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // 高亮渲染结果：高亮器就绪且文本非空时产出，文本变化时重算
+  const highlightedHtml = useMemo(
+    () => (highlighter ? renderWikitext(highlighter, text) : ''),
+    [highlighter, text],
+  );
+
   return (
     <>
       <div className={`flex items-center justify-between shrink-0 px-1 ${standalone ? 'mb-2' : 'h-6'}`}>
@@ -36,9 +65,12 @@ const CodePanel = memo(({ text, loading, loadingDescription, variant = 'inset' }
             text-sm overflow-auto whitespace-pre-wrap leading-relaxed
             bg-(--ant-color-bg-elevated)
             border border-(--ant-color-border) ${standalone ? 'rounded-lg' : ''}
+            wikitext-highlight
           `}
         >
-          {text}
+          {highlightedHtml
+            ? <code dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+            : text}
         </pre>
         {loading && (
           <div
