@@ -64,7 +64,7 @@ pnpm tauri dev
    ```
 2. 提交改动并打 tag（tag 名须为 `v` + 版本号，含预发布后缀）：
    ```bash
-   git commit -am "chore: 发版 v<version>"
+   git commit -am "chore: 发布 v<version>"
    git tag v<version>
    ```
 3. 推送 tag 触发 CI：
