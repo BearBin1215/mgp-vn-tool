@@ -22,7 +22,7 @@ describe('unwrap', () => {
     expect(() => unwrap(res)).toThrow('数据库错误');
   });
 
-  it('失败且 response 为空串时使用默认提示', () => {
+  it('失败且 response 为空字符串时使用默认提示', () => {
     const res: ErogamescapeResponse<string> = { statusCode: '0', result: 'fail', response: '' };
     expect(catchUnwrapError(res)).toEqual({ code: 'ero_unknown_failure', detail: '批评空间请求失败' });
   });

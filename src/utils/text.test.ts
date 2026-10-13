@@ -49,7 +49,7 @@ describe('isNumeric', () => {
     expect(isNumeric(' 123 ')).toBe(true);
   });
 
-  it('空串不为数字', () => {
+  it('空字符串不为数字', () => {
     expect(isNumeric('')).toBe(false);
   });
 
@@ -133,7 +133,7 @@ describe('wrapLj', () => {
 });
 
 describe('generateExternalLinksWikitext', () => {
-  it('全部字段为空时返回空串', () => {
+  it('全部字段为空时返回空字符串', () => {
     expect(generateExternalLinksWikitext({})).toBe('');
   });
 
@@ -159,7 +159,7 @@ describe('resolveTitle', () => {
     ['不存在页面', makePageInfo({ title: '不存在页面', pageId: null })],
   ]);
 
-  it('空标题返回空串', () => {
+  it('空标题返回空字符串', () => {
     expect(resolveTitle('', pageInfoMap)).toBe('');
   });
 
@@ -197,7 +197,7 @@ describe('resolveInternalLink', () => {
     expect(resolveInternalLink('其他', pageInfoMap)).toBe('[[其他]]');
   });
 
-  it('空标题返回空串', () => {
+  it('空标题返回空字符串', () => {
     expect(resolveInternalLink('', pageInfoMap)).toBe('');
   });
 });
@@ -287,7 +287,7 @@ describe('extractReleaseDate', () => {
     expect(extractReleaseDate(wikitext)).toBe('2016-09-30');
   });
 
-  it('无法提取时返回空串', () => {
+  it('无法提取时返回空字符串', () => {
     expect(extractReleaseDate('2016年发售')).toBe('');
   });
 });
@@ -321,7 +321,7 @@ describe('extractJa', () => {
     expect(extractJa('{{Infobox\n|原名 =\n}}\n{{lj|アマツツミ}}')).toBe('アマツツミ');
   });
 
-  it('无法提取时返回空串', () => {
+  it('无法提取时返回空字符串', () => {
     expect(extractJa('没有日文原名')).toBe('');
   });
 });
@@ -362,7 +362,7 @@ describe('extractBrand', () => {
     expect(extractBrand(wikitext)).toBe('Purple software');
   });
 
-  it('无法提取时返回空串', () => {
+  it('无法提取时返回空字符串', () => {
     expect(extractBrand('没有制作组织信息')).toBe('');
   });
 });

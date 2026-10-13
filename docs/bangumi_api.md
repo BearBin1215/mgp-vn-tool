@@ -52,11 +52,11 @@ HTTP 404
 }
 ```
 
-后端 `format_bangumi_error` 处理错误响应：优先取 JSON 的 `title`/`description` 用 `：` 拼接（如 `Not Found：resource can't be found...`）；JSON 解析失败或为空时回退到截断 200 字符的裸响应体；最终格式化为 `Bangumi API HTTP {status}: {detail}`。
+后端 `format_bangumi_error` 处理错误响应：优先取 JSON 的 `title`/`description` 用 `：` 拼接（如 `Not Found：resource can't be found...`）；JSON 解析失败或为空时回退到截断为 200 字符的原始响应体；最终格式化为 `Bangumi API HTTP {status}: {detail}`。
 
 ## 使用接口
 
-本工具用以下四个端点（以下示例均以 sprite / person `13541` 为例，长字段已截断，列表仅保留代表性项）：
+本工具使用以下端点（以下示例均以 sprite / person `13541` 为例，长字段已截断，列表仅保留代表性项）：
 
 ### 1. 人物/组织信息
 
@@ -106,7 +106,7 @@ HTTP 404
 | --- | --- | --- |
 | `id` | number | 条目 subject id |
 | `name` | string | 原名 |
-| `name_cn` | string | 中文名，无则空串 |
+| `name_cn` | string | 中文名，无则为空字符串 |
 | `type` | number | 条目类型，见下 |
 | `staff` | string | 该 person 在本条目的职务（如「开发」「原作」「厂牌」） |
 | `image`/`eps` 等 | - | 其余字段 |

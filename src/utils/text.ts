@@ -182,7 +182,7 @@ export const resolveFamilyTemplate = (
 /**
  * 格式化日期字符串为中文格式 `YYYY年M月D日`
  *
- * 空值返回空串；无效日期原样返回。
+ * 空值返回空字符串；无效日期原样返回。
  * @param date YYYY-MM-DD 格式日期字符串
  */
 export const formatDateCN = (date: string | null): string => {
@@ -198,7 +198,7 @@ export const formatDateCN = (date: string | null): string => {
  * 未命中时兜底匹配正文的「于XXXX年X月X日发行/发售」句式。关键字兼容繁简
  * （发行/發行、发售/發售、于/於），「年/月/日」繁简同形无需区分。
  * @param wikitext 页面源代码
- * @returns YYYY-MM-DD 格式日期，无法提取时返回空串
+ * @returns YYYY-MM-DD 格式日期，无法提取时返回空字符串
  */
 export const extractReleaseDate = (wikitext: string): string => {
   const patterns = [
@@ -223,7 +223,7 @@ export const extractReleaseDate = (wikitext: string): string => {
  * 正文 `{{lang-ja|...}}` / `{{lj|...}}` 模板。取到原始片段后剥离模板与
  * 加粗标记，保留内部日文原名。
  * @param wikitext 页面源代码
- * @returns 日文原名，无法提取时返回空串
+ * @returns 日文原名，无法提取时返回空字符串
  */
 export const extractJa = (wikitext: string): string => {
   const patterns = [
@@ -258,9 +258,9 @@ const normalizeBrandText = (text: string): string => text
  * 从条目 wikitext 源代码中提取制作组织。
  *
  * 仅识别顶部信息框的 `开发/開發` 参数，以及序言中的「由…制作/製作、
- * 开发/開發、创作/創作」句式。两种句式均支持普通文本和 `[[内链]]`。
+ * 开发/開發、创作/創作」句式。上述句式均支持普通文本和 `[[内链]]`。
  * @param wikitext 页面源代码
- * @returns 制作组织名，无法提取时返回空串
+ * @returns 制作组织名，无法提取时返回空字符串
  */
 export const extractBrand = (wikitext: string): string => {
   // 序言和顶部信息框位于首个二级标题之前，后续章节不参与会社提取。

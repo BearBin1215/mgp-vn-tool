@@ -18,7 +18,7 @@ use crate::error::ToolError;
 /// 把配置文件名解析为用户配置目录下的绝对路径
 ///
 /// 所有需要读写配置文件的代码（前端经命令、后端经 [`store`]）都应通过此处取得路径，
-/// 以保证前后端落在同一文件。
+/// 以保证前后端读写同一个文件。
 pub fn config_file_path(app: &tauri::AppHandle, filename: &str) -> Result<PathBuf, ToolError> {
     let config_dir = app.path().app_config_dir().map_err(|e| {
         ToolError::new(

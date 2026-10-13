@@ -13,7 +13,7 @@ dayjs.extend(customParseFormat);
 dayjs.locale('zh-cn');
 
 document.addEventListener('keydown', (e) => {
-  // 阻止 webview 的默认快捷键和 Fn 键行为，假装自己不是个浏览器
+  // 阻止 webview 的默认快捷键和 Fn 键行为，使其表现与常规桌面应用一致
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
     if (['j', 'p', 'g', 'r'].includes(e.key.toLowerCase())) {
       e.preventDefault();

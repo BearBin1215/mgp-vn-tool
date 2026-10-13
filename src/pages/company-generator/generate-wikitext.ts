@@ -70,7 +70,7 @@ function resolveOriginalDisplayWithLink(title: string, gameMap: Map<string, stri
   return wrapLj(title);
 }
 
-/** 格式化作品发行日期为 `YYYY年M月D日`，无日期返回空串 */
+/** 格式化作品发行日期为 `YYYY年M月D日`，无日期返回空字符串 */
 const formatDate = (date: string | null): string => formatDateCN(date);
 
 /**

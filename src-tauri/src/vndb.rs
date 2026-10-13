@@ -198,7 +198,7 @@ fn vndb_http_error(prefix: &str, status: reqwest::StatusCode, body: &str) -> Too
     } else {
         format!("{prefix} HTTP {status}: {body}")
     };
-    // suffix 参数供翻译模板渲染冒号后缀，body 为空时保持空串，避免出现悬挂的「: 」
+    // suffix 参数供翻译模板渲染冒号后缀，body 为空时保持空字符串，避免出现悬挂的「: 」
     let suffix = if body.is_empty() {
         json!("")
     } else {

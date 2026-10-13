@@ -192,7 +192,7 @@ async fn fetch_bangumi_request<T: DeserializeOwned>(
                     });
                 }
 
-                // 读取响应体：Bangumi 错误为 JSON（含 title/description），失败时回退裸文本
+                // 读取响应体：Bangumi 错误为 JSON（含 title/description），失败时回退原始文本
                 let body = resp.text().await.unwrap_or_default();
                 last_error = Some(format_bangumi_error(status, &body));
                 if !status.is_server_error() {
@@ -223,7 +223,7 @@ async fn fetch_bangumi_request<T: DeserializeOwned>(
         }
 
         if attempt + 1 < attempts {
-            // 中间失败记 warn，便于排查“查询慢是重试拖的”；最终失败由调用方记 error。
+            // 中间失败记 warn，便于排查重试导致的查询耗时增加；最终失败由调用方记 error。
             // 能走到重试说明本轮必有错误（成功已 return、4xx 已 break），last_error 恒有值
             if let Some(e) = &last_error {
                 log::warn!(
@@ -242,7 +242,7 @@ async fn fetch_bangumi_request<T: DeserializeOwned>(
 /// 将 Bangumi HTTP 错误响应格式化为结构化错误
 ///
 /// 优先取错误 JSON 的 `title`/`description`（如 `Not Found：resource can't be found...`）；
-/// 解析失败或为空时回退到截断后的裸响应体。
+/// 解析失败或为空时回退到截断后的原始响应体。
 fn format_bangumi_error(status: reqwest::StatusCode, body: &str) -> ToolError {
     let trimmed = body.trim();
     let detail = serde_json::from_str::<Value>(trimmed)

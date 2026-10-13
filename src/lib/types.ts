@@ -1,4 +1,4 @@
-/** 批评空间全部可选地址（均不含尾斜杠），为 ErogamescapeUrl 类型的事实来源 */
+/** 批评空间全部可选地址（均不含尾斜杠），ErogamescapeUrl 类型以此处为准 */
 export const EROGAMESCAPE_URLS = [
   'http://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki',
   'https://erogamescape.org/~ap2/ero/toukei_kaiseki',

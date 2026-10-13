@@ -356,7 +356,7 @@ const joinMusicNames = (
  *
  * 有音乐记录时按分类分组，每曲生成 `* 分类《曲名》` + 演唱/作曲/编曲/作词子行；
  * 创作者名按萌百页面信息解析内链（作曲/作词/编曲用音乐人分类，歌手用歌手分类）。
- * 无音乐记录时返回空串，由调用方保留模板注释。
+ * 无音乐记录时返回空字符串，由调用方保留模板注释。
  */
 const buildMusic = (entries: MusicEntry[], pageInfoMap?: Map<string, PageInfo>) => {
   if (entries.length === 0) {

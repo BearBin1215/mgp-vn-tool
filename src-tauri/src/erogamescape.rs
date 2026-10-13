@@ -104,8 +104,8 @@ async fn post_sql(app: &tauri::AppHandle, sql: &str) -> Result<(u16, String), To
 /// 从 HTML 中解析 `#query_result_main` 内的结果表格，返回 (列名列表, 数据行列表)
 ///
 /// `#query_result_main` 容器内仅有一个结果表格。若未找到数据表格但容器内存在错误提示，
-/// 返回该提示文本作为错误，以便上层透传给前端。错误提示有两种呈现方式：
-/// 执行成本超限等是 `<p>` 包裹的文本，SQL 语法错误等是裸文本。
+/// 返回该提示文本作为错误，以便上层透传给前端。错误提示可能是 `<p>` 包裹的文本，
+/// 也可能是未用 `<p>` 包裹的文本。
 fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), ToolError> {
     let document = scraper::Html::parse_document(html);
     let container_selector = scraper::Selector::parse("#query_result_main")
@@ -146,7 +146,7 @@ fn parse_result_table(html: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Too
 
     // 未找到有效数据表格时，检查容器内是否有错误提示。查询失败时的实际返回：
     // - 执行成本超限等：<div id="query_result_main"><p>错误信息</p></div>
-    // - SQL 语法错误等：<div id="query_result_main">错误信息</div>（裸文本，无 <p> 包裹）
+    // - SQL 语法错误等：<div id="query_result_main">错误信息</div>（无 <p> 包裹）
     // 容器内无表格时，全部文本（无论是否被 <p> 包裹）均视为错误提示；容器为空则返回空结果
     let table_selector = scraper::Selector::parse("table").unwrap();
     if container.select(&table_selector).next().is_some() {
@@ -233,7 +233,7 @@ pub async fn check_connectivity(app: tauri::AppHandle) -> Result<Value, ToolErro
         .timeout(std::time::Duration::from_secs(settings.timeout))
         .build()?;
 
-    // 向sql执行页而不是有较多动态内容的主页发请求，减少压力和响应内容
+    // 向 SQL 执行页而非主页发请求，降低服务器压力并减少响应体积
     let sql_url = format!(
         "{}/sql_for_erogamer_form.php",
         settings.url.trim_end_matches('/')
@@ -417,8 +417,6 @@ async fn do_query_creator_works(
 ///
 /// 关联方向：subject=衍生作品，object=原作。返回 `[{ kind, subjectGameName, objectGameName }]`。
 /// 查询失败时记录日志并返回空数组，不阻断主流程。
-///
-/// ~~太伟大了批评空间，你怎么连这都有啊~~
 async fn query_game_connections(app: &tauri::AppHandle, game_ids: &[String]) -> Vec<Value> {
     if game_ids.is_empty() {
         return Vec::new();
@@ -1134,7 +1132,7 @@ mod tests {
         assert!(rows.is_empty());
     }
 
-    /// 真实响应：SQL 语法错误时容器内是裸文本（无 <p> 包裹），应透传为错误
+    /// 真实响应：SQL 语法错误时容器内是未用 <p> 包裹的文本，应透传为错误
     #[test]
     fn parse_result_table_syntax_error() {
         let html = r#"<div id="query_result_main">ERROR:  syntax error at or near "WHERE"

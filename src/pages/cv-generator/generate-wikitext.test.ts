@@ -39,7 +39,7 @@ describe('buildConnectionsMap', () => {
 });
 
 describe('buildActingWikitext 生成出演作品源代码', () => {
-  it('空记录返回空串', () => {
+  it('空记录返回空字符串', () => {
     expect(buildActingWikitext([], new Map())).toBe('');
   });
 
@@ -185,7 +185,7 @@ describe('buildActingWikitext 生成出演作品源代码', () => {
 });
 
 describe('generateMusicWikitable 生成音乐作品源代码', () => {
-  it('空记录返回空串', () => {
+  it('空记录返回空字符串', () => {
     expect(generateMusicWikitable([], new Map())).toBe('');
   });
 

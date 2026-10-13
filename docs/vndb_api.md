@@ -65,7 +65,7 @@ Invalid 'id' filter: Invalid value.
 
 `POST /producer`
 
-返回符合条件的 producer 列表（`results[0]`）。本工具取 `results` 首项。
+返回符合条件的 producer 列表，本工具取 `results` 首项。
 
 | 字段 | 类型 | 说明 | 本工具处理 |
 | --- | --- | --- | --- |
@@ -123,7 +123,7 @@ Invalid 'id' filter: Invalid value.
 
 | 字段 | 类型 | 说明 | 本工具处理 |
 | --- | --- | --- | --- |
-| `id` | string | producer id（如 `p7001`） | 剥掉前缀 `p`，仅留数字供前端使用 |
+| `id` | string | producer id（如 `p7001`） | 去掉前缀 `p`，仅留数字供前端使用 |
 | `name` | string | 名称（罗马音） | 优先用作展示名 |
 | `original` | string \| null | 原文名 | name 缺失时回退；与 name 不同时附带展示 |
 | `aliases` | string[] | 别名 | 本工具未使用（仅展示） |
