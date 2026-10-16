@@ -16,8 +16,8 @@ const getWikitextHighlighter = (): Promise<HighlighterCore> => {
     highlighterPromise = createHighlighterCore({
       langs: [import('shiki/langs/wikitext.mjs')],
       themes: [
-        import('shiki/themes/github-light.mjs'),
-        import('shiki/themes/github-dark.mjs'),
+        import('shiki/themes/vitesse-light.mjs'),
+        import('shiki/themes/vitesse-dark.mjs'),
       ],
       engine: createJavaScriptRegexEngine(),
     });
@@ -28,7 +28,7 @@ const getWikitextHighlighter = (): Promise<HighlighterCore> => {
 /**
  * 渲染 wikitext 高亮 HTML
  *
- * 采用双主题（github-light / github-dark）+ `defaultColor: false` 模式：每个
+ * 采用双主题（vitesse-light / vitesse-dark）+ `defaultColor: false` 模式：每个
  * token span 只携带 `--shiki-light` / `--shiki-dark` CSS 变量，颜色值不固定
  * 在输出里，实际显示颜色由 App.css 中 `.wikitext-highlight` 规则随应用
  * 明暗主题切换。
@@ -47,7 +47,7 @@ const renderWikitext = (highlighter: HighlighterCore, text: string): string => {
   }
   const html = highlighter.codeToHtml(text, {
     lang: 'wikitext',
-    themes: { light: 'github-light', dark: 'github-dark' },
+    themes: { light: 'vitesse-light', dark: 'vitesse-dark' },
     defaultColor: false,
   });
   return html
