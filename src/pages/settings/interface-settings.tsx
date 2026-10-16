@@ -25,7 +25,6 @@ export default function InterfaceSettings() {
   const setBackgroundImage = useSettingsStore((s) => s.setBackgroundImage);
   const backgroundImageTransparency = useSettingsStore((s) => s.backgroundImageTransparency);
   const setBackgroundImageTransparency = useSettingsStore((s) => s.setBackgroundImageTransparency);
-  const previewBackgroundImageTransparency = useSettingsStore((s) => s.previewBackgroundImageTransparency);
 
   const [uiFontDraft, setUiFontDraft] = useState(uiFont);
   const [codeFontDraft, setCodeFontDraft] = useState(codeFont);
@@ -116,7 +115,7 @@ export default function InterfaceSettings() {
             min={0}
             max={100}
             value={backgroundImageTransparency}
-            onChange={(value) => previewBackgroundImageTransparency(value)}
+            onChange={(value) => setBackgroundImageTransparency(value, false)}
             onChangeComplete={(value) => setBackgroundImageTransparency(value)}
             disabled={!backgroundImage}
             tooltip={{ formatter: (value) => `${value}%` }}

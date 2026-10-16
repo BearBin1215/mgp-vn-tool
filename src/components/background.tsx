@@ -1,28 +1,30 @@
+import { useEffect } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useSettingsStore } from '@/stores/settings-store';
 
-/** 应用背景组件，由背景图层和遮罩层组成，绝对定位铺满视口，z-index 低于内容区 */
+/** 应用背景图片层：固定定位铺满视口，以可见度绘制在主题底色上，可见度同时经 :root 变量驱动各半透明面板联动（见 App.css） */
 export default function Background() {
   const backgroundImage = useSettingsStore((s) => s.backgroundImage);
   const backgroundImageTransparency = useSettingsStore((s) => s.backgroundImageTransparency);
-  const colorMode = useSettingsStore((s) => s.colorMode);
 
-  // 无背景图片时遮罩完全不透明以提供基础背景色，有背景图片时按透明度参数遮罩
-  const alpha = backgroundImage ? backgroundImageTransparency / 100 : 1;
-  const maskColor = colorMode === 'dark' ? `rgb(0 0 0 / ${alpha})` : `rgb(255 255 255 / ${alpha})`;
+  // 背景图片可见度（0-1），与透明度互补；无背景图时为 0
+  const visibility = backgroundImage ? 1 - backgroundImageTransparency / 100 : 0;
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--bg-image-visibility', visibility.toFixed(4));
+  }, [visibility]);
+
+  if (!backgroundImage) {
+    return null;
+  }
+
+  // 转义双引号，防止文件路径含引号时 url() 失效
+  const url = convertFileSrc(backgroundImage).replaceAll('"', '\\"');
 
   return (
-    <>
-      {backgroundImage && (
-        <div
-          className='pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat'
-          style={{ backgroundImage: `url('${convertFileSrc(backgroundImage)}')` }}
-        />
-      )}
-      <div
-        className='pointer-events-none absolute inset-0 z-[1]'
-        style={{ background: maskColor }}
-      />
-    </>
+    <div
+      className='pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat'
+      style={{ backgroundImage: `url("${url}")`, opacity: visibility }}
+    />
   );
 }

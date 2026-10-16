@@ -69,24 +69,42 @@ body,
   scrollbar-color: var(--ant-color-text-tertiary) var(--ant-color-bg-container);
 }
 
-/* 调整元素透明度以适配背景图片显示 */
+/*
+ * 背景图片与半透明面板的透明度体系：
+ * --bg-image-visibility 为背景图片可见度（0-1），由 App.tsx 声明式写入 .ant-app，默认 0 表示无背景图；
+ * 图片层以该可见度绘制在 .ant-app 主题底色上（见 background.tsx）；
+ * 各面板 alpha = base - (base - floor) * 可见度，随图片显现同步减淡，floor 为图片完全可见时的保底值；
+ * 取值按界面层级：浮层最高，容器与承载文字的面板次之，结构面板再次，装饰面板最低，任何可见度下保持该梯度。
+ */
+:root {
+  --bg-image-visibility: 0;
+}
+
+/* 按界面层级集中定义各档 alpha 公式，与 antd 变量的对应关系见下方 .ant-app */
+.css-var-mgp_vn_tool {
+  --alpha-elevated: calc(0.75 - 0.1 * var(--bg-image-visibility));
+  --alpha-container: calc(0.6 - 0.1 * var(--bg-image-visibility));
+  --alpha-structural: calc(0.5 - 0.1 * var(--bg-image-visibility));
+  --alpha-decorative: calc(0.35 - 0.15 * var(--bg-image-visibility));
+}
+
 .ant-app {
   &.dark-mode {
     background-color: #000;
 
     .css-var-mgp_vn_tool {
-      --ant-color-bg-container: rgb(20 20 20 / 0.62);
-      --ant-color-bg-elevated: rgb(31 31 31 / 0.7);
+      --ant-color-bg-container: rgb(20 20 20 / var(--alpha-container));
+      --ant-color-bg-elevated: rgb(31 31 31 / var(--alpha-elevated));
 
-      --ant-layout-sider-bg: rgb(0 21 41 / 0.2);
-      --ant-layout-header-bg: rgb(0 0 0 / 0.67);
-      --ant-layout-body-bg: rgb(0 0 0 / 0.12);
+      --ant-layout-sider-bg: rgb(0 21 41 / var(--alpha-decorative));
+      --ant-layout-header-bg: rgb(0 0 0 / var(--alpha-structural));
+      --ant-layout-body-bg: rgb(0 0 0 / calc(0.1 - 0.1 * var(--bg-image-visibility)));
 
-      --ant-menu-item-bg: rgb(20 20 20 / 0.4);
+      --ant-menu-item-bg: rgb(20 20 20 / var(--alpha-decorative));
 
-      --ant-select-selector-bg: rgb(20 20 20 / 0.4);
-      --ant-btn-bg-color-disabled: rgb(0 0 0 / 0.6);
-      --ant-table-header-bg: rgb(29 29 29 / 0.6);
+      --ant-select-selector-bg: rgb(20 20 20 / var(--alpha-container));
+      --ant-btn-bg-color-disabled: rgb(0 0 0 / var(--alpha-structural));
+      --ant-table-header-bg: rgb(29 29 29 / var(--alpha-container));
     }
   }
 
@@ -94,18 +112,18 @@ body,
     background-color: #fff;
 
     .css-var-mgp_vn_tool {
-      --ant-color-bg-container: rgb(255 255 255 / 0.62);
-      --ant-color-bg-elevated: rgb(255 255 255 / 0.7);
+      --ant-color-bg-container: rgb(255 255 255 / var(--alpha-container));
+      --ant-color-bg-elevated: rgb(255 255 255 / var(--alpha-elevated));
 
-      --ant-layout-light-sider-bg: rgb(255 255 255 / 0.2);
-      --ant-layout-header-bg: rgb(255 255 255 / 0.67);
-      --ant-layout-body-bg: rgb(245 245 245 / 0.12);
+      --ant-layout-light-sider-bg: rgb(255 255 255 / var(--alpha-decorative));
+      --ant-layout-header-bg: rgb(255 255 255 / var(--alpha-structural));
+      --ant-layout-body-bg: rgb(245 245 245 / calc(0.1 - 0.1 * var(--bg-image-visibility)));
 
-      --ant-menu-item-bg: rgb(255 255 255 / 0.4);
+      --ant-menu-item-bg: rgb(255 255 255 / var(--alpha-decorative));
 
-      --ant-select-selector-bg: rgb(255 255 255 / 0.4);
-      --ant-btn-bg-color-disabled: rgb(255 255 255 / 0.6);
-      --ant-table-header-bg: rgb(250 250 250 / 0.6);
+      --ant-select-selector-bg: rgb(255 255 255 / var(--alpha-container));
+      --ant-btn-bg-color-disabled: rgb(255 255 255 / var(--alpha-structural));
+      --ant-table-header-bg: rgb(250 250 250 / var(--alpha-container));
     }
   }
 }

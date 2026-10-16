@@ -28,9 +28,8 @@ interface SettingsStore {
   setBackgroundImage: (path: string) => void;
   /** 背景图片透明度（0-100，数值越大背景图片越透明） */
   backgroundImageTransparency: number;
-  setBackgroundImageTransparency: (value: number) => void;
-  /** 实时预览背景图片透明度（仅更新内存状态，不写入持久化存储） */
-  previewBackgroundImageTransparency: (value: number) => void;
+  /** persist 为 false 时仅更新内存状态用于实时预览，不写入持久化存储 */
+  setBackgroundImageTransparency: (value: number, persist?: boolean) => void;
   /** 萌娘百科 API 域名前缀 */
   moegirlApiHost: MoegirlHost;
   setMoegirlApiHost: (host: MoegirlHost) => void;
@@ -157,11 +156,12 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     set({ backgroundImage: path });
   },
   backgroundImageTransparency: 90,
-  setBackgroundImageTransparency: async (value) => {
-    await persistSetting('backgroundImageTransparency', value);
+  setBackgroundImageTransparency: async (value, persist = true) => {
+    if (persist) {
+      await persistSetting('backgroundImageTransparency', value);
+    }
     set({ backgroundImageTransparency: value });
   },
-  previewBackgroundImageTransparency: (value) => set({ backgroundImageTransparency: value }),
   setColorMode: async (mode) => {
     await persistSetting('colorMode', mode);
     await getCurrentWindow().setTheme(mode);
